@@ -97,36 +97,44 @@
             <DataTemplate x:DataType="vm:SourceItemViewModel">
               <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="{Binding IsChild, Converter={x:Static vm:IndentConverter.Instance}}">
                 
-                <!-- Checkbox for non-child, non-merge items -->
+                <!-- Checkbox for top-level, non-merge items -->
                 <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForMerge}" 
-                          IsVisible="{Binding Kind, Converter={x:Static vm:NotMergeKindConverter.Instance}}" 
+                          IsVisible="{Binding CanSelectForMerge}" 
                           Margin="0,0,6,0" VerticalAlignment="Center" />
                           
-                <!-- Chevron for merge groups -->
-                <ToggleButton Grid.Column="0" IsChecked="{Binding IsExpanded}"
-                              IsVisible="{Binding Kind, Converter={x:Static vm:MergeKindConverter.Instance}}"
-                              Classes="neon-action" Width="20" Height="20" Padding="0" Margin="0,0,4,0" Background="Transparent">
-                  <TextBlock Text="{Binding IsExpanded, Converter={x:Static vm:ChevronConverter.Instance}}"
-                             FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="10"
-                             Foreground="{DynamicResource DimTextBrush}" />
-                </ToggleButton>
+                <!-- Merge controls -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            IsVisible="{Binding IsMergeSource}"
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center">
+                  <ToggleButton IsChecked="{Binding IsExpanded}"
+                                Classes="neon-action" Width="20" Height="20" Padding="0" Background="Transparent">
+                    <TextBlock Text="{Binding IsExpanded, Converter={x:Static vm:ChevronConverter.Instance}}"
+                               FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="10"
+                               Foreground="{DynamicResource DimTextBrush}" />
+                  </ToggleButton>
+                  <Button Classes="neon-action"
+                          Width="20" Height="20" Padding="0"
+                          Background="Transparent"
+                          Command="{Binding $parent[UserControl].DataContext.RemoveSourceItemCommand}"
+                          CommandParameter="{Binding}"
+                          ToolTip.Tip="Remove merged view">
+                    <TextBlock Text="&#x2715;" FontSize="10" />
+                  </Button>
+                </StackPanel>
 
                 <!-- Color Pip / Bar -->
                 <Ellipse Grid.Column="1" Classes="neon-pip"
-                         IsVisible="{Binding !IsChild}"
+                         IsVisible="{Binding ShowSourcePip}"
                          Margin="0,0,6,0"
                          VerticalAlignment="Center"
-                         Width="10" Height="10">
-                  <Ellipse.Fill>
-                    <SolidColorBrush Color="{Binding SourceColorHex}" />
-                  </Ellipse.Fill>
-                </Ellipse>
+                         Width="10" Height="10"
+                         Fill="{Binding SourceColorHex, Converter={x:Static vm:HexToColorConverter.Instance}}" />
                 <Border Grid.Column="1" Width="4" Height="14" CornerRadius="2"
-                        IsVisible="{Binding IsChild}" Margin="6,0,6,0" VerticalAlignment="Center">
-                  <Border.Background>
-                    <SolidColorBrush Color="{Binding SourceColorHex}" />
-                  </Border.Background>
-                </Border>
+                        IsVisible="{Binding ShowChildColorBar}" Margin="6,0,6,0" VerticalAlignment="Center"
+                        Background="{Binding SourceColorHex, Converter={x:Static vm:HexToColorConverter.Instance}}" />
 
                 <!-- Name -->
                 <TextBlock Grid.Column="2" Text="{Binding DisplayName}"

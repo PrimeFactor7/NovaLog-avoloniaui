@@ -38,10 +38,9 @@ public partial class MainWindow : Window
         SidebarPanel.AddFileRequested += OnOpenFileClick;
         SidebarPanel.AddFolderRequested += OnOpenFolderClick;
 
-        // Tab bar: handle tab clicks, middle-click close, and context menu
+        // Tab bar: handle tab clicks and middle-click close
         TabBar.AddHandler(Button.ClickEvent, OnTabButtonClick);
         TabBar.AddHandler(PointerPressedEvent, OnTabBarPointerPressed, handledEventsToo: true);
-        TabBar.AddHandler(MenuItem.ClickEvent, OnTabContextMenuClick);
     }
 
     private void OnTabButtonClick(object? sender, RoutedEventArgs e)
@@ -69,25 +68,27 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnTabContextMenuClick(object? sender, RoutedEventArgs e)
+    private async void OnTabContextMenuItemClick(object? sender, RoutedEventArgs e)
     {
-        if (e.Source is not MenuItem mi || DataContext is not MainWindowViewModel vm) return;
+        if (sender is not MenuItem mi || DataContext is not MainWindowViewModel vm) return;
 
-        // Walk up to find which tab this context menu belongs to
-        var contextMenu = mi.Parent as ContextMenu;
-        if (contextMenu?.DataContext is not WorkspaceTabItem tab) return;
+        // MenuItem inherits DataContext from the Button it's attached to
+        if (mi.DataContext is not WorkspaceTabItem tab) return;
 
         var idx = vm.Workspace.Tabs.IndexOf(tab);
         if (idx < 0) return;
 
-        var tag = mi.Tag as string;
-        switch (tag)
+        switch (mi.Tag as string)
         {
             case "rename":
                 var dialog = new InputDialog("Rename Tab", "Enter tab name:", tab.Name);
                 var newName = await dialog.ShowDialog<string?>(this);
                 if (!string.IsNullOrWhiteSpace(newName))
                     vm.Workspace.RenameTab(idx, newName);
+                break;
+            case "closepanes":
+                vm.Workspace.SwitchTab(idx);
+                vm.CloseAllPanesInActiveTabCommand.Execute(null);
                 break;
             case "closeothers":
                 vm.Workspace.CloseOtherTabs(idx);
@@ -103,11 +104,23 @@ public partial class MainWindow : Window
 
     private void OnWindowOpened(object? sender, EventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm &&
-            AvaloniaApp.Current is { } app)
+        if (DataContext is MainWindowViewModel vm)
         {
-            var mapper = new ThemeMapper(vm.ThemeService);
-            mapper.ApplyTheme(app);
+            if (AvaloniaApp.Current is { } app)
+            {
+                var mapper = new ThemeMapper(vm.ThemeService);
+                mapper.ApplyTheme(app);
+            }
+
+            // Restore window state
+            var (w, h, maximized) = vm.GetSavedWindowState();
+            if (w > 0 && h > 0)
+            {
+                Width = w;
+                Height = h;
+            }
+            if (maximized)
+                WindowState = WindowState.Maximized;
         }
 
         Program.StartupStopwatch.Stop();
@@ -118,62 +131,66 @@ public partial class MainWindow : Window
         Console.WriteLine($"[BENCHMARK] Startup: {startupMs}ms");
         Console.WriteLine($"[BENCHMARK] Memory (WorkingSet): {memoryMb:F1} MB");
         Console.WriteLine($"[BENCHMARK] Memory (PrivateBytes): {privateMb:F1} MB");
-
-
     }
 
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (DataContext is MainWindowViewModel vm)
+        {
+            vm.SaveWindowState(
+                (int)Width,
+                (int)Height,
+                WindowState == WindowState.Maximized);
             vm.SaveSettings();
+        }
+    }
+
+    private async Task<IStorageFolder?> GetLastDirectoryFolder()
+    {
+        if (DataContext is MainWindowViewModel vm && !string.IsNullOrEmpty(vm.LastDirectory))
+        {
+            try { return await StorageProvider.TryGetFolderFromPathAsync(vm.LastDirectory); }
+            catch { return null; }
+        }
+        return null;
     }
 
     private async void OnOpenFileClick(object? sender, RoutedEventArgs e)
     {
+        var startDir = await GetLastDirectoryFolder();
         var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open Log File",
             AllowMultiple = false,
+            SuggestedStartLocation = startDir,
             FileTypeFilter = [new FilePickerFileType("Log Files") { Patterns = ["*.log", "*.txt", "*.*"] }]
         });
 
         if (result.Count > 0 && DataContext is MainWindowViewModel vm)
         {
             var path = result[0].Path.LocalPath;
+            vm.LastDirectory = Path.GetDirectoryName(path);
             vm.LoadFile(path);
             vm.SourceManager.AddSource(path, NovaLog.Core.Models.SourceKind.File);
-
-            var memoryMb = Process.GetCurrentProcess().WorkingSet64 / (1024.0 * 1024.0);
-            var privateMb = Process.GetCurrentProcess().PrivateMemorySize64 / (1024.0 * 1024.0);
-            Console.WriteLine($"[BENCHMARK] Post-load Memory (WorkingSet): {memoryMb:F1} MB");
-            Console.WriteLine($"[BENCHMARK] Post-load Memory (PrivateBytes): {privateMb:F1} MB");
         }
     }
 
     private async void OnOpenFolderClick(object? sender, RoutedEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine("[WINDOW] OnOpenFolderClick called");
-
+        var startDir = await GetLastDirectoryFolder();
         var result = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = "Select Log Folder",
-            AllowMultiple = false
+            AllowMultiple = false,
+            SuggestedStartLocation = startDir
         });
-
-        System.Diagnostics.Debug.WriteLine($"[WINDOW] Folder picker returned {result.Count} results");
 
         if (result.Count > 0 && DataContext is MainWindowViewModel vm)
         {
             var path = result[0].Path.LocalPath;
-            System.Diagnostics.Debug.WriteLine($"[WINDOW] Selected folder: {path}");
-            System.Diagnostics.Debug.WriteLine($"[WINDOW] Calling vm.LoadFolder");
+            vm.LastDirectory = Path.GetDirectoryName(path) ?? path;
             vm.LoadFolder(path);
             vm.SourceManager.AddSource(path, NovaLog.Core.Models.SourceKind.Folder);
-            System.Diagnostics.Debug.WriteLine($"[WINDOW] OnOpenFolderClick completed");
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine("[WINDOW] No folder selected or VM is null");
         }
     }
 
@@ -191,13 +208,13 @@ public partial class MainWindow : Window
 
         if (ctrl && e.Key == Key.OemBackslash && !shift)
         {
-            // Ctrl+\ — split vertical (side-by-side)
+            // Ctrl+\ — split horizontal (side-by-side)
             vm.Workspace.SplitFocused(horizontal: true);
             e.Handled = true;
         }
         else if (ctrl && e.Key == Key.OemBackslash && shift)
         {
-            // Ctrl+Shift+\ — split horizontal (stacked)
+            // Ctrl+Shift+\ — split vertical (stacked)
             vm.Workspace.SplitFocused(horizontal: false);
             e.Handled = true;
         }

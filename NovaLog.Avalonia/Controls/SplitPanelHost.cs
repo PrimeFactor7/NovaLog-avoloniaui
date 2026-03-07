@@ -1,5 +1,7 @@
 using global::Avalonia;
 using global::Avalonia.Controls;
+using global::Avalonia.Input;
+using global::Avalonia.Interactivity;
 using global::Avalonia.Layout;
 using global::Avalonia.Markup.Xaml.MarkupExtensions;
 using global::Avalonia.VisualTree;
@@ -19,6 +21,9 @@ public class SplitPanelHost : ContentControl
     public static readonly StyledProperty<SplitNodeViewModel?> NodeProperty =
         AvaloniaProperty.Register<SplitPanelHost, SplitNodeViewModel?>(nameof(Node));
 
+    private SplitNodeViewModel? _subscribedNode;
+    private System.ComponentModel.PropertyChangedEventHandler? _nodeHandler;
+
     public SplitNodeViewModel? Node
     {
         get => GetValue(NodeProperty);
@@ -30,8 +35,20 @@ public class SplitPanelHost : ContentControl
         NodeProperty.Changed.AddClassHandler<SplitPanelHost>((host, _) => host.RebuildContent());
     }
 
+    private void UnsubscribePrevious()
+    {
+        if (_subscribedNode is not null && _nodeHandler is not null)
+        {
+            _subscribedNode.PropertyChanged -= _nodeHandler;
+            _nodeHandler = null;
+            _subscribedNode = null;
+        }
+    }
+
     private void RebuildContent()
     {
+        UnsubscribePrevious();
+
         var node = Node;
         if (node is null)
         {
@@ -105,22 +122,24 @@ public class SplitPanelHost : ContentControl
             };
 
             // Bind border color to focus state
-            pane.PropertyChanged += (_, e) =>
+            _nodeHandler = (_, e) =>
             {
                 if (e.PropertyName == nameof(PaneNodeViewModel.IsFocused))
                     UpdateBorderBrush(border, pane.IsFocused);
             };
+            _subscribedNode = pane;
+            pane.PropertyChanged += _nodeHandler;
 
             if (pane.IsFocused)
                 UpdateBorderBrush(border, true);
 
             // Focus on pointer press — walk up visual tree to find WorkspaceViewModel
-            border.PointerPressed += (_, _) =>
+            border.AddHandler(InputElement.PointerPressedEvent, (_, _) =>
             {
                 var window = this.FindAncestorOfType<MainWindow>();
                 if (window?.DataContext is MainWindowViewModel mvm)
                     mvm.Workspace.FocusPane(pane);
-            };
+            }, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
 
             Content = border;
         }
@@ -175,7 +194,7 @@ public class SplitPanelHost : ContentControl
 
             Content = grid;
 
-            branch.PropertyChanged += (_, e) =>
+            _nodeHandler = (_, e) =>
             {
                 if (e.PropertyName is nameof(SplitBranchViewModel.Child1)
                     or nameof(SplitBranchViewModel.Child2)
@@ -184,6 +203,8 @@ public class SplitPanelHost : ContentControl
                     RebuildContent();
                 }
             };
+            _subscribedNode = branch;
+            branch.PropertyChanged += _nodeHandler;
         }
     }
 

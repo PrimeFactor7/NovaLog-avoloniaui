@@ -27,6 +27,8 @@ public partial class LogViewViewModel : ObservableObject
     private bool _scrollPending;
 
     public event Action? SelectedLineChanged;
+    public event Action? RowVisualsChanged;
+    internal void NotifyRowVisualsChanged() => RowVisualsChanged?.Invoke();
 
     partial void OnSelectedLineIndexChanged(int? value)
     {
@@ -107,6 +109,9 @@ public partial class LogViewViewModel : ObservableObject
     public ObservableCollection<HighlightRule> HighlightRules { get; } = [];
     public PanePickerViewModel Picker { get; } = new();
 
+    /// <summary>Active search matcher for highlighting matches in the log view. Set by FilterPanelViewModel.</summary>
+    public CompiledMatcher? ActiveSearchMatcher { get; set; }
+
     public event Action? CloseRequested;
     
     [RelayCommand]
@@ -181,13 +186,83 @@ public partial class LogViewViewModel : ObservableObject
     /// <summary>Set by the view to track the current viewport center line.</summary>
     public void SetCurrentLine(int line) => _currentLine = line;
 
+    public void SelectLine(int line, bool disableFollow = true)
+    {
+        if (!TryNormalizeLineIndex(line, out var normalized))
+            return;
+
+        if (disableFollow)
+            IsFollowMode = false;
+
+        SelectedLineIndex = normalized;
+        SetCurrentLine(normalized);
+    }
+
+    private bool TryNormalizeLineIndex(int requestedLine, out int normalizedLine)
+    {
+        var lineCount = GetLoadedLineCount();
+        if (lineCount <= 0)
+        {
+            normalizedLine = -1;
+            return false;
+        }
+
+        normalizedLine = Math.Clamp(requestedLine, 0, lineCount - 1);
+        return true;
+    }
+
+    private int GetLoadedLineCount()
+    {
+        if (_memorySource is not null)
+            return _memorySource.Count;
+
+        if (_virtualSource is not null && _provider is not null)
+            return _virtualSource.Count;
+
+        return 0;
+    }
+
+    private bool TryGetActiveLineIndex(out int lineIndex)
+    {
+        var lineCount = GetLoadedLineCount();
+        if (lineCount <= 0)
+        {
+            lineIndex = -1;
+            return false;
+        }
+
+        if (SelectedLineIndex is int selectedLine && selectedLine >= 0 && selectedLine < lineCount)
+        {
+            lineIndex = selectedLine;
+            return true;
+        }
+
+        if (_currentLine >= 0 && _currentLine < lineCount)
+        {
+            lineIndex = _currentLine;
+            return true;
+        }
+
+        lineIndex = -1;
+        return false;
+    }
+
+    private void ResetLineSelection()
+    {
+        SelectedLineIndex = null;
+        _currentLine = 0;
+    }
+
     /// <summary>Returns the timestamp of the current line, if any.</summary>
     public DateTime? GetCurrentTimestamp()
     {
-        if (_memorySource is not null && _currentLine >= 0 && _currentLine < _memorySource.Count)
-            return _memorySource[_currentLine].Timestamp;
-        if (_virtualSource is not null && _provider is not null && _currentLine >= 0 && _currentLine < _virtualSource.Count)
-            return _provider.GetLine(_currentLine)?.Timestamp;
+        if (!TryGetActiveLineIndex(out var lineIndex))
+            return null;
+
+        if (_memorySource is not null)
+            return _memorySource[lineIndex].Timestamp;
+        if (_virtualSource is not null && _provider is not null)
+            return _provider.GetLine(lineIndex)?.Timestamp;
         return null;
     }
 
@@ -256,10 +331,13 @@ public partial class LogViewViewModel : ObservableObject
     /// <summary>Returns the raw text of the current line, or null if unavailable.</summary>
     public string? GetCurrentLineText()
     {
-        if (_memorySource is not null && _currentLine >= 0 && _currentLine < _memorySource.Count)
-            return _memorySource[_currentLine].RawText;
-        if (_virtualSource is not null && _provider is not null && _currentLine >= 0 && _currentLine < _virtualSource.Count)
-            return _provider.GetRawLine(_currentLine);
+        if (!TryGetActiveLineIndex(out var lineIndex))
+            return null;
+
+        if (_memorySource is not null)
+            return _memorySource[lineIndex].RawText;
+        if (_virtualSource is not null && _provider is not null)
+            return _provider.GetRawLine(lineIndex);
         return null;
     }
 
@@ -306,10 +384,11 @@ public partial class LogViewViewModel : ObservableObject
 
     public void NavigateToLine(int line)
     {
-        IsFollowMode = false;
-        SelectedLineIndex = line;
-        SetCurrentLine(line);
-        RequestScrollToLine(line);
+        if (!TryNormalizeLineIndex(line, out var normalized))
+            return;
+
+        SelectLine(normalized);
+        RequestScrollToLine(normalized);
     }
 
     public void NavigateBookmark(bool forward)
@@ -336,9 +415,24 @@ public partial class LogViewViewModel : ObservableObject
 
     public void ToggleBookmark()
     {
-        NavIndex.ToggleBookmark(_currentLine);
-        var total = NavIndex.GetPositionInfo(NavigationCategory.Bookmark, _currentLine).TotalCount;
+        if (!TryGetActiveLineIndex(out var lineIndex))
+            return;
+
+        NavIndex.ToggleBookmark(lineIndex);
+        var total = NavIndex.GetPositionInfo(NavigationCategory.Bookmark, lineIndex).TotalCount;
         NavStatus = total > 0 ? $"{total} Bookmarks" : "";
+        RowVisualsChanged?.Invoke();
+    }
+
+    /// <summary>Gets a stable key for bookmark persistence (first loaded path).</summary>
+    public string? GetBookmarkKey()
+        => _loadedPaths.Count > 0 ? _loadedPaths.First() : null;
+
+    /// <summary>Restores bookmarks from a saved list.</summary>
+    public void RestoreBookmarks(List<long> bookmarks)
+    {
+        if (bookmarks.Count > 0)
+            NavIndex.SetBookmarks(bookmarks);
     }
 
     /// <summary>Load lines from raw text (small file, all in memory).</summary>
@@ -347,6 +441,7 @@ public partial class LogViewViewModel : ObservableObject
         DisposeProvider();
         _loadedSourceIds.Clear();
         _loadedPaths.Clear();
+        ResetLineSelection();
 
         _memorySource = new InMemoryLogItemsSource();
         var parsed = rawLines.Select((raw, i) => LogLineParser.Parse(raw, i));
@@ -371,6 +466,7 @@ public partial class LogViewViewModel : ObservableObject
         DisposeProvider();
         _loadedSourceIds.Clear();
         _loadedPaths.Clear();
+        ResetLineSelection();
 
         _provider = provider;
         _virtualSource = new VirtualLogItemsSource(provider);
@@ -471,6 +567,7 @@ public partial class LogViewViewModel : ObservableObject
         DisposeProvider();
         _loadedSourceIds.Clear();
         _loadedPaths.Clear();
+        ResetLineSelection();
 
         var engine = new ChronoMergeEngine();
         int priority = 0;
@@ -540,6 +637,7 @@ public partial class LogViewViewModel : ObservableObject
             DisposeProvider();
             _loadedSourceIds.Clear();
             _loadedPaths.Clear();
+            ResetLineSelection();
             _delegatingSource.SetInner(PlaceholderLine);
             Title = $"Missing: {Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))}";
             TotalLineCount = PlaceholderLine.Count;
@@ -697,10 +795,12 @@ public partial class LogViewViewModel : ObservableObject
         _watcher = null;
         _provider?.Dispose();
         _provider = null;
+        _virtualSource?.Dispose();
         _virtualSource = null;
         _memorySource = null;
         _scrollPending = false;
         IsStreaming = false;
+        ResetLineSelection();
     }
 
     /// <summary>Helper to find and track source ID by physical path.</summary>

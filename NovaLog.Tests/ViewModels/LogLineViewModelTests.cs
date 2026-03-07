@@ -108,4 +108,15 @@ public class LogLineViewModelTests
 
         Assert.Equal(SyntaxFlavor.Json, vm.Flavor);
     }
+
+    [Fact]
+    public void Ctor_PreservesMergeSourceMetadata()
+    {
+        var line = new LogLine { GlobalIndex = 4, Message = "merged line" };
+
+        var vm = new LogLineViewModel(line, "api-1", "#00D4FF");
+
+        Assert.Equal("api-1", vm.MergeSourceTag);
+        Assert.Equal("#00D4FF", vm.MergeSourceColorHex);
+    }
 }

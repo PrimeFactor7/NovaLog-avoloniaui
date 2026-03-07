@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using NovaLog.Avalonia.Services;
 using NovaLog.Avalonia.ViewModels;
 using NovaLog.Core.Models;
@@ -16,12 +17,15 @@ public partial class LogLineRow : Control
 {
     private static readonly Typeface MonoTypeface = new("Cascadia Mono, Consolas, Courier New");
     private const double LogFontSize = 12;
-    private const double RowHeight = 18;
+    internal const double RowHeight = 18;
     private const double CharWidth = 7.2;
     private const double TimestampChars = 23;
     private const double LevelCharsMax = 8;
     private const double GapChars = 2;
     private const double LeftPad = 4;
+    private const double MergeColorBarWidth = 6;
+    private const double MergeGutterGap = 2;
+    private const double BookmarkMarkerWidth = 3;
     private static readonly IBrush SelectedLineBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x4F, 0xC3, 0xF7));
     private static readonly IPen SelectedLinePen = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x4F, 0xC3, 0xF7)), 1);
     private static readonly ConcurrentDictionary<string, IBrush> ParsedBrushes = new(StringComparer.OrdinalIgnoreCase);
@@ -51,6 +55,8 @@ public partial class LogLineRow : Control
     private static readonly IBrush FallbackJsonBraceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
     private static readonly IBrush FallbackJsonBracketBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
     private static readonly IBrush FallbackSqlKeywordBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
+    private static readonly IBrush FallbackBookmarkBrush = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xFF));
+    private static readonly IBrush SearchHighlightBrush = new SolidColorBrush(Color.FromArgb(0x60, 0xFF, 0xE0, 0x00));
 
     private LogLineViewModel? _vm;
     public static readonly StyledProperty<LogViewViewModel?> OwnerLogViewProperty =
@@ -75,7 +81,28 @@ public partial class LogLineRow : Control
     {
         base.OnDataContextChanged(e);
         _vm = DataContext as LogLineViewModel;
+        EnsureOwnerLogView();
         InvalidateVisual();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        EnsureOwnerLogView();
+    }
+
+    private void EnsureOwnerLogView()
+    {
+        if (OwnerLogView is not null) return;
+
+        for (var current = this.GetVisualParent(); current is not null; current = current.GetVisualParent())
+        {
+            if (current is NovaLog.Avalonia.Views.LogViewPanel panel && panel.DataContext is LogViewViewModel vm)
+            {
+                OwnerLogView = vm;
+                return;
+            }
+        }
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -86,7 +113,9 @@ public partial class LogLineRow : Control
             int chars = (_vm.TimestampText?.Length ?? 0) + 
                         (_vm.LevelText?.Length ?? 0) + 
                         (_vm.Message?.Length ?? 0) + 10;
-            desiredWidth = LeftPad + (chars * CharWidth);
+            desiredWidth = LeftPad +
+                           (!string.IsNullOrWhiteSpace(_vm.MergeSourceColorHex) ? MergeColorBarWidth + MergeGutterGap : 0) +
+                           (chars * CharWidth);
         }
         double width = double.IsInfinity(availableSize.Width) ? desiredWidth : Math.Max(desiredWidth, availableSize.Width);
         return new Size(width, RowHeight);
@@ -97,35 +126,34 @@ public partial class LogLineRow : Control
         _vm = null;
     }
 
-    private (IEnumerable<HighlightRule>? Rules, ThemeService? Theme, int? SelectedLineIndex) GetContext()
+    private (IEnumerable<HighlightRule>? Rules, ThemeService? Theme, int? SelectedLineIndex, NavigationIndex? NavIndex) GetContext()
     {
         var owner = OwnerLogView;
         return owner is null
-            ? (null, null, null)
-            : (owner.HighlightRules, owner.Theme, owner.SelectedLineIndex);
+            ? (null, null, null, null)
+            : (owner.HighlightRules, owner.Theme, owner.SelectedLineIndex, owner.NavIndex);
     }
 
     public override void Render(DrawingContext context)
     {
-        var bounds = Bounds;
+        // Use local rect (0,0,w,h) — Bounds includes parent offset which is wrong for Render's local coordinate space
+        var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         if (_vm is null) return;
 
-        var (rules, theme, selectedLineIndex) = GetContext();
+        var (rules, theme, selectedLineIndex, navIndex) = GetContext();
+        bool hasMergeSource = !string.IsNullOrWhiteSpace(_vm.MergeSourceColorHex);
+        bool isSelectedLine = selectedLineIndex == _vm.GlobalIndex;
+        bool isBookmarked = navIndex?.IsBookmarked(_vm.GlobalIndex) == true;
 
         double y = (bounds.Height - LogFontSize) / 2;
         if (y < 1) y = 1;
 
-        if (selectedLineIndex == _vm.GlobalIndex)
+        // 1. Log Level Row background tint (only when setting is enabled)
+        if (theme?.LevelEntireLineEnabled == true)
         {
-            context.FillRectangle(SelectedLineBrush, bounds);
-            context.DrawRectangle(SelectedLinePen, bounds.Deflate(0.5));
-        }
-
-        // 1. Log Level Row background tint (prioritize theme override)
-        string? bgHex = theme?.GetLevelBgColorHex(_vm.Level);
-        if (!string.IsNullOrEmpty(bgHex))
-        {
-            context.FillRectangle(ParseBrush(bgHex), new Rect(0, 0, bounds.Width, bounds.Height));
+            string? bgHex = theme.GetLevelBgColorHex(_vm.Level);
+            if (!string.IsNullOrEmpty(bgHex))
+                context.FillRectangle(ParseBrush(bgHex), new Rect(0, 0, bounds.Width, bounds.Height));
         }
 
         // 2. Custom Highlight Rule Line Backgrounds
@@ -142,6 +170,9 @@ public partial class LogLineRow : Control
             }
         }
 
+        if (isSelectedLine)
+            context.FillRectangle(SelectedLineBrush, bounds);
+
         if (_vm.IsFileSeparator)
         {
             var sepBrush = GetBrush("SeparatorBrush") ?? Brushes.Gray;
@@ -154,7 +185,16 @@ public partial class LogLineRow : Control
             return;
         }
 
-        double x = LeftPad;
+        if (hasMergeSource)
+            context.FillRectangle(ParseBrush(_vm.MergeSourceColorHex!), new Rect(0, 0, MergeColorBarWidth, bounds.Height));
+
+        if (isBookmarked)
+        {
+            var bookmarkBrush = GetBrush("BookmarkMarkerBrush") ?? FallbackBookmarkBrush;
+            context.FillRectangle(bookmarkBrush, new Rect(0, 0, BookmarkMarkerWidth, bounds.Height));
+        }
+
+        double x = LeftPad + (hasMergeSource ? MergeColorBarWidth + MergeGutterGap : 0);
 
         // 3. Timestamp
         if (!_vm.IsContinuation && !string.IsNullOrEmpty(_vm.TimestampText))
@@ -213,6 +253,21 @@ public partial class LogLineRow : Control
                 }
             }
         }
+
+        // 6. Search match highlights
+        var owner = OwnerLogView;
+        if (owner?.ActiveSearchMatcher is { } searchMatcher && !string.IsNullOrEmpty(_vm.Message))
+        {
+            foreach (var (idx, len) in searchMatcher.FindMatches(_vm.Message))
+            {
+                double hx = xMessageStart + idx * CharWidth;
+                double hw = len * CharWidth;
+                context.FillRectangle(SearchHighlightBrush, new Rect(hx, 0, hw, RowHeight));
+            }
+        }
+
+        if (isSelectedLine)
+            context.DrawRectangle(SelectedLinePen, bounds.Deflate(0.5));
     }
 
     private void RenderMessage(DrawingContext context, double x, double y, LogLineViewModel vm, ThemeService? theme)
@@ -540,6 +595,7 @@ public partial class LogLineRow : Control
             "TextDefaultBrush" => FallbackText,
             "DimTextBrush" => FallbackDim,
             "TimestampBrush" => FallbackTimestamp,
+            "BookmarkMarkerBrush" => FallbackBookmarkBrush,
             _ => null
         };
     }

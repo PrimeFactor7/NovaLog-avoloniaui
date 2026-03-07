@@ -61,9 +61,10 @@ public sealed class DelegatingItemsSource : IList, IReadOnlyList<LogLineViewMode
     public bool IsSynchronized => false;
 }
 
-public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewModel>, INotifyCollectionChanged
+public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewModel>, INotifyCollectionChanged, IDisposable
 {
     private readonly IVirtualLogProvider _provider;
+    private readonly IMergedLogProvider? _mergedProvider;
     private readonly Dictionary<long, LogLineViewModel> _cache = new();
     private readonly LinkedList<long> _lruOrder = new();
     private const int CacheCapacity = 200;
@@ -73,6 +74,7 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
     public VirtualLogItemsSource(IVirtualLogProvider provider)
     {
         _provider = provider;
+        _mergedProvider = provider as IMergedLogProvider;
         _provider.LinesAppended += OnLinesAppended;
         _provider.IndexingCompleted += OnIndexingCompleted;
     }
@@ -105,10 +107,19 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
                 }
             }
 
-            var vm = new LogLineViewModel(line.Value);
+            var vm = CreateViewModel(line.Value, index);
             AddToCache(key, vm);
             return vm;
         }
+    }
+
+    private LogLineViewModel CreateViewModel(LogLine line, int index)
+    {
+        if (_mergedProvider is null)
+            return new LogLineViewModel(line);
+
+        var (tag, colorHex) = _mergedProvider.GetSourceInfo(index);
+        return new LogLineViewModel(line, tag, colorHex);
     }
 
     /// <summary>
@@ -175,6 +186,12 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
     public void CopyTo(Array array, int index) { }
     public object SyncRoot => this;
     public bool IsSynchronized => false;
+
+    public void Dispose()
+    {
+        _provider.LinesAppended -= OnLinesAppended;
+        _provider.IndexingCompleted -= OnIndexingCompleted;
+    }
 }
 
 public sealed class InMemoryLogItemsSource : IList, IReadOnlyList<LogLineViewModel>, INotifyCollectionChanged

@@ -112,6 +112,9 @@ public sealed class AppSettings
 
     [JsonPropertyName("recentSources")]
     public List<RecentSourceEntry> RecentSources { get; set; } = [];
+
+    [JsonPropertyName("bookmarks")]
+    public Dictionary<string, List<long>> Bookmarks { get; set; } = new();
 }
 
 public sealed class LevelColorEntry

@@ -162,6 +162,20 @@ public class LogViewViewModelExtendedTests : IDisposable
     }
 
     [Fact]
+    public void ToggleBookmark_UsesSelectedLine_WhenPresent()
+    {
+        var vm = new LogViewViewModel();
+        vm.LoadFromLines("test.log", Enumerable.Range(0, 100).Select(i => $"Line {i}").ToList());
+        vm.SetCurrentLine(42);
+        vm.SelectLine(7);
+
+        vm.ToggleBookmark();
+
+        Assert.True(vm.NavIndex.IsBookmarked(7));
+        Assert.False(vm.NavIndex.IsBookmarked(42));
+    }
+
+    [Fact]
     public void NavigateBookmark_Forward_ScrollsToHit()
     {
         var vm = new LogViewViewModel();
@@ -336,6 +350,35 @@ public class LogViewViewModelExtendedTests : IDisposable
         Assert.Null(text);
     }
 
+    [Fact]
+    public void GetCurrentLineText_UsesSelectedLine_WhenPresent()
+    {
+        var vm = new LogViewViewModel();
+        vm.LoadFromLines("test.log", ["Line 0", "Line 1", "Line 2"]);
+        vm.SetCurrentLine(2);
+        vm.SelectLine(0);
+
+        var text = vm.GetCurrentLineText();
+
+        Assert.Equal("Line 0", text);
+    }
+
+    [Fact]
+    public void GetCurrentTimestamp_UsesSelectedLine_WhenPresent()
+    {
+        var vm = new LogViewViewModel();
+        vm.LoadFromLines("test.log", [
+            "2025-01-01 10:00:00.000 info: first",
+            "2025-01-01 10:00:01.000 info: second"
+        ]);
+        vm.SetCurrentLine(1);
+        vm.SelectLine(0);
+
+        var timestamp = vm.GetCurrentTimestamp();
+
+        Assert.Equal(new DateTime(2025, 1, 1, 10, 0, 0), timestamp);
+    }
+
     // ── RequestScrollToLine ─────────────────────────────────────────
 
     [Fact]
@@ -374,6 +417,18 @@ public class LogViewViewModelExtendedTests : IDisposable
         Assert.False(vm.IsFollowMode);
         vm.ToggleFollowCommand.Execute(null); // re-enable
         Assert.True(vm.IsFollowMode);
+    }
+
+    [Fact]
+    public void SelectLine_DisablesFollowAndUpdatesSelectedLine()
+    {
+        var vm = new LogViewViewModel();
+        vm.LoadFromLines("test.log", ["Line 0", "Line 1"]);
+
+        vm.SelectLine(1);
+
+        Assert.False(vm.IsFollowMode);
+        Assert.Equal(1, vm.SelectedLineIndex);
     }
 
     // ── Reload Behavior ─────────────────────────────────────────────

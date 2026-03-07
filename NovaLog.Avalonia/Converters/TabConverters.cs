@@ -30,6 +30,25 @@ public sealed class BoolToOpacityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Converts a hex color string (e.g., "#00FF41") to a SolidColorBrush.</summary>
+public sealed class HexToColorConverter : IValueConverter
+{
+    public static readonly HexToColorConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string hex && !string.IsNullOrWhiteSpace(hex))
+        {
+            try { return new SolidColorBrush(Color.Parse(hex)); }
+            catch { /* fall through */ }
+        }
+        return Brushes.Transparent;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Converts minimap visibility to the desired native vertical scrollbar mode.</summary>
 public sealed class MinimapToVerticalScrollBarVisibilityConverter : IValueConverter
 {

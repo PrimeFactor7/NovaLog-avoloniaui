@@ -65,30 +65,39 @@ public partial class SourceManagerPanel : UserControl
     {
         System.Diagnostics.Debug.WriteLine($"[DRAG] PointerPressed fired, sender={sender?.GetType().Name}");
 
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        var point = e.GetCurrentPoint(this);
+        bool isLeftPressed = point.Properties.IsLeftButtonPressed;
+        bool isRightPressed = point.Properties.IsRightButtonPressed;
+
+        if (DataContext is SourceManagerViewModel vm)
+        {
+            var hitSource = TryGetSourceFromPointerEvent(e);
+            if (hitSource != null)
+            {
+                vm.SelectedSource = hitSource;
+                _dragSourceId = hitSource.SourceId;
+                System.Diagnostics.Debug.WriteLine($"[DRAG] Hit source: {hitSource.DisplayName}, ID={_dragSourceId}");
+            }
+            else if (vm.SelectedSource != null)
+            {
+                _dragSourceId = vm.SelectedSource.SourceId;
+                System.Diagnostics.Debug.WriteLine($"[DRAG] Using selected source: {vm.SelectedSource.DisplayName}, ID={_dragSourceId}");
+            }
+        }
+
+        if (isLeftPressed)
         {
             _dragStartPoint = e.GetPosition(this);
             _dragPending = true;
             _dragPressArgs = e;
-            _dragSourceId = null;
-
             System.Diagnostics.Debug.WriteLine($"[DRAG] Left button pressed, dragStartPoint={_dragStartPoint}");
+            return;
+        }
 
-            if (DataContext is SourceManagerViewModel vm)
-            {
-                var hitSource = TryGetSourceFromPointerEvent(e);
-                if (hitSource != null)
-                {
-                    vm.SelectedSource = hitSource;
-                    _dragSourceId = hitSource.SourceId;
-                    System.Diagnostics.Debug.WriteLine($"[DRAG] Hit source: {hitSource.DisplayName}, ID={_dragSourceId}");
-                }
-                else if (vm.SelectedSource != null)
-                {
-                    _dragSourceId = vm.SelectedSource.SourceId;
-                    System.Diagnostics.Debug.WriteLine($"[DRAG] Using selected source: {vm.SelectedSource.DisplayName}, ID={_dragSourceId}");
-                }
-            }
+        if (isRightPressed)
+        {
+            _dragPending = false;
+            _dragPressArgs = null;
         }
 
         // Don't mark as handled - let ListBox process for selection

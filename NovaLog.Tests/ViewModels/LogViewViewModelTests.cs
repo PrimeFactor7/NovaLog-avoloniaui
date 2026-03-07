@@ -226,6 +226,210 @@ public class LogViewViewModelTests : IDisposable
         Assert.Equal(1, delegating.Count);
     }
 
+    // ── Line selection ─────────────────────────────────────────
+
+    [Fact]
+    public void SelectLine_GlobalIndexMatchesPosition()
+    {
+        var vm = new LogViewViewModel();
+        var lines = new[]
+        {
+            "2026-01-01 00:00:00.000 info: Line zero",
+            "2026-01-01 00:00:01.000 warn: Line one",
+            "2026-01-01 00:00:02.000 error: Line two",
+            "2026-01-01 00:00:03.000 info: Line three",
+            "2026-01-01 00:00:04.000 debug: Line four"
+        };
+        vm.LoadFromLines("test.log", lines);
+
+        var source = (DelegatingItemsSource)vm.ItemsSource;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            Assert.Equal(i, source[i].GlobalIndex);
+        }
+    }
+
+    [Fact]
+    public void SelectLine_SetsSelectedLineIndex_ToClickedGlobalIndex()
+    {
+        var vm = new LogViewViewModel();
+        var lines = new[]
+        {
+            "2026-01-01 00:00:00.000 info: Line zero",
+            "2026-01-01 00:00:01.000 warn: Line one",
+            "2026-01-01 00:00:02.000 error: Line two",
+            "2026-01-01 00:00:03.000 info: Line three",
+            "2026-01-01 00:00:04.000 debug: Line four"
+        };
+        vm.LoadFromLines("test.log", lines);
+
+        var source = (DelegatingItemsSource)vm.ItemsSource;
+
+        // Simulate clicking each line: the view uses row.DataContext.GlobalIndex
+        for (int i = 0; i < lines.Length; i++)
+        {
+            int globalIndex = source[i].GlobalIndex;
+            vm.SelectLine(globalIndex);
+
+            Assert.Equal(globalIndex, vm.SelectedLineIndex);
+            // The selected index must match this row's GlobalIndex
+            Assert.Equal(i, vm.SelectedLineIndex);
+        }
+    }
+
+    [Fact]
+    public void SelectLine_SelectedLineIndex_MatchesOnlyClickedRow()
+    {
+        var vm = new LogViewViewModel();
+        var lines = new[]
+        {
+            "2026-01-01 00:00:00.000 info: Line zero",
+            "2026-01-01 00:00:01.000 warn: Line one",
+            "2026-01-01 00:00:02.000 error: Line two",
+        };
+        vm.LoadFromLines("test.log", lines);
+
+        var source = (DelegatingItemsSource)vm.ItemsSource;
+
+        // Click line 1
+        vm.SelectLine(source[1].GlobalIndex);
+
+        // Verify: only line 1 should match the selection check used in LogLineRow.Render
+        for (int i = 0; i < lines.Length; i++)
+        {
+            bool isSelected = vm.SelectedLineIndex == source[i].GlobalIndex;
+            Assert.Equal(i == 1, isSelected);
+        }
+    }
+
+    [Fact]
+    public void SelectLine_FiresSelectedLineChangedEvent()
+    {
+        var vm = new LogViewViewModel();
+        vm.LoadFromLines("test.log", new[] { "2026-01-01 00:00:00.000 info: test" });
+
+        int fireCount = 0;
+        vm.SelectedLineChanged += () => fireCount++;
+
+        vm.SelectLine(0);
+        Assert.Equal(1, fireCount);
+    }
+
+    [Fact]
+    public void SelectLine_DisablesFollowMode()
+    {
+        var vm = new LogViewViewModel();
+        vm.LoadFromLines("test.log", new[] { "2026-01-01 00:00:00.000 info: test" });
+        Assert.True(vm.IsFollowMode);
+
+        vm.SelectLine(0);
+        Assert.False(vm.IsFollowMode);
+    }
+
+    // ── Merge selection ─────────────────────────────────────────
+
+    [Fact]
+    public void SelectLine_WorksWithVirtualSource_ViaLoadFromProvider()
+    {
+        // Build a merge engine with two sources
+        var engine = new ChronoMergeEngine();
+
+        var s1 = new LogStreamer(new List<string>());
+        var s2 = new LogStreamer(new List<string>());
+
+        engine.AddSource(s1, "src1", "#FF0000", 0);
+        engine.AddSource(s2, "src2", "#00FF00", 1);
+        engine.PushHistory(0, new[]
+        {
+            "2026-01-01 00:00:00.000 info: Source1 line A",
+            "2026-01-01 00:00:02.000 info: Source1 line B",
+        });
+        engine.PushHistory(1, new[]
+        {
+            "2026-01-01 00:00:01.000 warn: Source2 line A",
+            "2026-01-01 00:00:03.000 error: Source2 line B",
+        });
+        engine.Build();
+
+        var logVm = new LogViewViewModel();
+        logVm.LoadFromProvider(engine);
+
+        Assert.Equal(4, logVm.TotalLineCount);
+
+        var source = (DelegatingItemsSource)logVm.ItemsSource;
+        for (int i = 0; i < 4; i++)
+        {
+            Assert.Equal(i, source[i].GlobalIndex);
+            logVm.SelectLine(source[i].GlobalIndex);
+            Assert.Equal(i, logVm.SelectedLineIndex);
+        }
+    }
+
+    [Fact]
+    public void SelectLine_WorksWithLoadMerge()
+    {
+        // Create temp files for the merge
+        var file1 = Path.Combine(_tempDir, "source1.log");
+        var file2 = Path.Combine(_tempDir, "source2.log");
+        File.WriteAllLines(file1, new[]
+        {
+            "2026-01-01 00:00:00.000 info: Source1 line A",
+            "2026-01-01 00:00:02.000 info: Source1 line B",
+        });
+        File.WriteAllLines(file2, new[]
+        {
+            "2026-01-01 00:00:01.000 warn: Source2 line A",
+            "2026-01-01 00:00:03.000 error: Source2 line B",
+        });
+
+        var src1 = new SourceItemViewModel
+        {
+            DisplayName = "source1.log",
+            PhysicalPath = file1,
+            Kind = SourceKind.File,
+            SourceColorHex = "#FF0000"
+        };
+        var src2 = new SourceItemViewModel
+        {
+            DisplayName = "source2.log",
+            PhysicalPath = file2,
+            Kind = SourceKind.File,
+            SourceColorHex = "#00FF00"
+        };
+
+        var logVm = new LogViewViewModel();
+        logVm.LoadMerge(new[] { src1, src2 });
+
+        // Merge should produce 4 lines (2 from each source, interleaved by time)
+        Assert.Equal(4, logVm.TotalLineCount);
+
+        var source = (DelegatingItemsSource)logVm.ItemsSource;
+        Assert.Equal(4, source.Count);
+
+        // Verify GlobalIndex matches position
+        for (int i = 0; i < 4; i++)
+        {
+            Assert.Equal(i, source[i].GlobalIndex);
+        }
+
+        // Verify selection works for each line
+        for (int i = 0; i < 4; i++)
+        {
+            logVm.SelectLine(source[i].GlobalIndex);
+            Assert.Equal(i, logVm.SelectedLineIndex);
+
+            // Verify only the clicked row matches the selection check
+            for (int j = 0; j < 4; j++)
+            {
+                bool isSelected = logVm.SelectedLineIndex == source[j].GlobalIndex;
+                Assert.Equal(j == i, isSelected);
+            }
+        }
+
+        // Verify merge source info is present (merge gutter colors)
+        Assert.NotNull(source[0].MergeSourceColorHex);
+    }
+
     // ── PropertyChanged notifications ────────────────────────────
 
     [Fact]

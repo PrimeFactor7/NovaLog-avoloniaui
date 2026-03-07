@@ -42,4 +42,25 @@ public class SourceManagerPersistenceTests
         Assert.Equal(3, restored.DisplaySources.Count);
         Assert.Equal(SourceKind.Merge, restored.DisplaySources[0].Kind);
     }
+
+    [Fact]
+    public void RemoveSelected_MergeNode_RestoresChildrenToTopLevel()
+    {
+        var vm = new SourceManagerViewModel();
+        vm.AddSource(@"C:\logs\alpha.log", SourceKind.File, "alpha");
+        vm.AddSource(@"C:\logs\beta.log", SourceKind.File, "beta");
+
+        vm.Sources.Single(s => s.SourceId == "alpha").IsSelectedForMerge = true;
+        vm.Sources.Single(s => s.SourceId == "beta").IsSelectedForMerge = true;
+        vm.MergeSelectedCommand.Execute(null);
+
+        var merge = vm.Sources.Single(s => s.Kind == SourceKind.Merge);
+        vm.SelectedSource = merge;
+
+        vm.RemoveSelectedCommand.Execute(null);
+
+        Assert.DoesNotContain(vm.Sources, s => s.Kind == SourceKind.Merge);
+        Assert.All(vm.Sources, s => Assert.False(s.IsChild));
+        Assert.Equal(2, vm.DisplaySources.Count);
+    }
 }

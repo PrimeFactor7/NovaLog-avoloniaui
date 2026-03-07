@@ -40,6 +40,7 @@ public sealed class ThemeService
         ThemeChanged?.Invoke(_theme);
     }
 
+    public bool LevelEntireLineEnabled { get; set; }
     public bool JsonHighlightEnabled { get; set; } = true;
     public bool SqlHighlightEnabled { get; set; } = true;
     public bool StackTraceHighlightEnabled { get; set; } = true;

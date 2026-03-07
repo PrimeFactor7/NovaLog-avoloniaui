@@ -53,6 +53,8 @@ public partial class MainWindowViewModel : ObservableObject
                 var sourcesToMerge = SourceManager.Sources.Where(s => ids.Contains(s.SourceId)).ToList();
                 Workspace.ActiveLogView?.LoadMerge(sourcesToMerge);
             }
+            if (Workspace.ActiveLogView is { } alv)
+                RestoreBookmarksForPane(alv);
         };
 
         SourceManager.SourceNewTabRequested += (path, kind) =>
@@ -119,6 +121,7 @@ public partial class MainWindowViewModel : ObservableObject
             }
         }
 
+        ThemeService.LevelEntireLineEnabled = Settings.LevelEntireLineEnabled;
         ThemeService.JsonHighlightEnabled = Settings.JsonHighlightEnabled;
         ThemeService.SqlHighlightEnabled = Settings.SqlHighlightEnabled;
         ThemeService.StackTraceHighlightEnabled = Settings.StackTraceHighlightEnabled;
@@ -160,6 +163,22 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void ToggleSidebar() => IsSidebarVisible = !IsSidebarVisible;
     [RelayCommand] private void ToggleSettings() => Settings.IsVisible = !Settings.IsVisible;
 
+    public (int Width, int Height, bool Maximized) GetSavedWindowState()
+        => (_appSettings.WindowWidth, _appSettings.WindowHeight, _appSettings.WindowMaximized);
+
+    public void SaveWindowState(int width, int height, bool maximized)
+    {
+        _appSettings.WindowWidth = width;
+        _appSettings.WindowHeight = height;
+        _appSettings.WindowMaximized = maximized;
+    }
+
+    public string? LastDirectory
+    {
+        get => _appSettings.LastDirectory;
+        set => _appSettings.LastDirectory = value;
+    }
+
     public void SaveSettings()
     {
         Settings.SaveTo(_appSettings);
@@ -169,8 +188,26 @@ public partial class MainWindowViewModel : ObservableObject
         foreach (var recent in SourceManager.RecentSources)
             _appSettings.RecentSources.Add(recent);
 
+        // Save bookmarks from all panes
+        _appSettings.Bookmarks.Clear();
+        foreach (var pane in Workspace.GetAllPanes())
+        {
+            var key = pane.LogView.GetBookmarkKey();
+            var bookmarks = pane.LogView.NavIndex.Bookmarks;
+            if (key != null && bookmarks.Count > 0)
+                _appSettings.Bookmarks[key] = bookmarks.ToList();
+        }
+
         SettingsManager.Save(_appSettings);
         SaveSession();
+    }
+
+    /// <summary>Restores bookmarks for a pane after loading its source.</summary>
+    public void RestoreBookmarksForPane(LogViewViewModel logView)
+    {
+        var key = logView.GetBookmarkKey();
+        if (key != null && _appSettings.Bookmarks.TryGetValue(key, out var saved))
+            logView.RestoreBookmarks(saved);
     }
 
     public void LoadFile(string path)

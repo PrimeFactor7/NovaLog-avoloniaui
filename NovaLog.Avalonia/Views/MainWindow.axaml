@@ -74,11 +74,12 @@
                          Opacity="{Binding IsActive, Converter={x:Static vm:BoolToOpacityConverter.Instance}}">
                    <Button.ContextMenu>
                      <ContextMenu>
-                       <MenuItem Header="Rename" Tag="rename" />
-                       <MenuItem Header="Close Others" Tag="closeothers" />
-                       <MenuItem Header="Close All" Tag="closeall" />
+                       <MenuItem Header="Rename" Tag="rename" Click="OnTabContextMenuItemClick" />
+                       <MenuItem Header="Close Panes" Tag="closepanes" Click="OnTabContextMenuItemClick" />
+                       <MenuItem Header="Close Others" Tag="closeothers" Click="OnTabContextMenuItemClick" />
+                       <MenuItem Header="Close All" Tag="closeall" Click="OnTabContextMenuItemClick" />
                        <Separator />
-                       <MenuItem Header="Close" Tag="close" />
+                       <MenuItem Header="Close" Tag="close" Click="OnTabContextMenuItemClick" />
                      </ContextMenu>
                    </Button.ContextMenu>
                  </Button>

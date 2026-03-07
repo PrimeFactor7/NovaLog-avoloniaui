@@ -133,6 +133,11 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
         {
             ClearResults();
             _currentMatcher = null;
+            if (_boundLogView is not null)
+            {
+                _boundLogView.ActiveSearchMatcher = null;
+                AvDispatcher.UIThread.Post(() => _boundLogView.NotifyRowVisualsChanged());
+            }
             _lastProcessedIndex = 0;
             return;
         }
@@ -154,6 +159,11 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
         }
 
         _currentMatcher = matcher;
+        if (_boundLogView is not null)
+        {
+            _boundLogView.ActiveSearchMatcher = matcher;
+            AvDispatcher.UIThread.Post(() => _boundLogView.NotifyRowVisualsChanged());
+        }
         _lastProcessedIndex = 0;
         Task.Run(() => ExecuteSearch(matcher, ct), ct);
     }
@@ -230,6 +240,11 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
     {
         IsVisible = false;
         ClearResults();
+        if (_boundLogView is not null)
+        {
+            _boundLogView.ActiveSearchMatcher = null;
+            _boundLogView.NotifyRowVisualsChanged();
+        }
         SearchText = "";
     }
 

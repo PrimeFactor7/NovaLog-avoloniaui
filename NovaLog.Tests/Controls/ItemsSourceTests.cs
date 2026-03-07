@@ -160,6 +160,14 @@ public class VirtualLogItemsSourceTests
         public void Dispose() { }
     }
 
+    private sealed class FakeMergedLogProvider : FakeVirtualLogProvider, IMergedLogProvider
+    {
+        public (string Tag, string TagColorHex) GetSourceInfo(long mergedLineIndex)
+            => ($"src-{mergedLineIndex}", mergedLineIndex % 2 == 0 ? "#00D4FF" : "#FFB000");
+
+        public int MaxTagLength => 5;
+    }
+
     [Fact]
     public void Count_ReflectsProvider()
     {
@@ -294,5 +302,18 @@ public class VirtualLogItemsSourceTests
         var messages = source.Select(vm => vm.Message).ToList();
 
         Assert.Equal(new[] { "x", "y" }, messages);
+    }
+
+    [Fact]
+    public void Indexer_MergedProvider_PopulatesSourceMetadata()
+    {
+        var provider = new FakeMergedLogProvider();
+        provider.AddLines(new LogLine { GlobalIndex = 0, Message = "merged" });
+
+        var source = new VirtualLogItemsSource(provider);
+        var vm = source[0];
+
+        Assert.Equal("src-0", vm.MergeSourceTag);
+        Assert.Equal("#00D4FF", vm.MergeSourceColorHex);
     }
 }

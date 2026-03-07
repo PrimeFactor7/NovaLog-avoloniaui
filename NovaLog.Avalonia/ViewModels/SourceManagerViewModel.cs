@@ -27,7 +27,6 @@ public partial class SourceItemViewModel : ObservableObject
     [ObservableProperty] private bool _isMissing;
 
     public ObservableCollection<string> ChildSourceIds { get; } = new();
-
     public string KindLabel => Kind switch
     {
         SourceKind.Folder => "DIR",
@@ -35,6 +34,27 @@ public partial class SourceItemViewModel : ObservableObject
         SourceKind.Merge => "MERGE",
         _ => ""
     };
+
+    public bool CanSelectForMerge => !IsChild && Kind != SourceKind.Merge;
+    public bool IsMergeSource => Kind == SourceKind.Merge;
+    public bool ShowSourcePip => !IsChild && Kind != SourceKind.Merge;
+    public bool ShowChildColorBar => IsChild;
+
+    partial void OnKindChanged(SourceKind value)
+    {
+        OnPropertyChanged(nameof(KindLabel));
+        OnPropertyChanged(nameof(CanSelectForMerge));
+        OnPropertyChanged(nameof(IsMergeSource));
+        OnPropertyChanged(nameof(ShowSourcePip));
+        OnPropertyChanged(nameof(ShowChildColorBar));
+    }
+
+    partial void OnIsChildChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSelectForMerge));
+        OnPropertyChanged(nameof(ShowSourcePip));
+        OnPropertyChanged(nameof(ShowChildColorBar));
+    }
 }
 
 public sealed class RecentHistoryItemViewModel
@@ -60,7 +80,7 @@ public partial class SourceManagerViewModel : ObservableObject
 
     public string MergeStatusText => $"{Sources.Count(s => s.IsSelectedForMerge && !s.IsChild)} selected for merge";
     public bool CanMerge => Sources.Count(s => s.IsSelectedForMerge && !s.IsChild) >= 2;
-    public bool CanClear => Sources.Any(s => s.IsSelectedForMerge && !s.IsChild);
+    public bool CanClear => Sources.Any(s => s.IsSelectedForMerge && !s.IsChild) || Sources.Any(s => s.Kind == SourceKind.Merge);
 
     public event Action<string, SourceKind>? SourceSelected;
     public event Action<string, SourceKind>? SourceNewTabRequested;
@@ -243,12 +263,15 @@ public partial class SourceManagerViewModel : ObservableObject
     [RelayCommand]
     private void ClearSelected()
     {
-        var toRemove = Sources.Where(s => s.IsSelectedForMerge && !s.IsChild).ToList();
+        // Remove merge sources first (and fully remove their children)
+        var merges = Sources.Where(s => s.Kind == SourceKind.Merge).ToList();
+        foreach (var merge in merges)
+            RemoveMergeWithChildren(merge);
+
+        // Then remove remaining selected sources
+        var toRemove = Sources.Where(s => s.IsSelectedForMerge).ToList();
         foreach (var item in toRemove)
-        {
-            Sources.Remove(item);
-            SourceRemoved?.Invoke(item);
-        }
+            RemoveSourceCore(item);
     }
 
     [RelayCommand]
@@ -274,12 +297,7 @@ public partial class SourceManagerViewModel : ObservableObject
             mergeItem.ChildSourceIds.Add(src.SourceId);
         }
 
-        mergeItem.PropertyChanged += (s, e) => 
-        {
-            if (e.PropertyName == nameof(SourceItemViewModel.IsExpanded))
-                UpdateDisplayList();
-        };
-
+        AttachSourceHandlers(mergeItem);
         Sources.Add(mergeItem);
         SourceSelected?.Invoke(mergeItem.PhysicalPath, SourceKind.Merge);
     }
@@ -302,10 +320,16 @@ public partial class SourceManagerViewModel : ObservableObject
     private void RemoveSelected()
     {
         if (SelectedSource is { } src)
-        {
-            Sources.Remove(src);
-            SourceRemoved?.Invoke(src);
-        }
+            RemoveSourceCore(src);
+    }
+
+    [RelayCommand]
+    private void RemoveSourceItem(SourceItemViewModel? source)
+    {
+        if (source is null)
+            return;
+
+        RemoveSourceCore(source);
     }
 
     [RelayCommand]
@@ -404,6 +428,78 @@ public partial class SourceManagerViewModel : ObservableObject
                 UpdateDisplayList();
             }
         };
+    }
+
+    private void RemoveSourceCore(SourceItemViewModel source)
+    {
+        if (source.Kind == SourceKind.Merge)
+        {
+            DissolveMergeSource(source);
+            return;
+        }
+
+        RemoveFromParentMerges(source.SourceId);
+        Sources.Remove(source);
+        if (ReferenceEquals(SelectedSource, source))
+            SelectedSource = null;
+        SourceRemoved?.Invoke(source);
+    }
+
+    private void RemoveFromParentMerges(string childSourceId)
+    {
+        var mergesToDissolve = Sources
+            .Where(s => s.Kind == SourceKind.Merge && s.ChildSourceIds.Contains(childSourceId))
+            .ToList();
+
+        foreach (var merge in mergesToDissolve)
+        {
+            merge.ChildSourceIds.Remove(childSourceId);
+            if (merge.ChildSourceIds.Count < 2)
+                DissolveMergeSource(merge);
+        }
+    }
+
+    /// <summary>Fully remove a merge and all its child sources.</summary>
+    private void RemoveMergeWithChildren(SourceItemViewModel mergeSource)
+    {
+        foreach (var childId in mergeSource.ChildSourceIds.ToList())
+        {
+            var child = Sources.FirstOrDefault(s => s.SourceId == childId);
+            if (child != null)
+            {
+                Sources.Remove(child);
+                SourceRemoved?.Invoke(child);
+            }
+        }
+
+        mergeSource.ChildSourceIds.Clear();
+        Sources.Remove(mergeSource);
+
+        if (ReferenceEquals(SelectedSource, mergeSource))
+            SelectedSource = null;
+
+        SourceRemoved?.Invoke(mergeSource);
+    }
+
+    private void DissolveMergeSource(SourceItemViewModel mergeSource)
+    {
+        foreach (var childId in mergeSource.ChildSourceIds.ToList())
+        {
+            var child = Sources.FirstOrDefault(s => s.SourceId == childId);
+            if (child != null)
+            {
+                child.IsChild = false;
+                child.IsSelectedForMerge = false;
+            }
+        }
+
+        mergeSource.ChildSourceIds.Clear();
+        Sources.Remove(mergeSource);
+
+        if (ReferenceEquals(SelectedSource, mergeSource))
+            SelectedSource = null;
+
+        SourceRemoved?.Invoke(mergeSource);
     }
 
     private static string GetDefaultDisplayName(string path, SourceKind kind) => kind switch

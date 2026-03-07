@@ -101,14 +101,21 @@ public partial class LogViewPanel : UserControl
             };
         }
 
+        // Register on the ScrollViewer — it has a Background so it always receives
+        // hit tests, even in gaps between rows where the ItemsRepeater is transparent.
+        if (_scroller is not null)
+        {
+            _scroller.AddHandler(InputElement.PointerPressedEvent, OnLogPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+
         if (_scroller is not null)
         {
             _scroller.ScrollChanged += (s, e) =>
             {
                 if (DataContext is LogViewViewModel vm)
                 {
-                    int topIdx = (int)(_scroller.Offset.Y / 18.0);
-                    int visibleCount = (int)(_scroller.Viewport.Height / 18.0);
+                    int topIdx = (int)(_scroller.Offset.Y / LogLineRow.RowHeight);
+                    int visibleCount = (int)(_scroller.Viewport.Height / LogLineRow.RowHeight);
                     vm.SetCurrentLine(topIdx + visibleCount / 2);
 
                     if (_minimap is not null)
@@ -304,6 +311,7 @@ public partial class LogViewPanel : UserControl
             _attachedViewModel.ScrollToLineRequested -= OnScrollToLineRequested;
             _attachedViewModel.NavIndex.IndicesChanged -= OnNavIndexChanged;
             _attachedViewModel.SelectedLineChanged -= OnSelectedLineChanged;
+            _attachedViewModel.RowVisualsChanged -= OnRowVisualsChanged;
         }
 
         if (_attachedFilterViewModel is not null)
@@ -321,6 +329,7 @@ public partial class LogViewPanel : UserControl
             _attachedViewModel.ScrollToLineRequested += OnScrollToLineRequested;
             _attachedViewModel.NavIndex.IndicesChanged += OnNavIndexChanged;
             _attachedViewModel.SelectedLineChanged += OnSelectedLineChanged;
+            _attachedViewModel.RowVisualsChanged += OnRowVisualsChanged;
             _attachedFilterViewModel?.PropertyChanged += OnFilterViewModelPropertyChanged;
 
             if (_minimap is not null)
@@ -349,9 +358,12 @@ public partial class LogViewPanel : UserControl
         Dispatcher.UIThread.Post(() =>
         {
             if (_scroller is null) return;
+            // Center the target line in the viewport
+            double halfViewport = _scroller.Viewport.Height / 2;
+            double targetY = Math.Max(0, lineIndex * LogLineRow.RowHeight - halfViewport);
             _scroller.Offset = new global::Avalonia.Vector(
                 _scroller.Offset.X,
-                lineIndex * 18.0);
+                targetY);
         });
     }
 
@@ -366,25 +378,60 @@ public partial class LogViewPanel : UserControl
 
     private void OnNavIndexChanged()
     {
-        if (_minimap is null || _minimapRefreshPending)
-            return;
+        bool refreshMinimap = _minimap is not null && !_minimapRefreshPending;
+        if (refreshMinimap)
+            _minimapRefreshPending = true;
 
-        _minimapRefreshPending = true;
         Dispatcher.UIThread.Post(() =>
         {
+            if (!refreshMinimap)
+                return;
+
             _minimapRefreshPending = false;
             _minimap?.InvalidateVisual();
         }, DispatcherPriority.Background);
+    }
+
+    private void OnLogPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_attachedViewModel is null || _repeater is null)
+            return;
+
+        var currentPoint = e.GetCurrentPoint(this);
+        if (!currentPoint.Properties.IsLeftButtonPressed && !currentPoint.Properties.IsRightButtonPressed)
+            return;
+
+        // Calculate line index from Y position — works for direct hits and gap clicks alike
+        var pos = e.GetPosition(_repeater);
+        int lineIndex = (int)(pos.Y / LogLineRow.RowHeight);
+        if (lineIndex >= 0 && lineIndex < _attachedViewModel.TotalLineCount)
+            _attachedViewModel.SelectLine(lineIndex);
+    }
+
+    private static T? FindVisualAncestorOrSelf<T>(object? source)
+        where T : class
+    {
+        for (var current = source as Visual; current is not null; current = current.GetVisualParent())
+        {
+            if (current is T match)
+                return match;
+        }
+
+        return null;
     }
 
     private void OnSelectedLineChanged()
     {
         Dispatcher.UIThread.Post(() =>
         {
-            InvalidateVisual();
-            _repeater?.InvalidateVisual();
+            if (_repeater is null) return;
+
+            foreach (var row in _repeater.GetVisualDescendants().OfType<LogLineRow>())
+                row.InvalidateVisual();
         }, DispatcherPriority.Background);
     }
+
+    private void OnRowVisualsChanged() => OnSelectedLineChanged();
 
     private void OnFilterViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -439,6 +486,12 @@ public partial class LogViewPanel : UserControl
         minimap.ViewportHeightRatio = heightRatio;
     }
 
+    private void OnHeaderDoubleTapped(object? sender, global::Avalonia.Input.TappedEventArgs e)
+    {
+        if (DataContext is LogViewViewModel vm)
+            vm.ShowPicker();
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (DataContext is not LogViewViewModel vm)
@@ -481,11 +534,6 @@ public partial class LogViewPanel : UserControl
         else if (ctrl && e.Key == Key.G)
         {
             ShowGoToTimestampDialog(vm);
-            e.Handled = true;
-        }
-        else if (ctrl && e.Key == Key.T)
-        {
-            vm.TimeTravelCommand.Execute(null);
             e.Handled = true;
         }
         else if (ctrl && e.Key == Key.L)

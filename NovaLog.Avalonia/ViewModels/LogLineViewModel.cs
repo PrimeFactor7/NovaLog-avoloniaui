@@ -17,16 +17,21 @@ public sealed class LogLineViewModel
     public bool IsFileSeparator { get; }
     public int GlobalIndex { get; }
     public string RawText { get; }
+    public string? MergeSourceTag { get; }
+    public string? MergeSourceColorHex { get; }
 
-    public LogLineViewModel(LogLine line)
+    public LogLineViewModel(LogLine line, string? mergeSourceTag = null, string? mergeSourceColorHex = null)
     {
         GlobalIndex = line.GlobalIndex;
         RawText = line.RawText;
+        Timestamp = line.Timestamp;
         Level = line.Level;
         Flavor = line.Flavor;
         IsContinuation = line.IsContinuation;
         IsFileSeparator = line.IsFileSeparator;
         Message = line.Message;
+        MergeSourceTag = mergeSourceTag;
+        MergeSourceColorHex = mergeSourceColorHex;
 
         TimestampText = line.Timestamp.HasValue
             ? line.Timestamp.Value.ToString("yyyy-MM-dd HH:mm:ss.fff")
