@@ -44,6 +44,9 @@ public sealed partial class AuditLogManager
     {
         _auditLogs.Clear();
 
+        if (!Directory.Exists(_logsDirectory))
+            return;
+
         foreach (var file in Directory.GetFiles(_logsDirectory, "*-audit.json", SearchOption.TopDirectoryOnly))
         {
             var audit = ParseAuditFile(file);

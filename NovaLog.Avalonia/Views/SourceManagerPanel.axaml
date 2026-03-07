@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:NovaLog.Avalonia.ViewModels"
-             xmlns:models="using:NovaLog.Core.Models"
              x:Class="NovaLog.Avalonia.Views.SourceManagerPanel"
              x:DataType="vm:SourceManagerViewModel">
 
@@ -39,12 +38,12 @@
 
           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="2" />
 
-          <ToggleButton Classes="neon-action" IsChecked="{Binding ShowRecents}" ToolTip.Tip="Toggle Recent Files">
+          <Button Classes="neon-action" Click="OnRecentHistoryClick" ToolTip.Tip="Open Recent History">
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
               <TextBlock Text="Recent" VerticalAlignment="Center" />
             </StackPanel>
-          </ToggleButton>
+          </Button>
 
           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="2" />
 
@@ -63,28 +62,6 @@
         </StackPanel>
 
         <Border Classes="neon-separator" DockPanel.Dock="Top" />
-
-        <!-- Recent sources panel -->
-        <Border DockPanel.Dock="Top" IsVisible="{Binding ShowRecents}" Background="{DynamicResource ToolBarBgBrush}" Padding="6" Margin="4,4,4,0">
-          <StackPanel>
-            <TextBlock Text="Recent Files" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,4" />
-            <ItemsControl ItemsSource="{Binding RecentSources}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:RecentSourceEntry">
-                  <Button Classes="neon-action" Command="{Binding $parent[UserControl].((vm:SourceManagerViewModel)DataContext).LoadRecentCommand}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,1">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                      <TextBlock Grid.Column="0" Text="&#xE8E5;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="10" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                      <TextBlock Grid.Column="1" Text="{Binding Path}" FontSize="10" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="8" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="4,0,0,0" />
-                    </Grid>
-                  </Button>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-        </Border>
-
-        <Border Classes="neon-separator" DockPanel.Dock="Top" IsVisible="{Binding ShowRecents}" />
 
         <!-- Footer -->
         <Border DockPanel.Dock="Bottom" Classes="neon-header">

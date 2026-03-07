@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NovaLog.Core.Models;
 using NovaLog.Core.Services;
 using NovaLog.Core.Theme;
+using System.ComponentModel;
 
 namespace NovaLog.Avalonia.ViewModels;
 
@@ -18,6 +19,7 @@ public partial class MainWindowViewModel : ObservableObject
     public ThemeService ThemeService { get; } = new();
     private readonly WorkspaceManager _workspaceManager = new();
     private AppSettings _appSettings = new();
+    private LogViewViewModel? _observedActiveLogView;
 
     public MainWindowViewModel()
     {
@@ -33,13 +35,13 @@ public partial class MainWindowViewModel : ObservableObject
         foreach (var recent in _appSettings.RecentSources)
             SourceManager.RecentSources.Add(recent);
 
-        Settings.SettingsChanged += () =>
-        {
-            ApplySettingsToTheme();
-            ThemeLabel = ThemeService.CurrentTheme.Name;
-        };
-
         Workspace.Initialize(SourceManager, ThemeService);
+        Workspace.SetFollowDefaults(Settings.MainFollowEnabled, Settings.FilterFollowEnabled, applyToExisting: true);
+        Workspace.PropertyChanged += OnWorkspacePropertyChanged;
+        AttachActiveLogView(Workspace.ActiveLogView);
+
+        Settings.SettingsChanged += OnSettingsChanged;
+        Settings.PropertyChanged += OnSettingsPropertyChanged;
 
         SourceManager.SourceSelected += (path, kind) =>
         {
@@ -86,6 +88,8 @@ public partial class MainWindowViewModel : ObservableObject
         };
 
         LoadSession();
+        AttachActiveLogView(Workspace.ActiveLogView);
+        RaiseStatusProperties();
         ApplySettingsToTheme();
     }
 
@@ -101,6 +105,7 @@ public partial class MainWindowViewModel : ObservableObject
     private void ApplySettingsToTheme()
     {
         ThemeService.SetTheme(Settings.Theme);
+        ThemeLabel = ThemeService.CurrentTheme.Name;
         
         ThemeService.SetTimestampOverride(Settings.TimestampColorEnabled ? Settings.TimestampColor.ToString() : null);
         ThemeService.SetMessageOverride(Settings.MessageColorEnabled ? Settings.MessageColor.ToString() : null);
@@ -118,12 +123,7 @@ public partial class MainWindowViewModel : ObservableObject
         ThemeService.SqlHighlightEnabled = Settings.SqlHighlightEnabled;
         ThemeService.StackTraceHighlightEnabled = Settings.StackTraceHighlightEnabled;
         ThemeService.NumberHighlightEnabled = Settings.NumberHighlightEnabled;
-        
-        foreach (var pane in Workspace.GetAllPanes())
-        {
-            pane.LogView.IsFollowMode = Settings.MainFollowEnabled;
-            pane.LogView.Filter.IsFollowMode = Settings.FilterFollowEnabled;
-        }
+        RaiseStatusProperties();
     }
 
     private void LoadSession()
@@ -132,11 +132,7 @@ public partial class MainWindowViewModel : ObservableObject
         _workspaceManager.Load();
 
         System.Diagnostics.Debug.WriteLine($"[SESSION] Loaded {_workspaceManager.Sources.Count} sources from workspace");
-        foreach (var src in _workspaceManager.Sources)
-        {
-            System.Diagnostics.Debug.WriteLine($"[SESSION] Adding source: {src.Id} - {src.PhysicalPath} ({src.Kind})");
-            SourceManager.AddSource(src.PhysicalPath, src.Kind, src.Id); // Preserve the original ID!
-        }
+        SourceManager.RestoreSources(_workspaceManager.Sources);
 
         System.Diagnostics.Debug.WriteLine($"[SESSION] SourceManager now has {SourceManager.Sources.Count} sources");
         foreach (var src in SourceManager.Sources)
@@ -146,33 +142,17 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (_workspaceManager.WorkspaceTabs.Count > 0)
         {
-            var activeTab = _workspaceManager.WorkspaceTabs.FirstOrDefault(t => t.IsActive)
-                         ?? _workspaceManager.WorkspaceTabs[0];
-            System.Diagnostics.Debug.WriteLine($"[SESSION] Loading layout for tab: {activeTab.DisplayName}");
-            Workspace.LoadLayout(activeTab.Layout);
+            System.Diagnostics.Debug.WriteLine($"[SESSION] Loading {_workspaceManager.WorkspaceTabs.Count} workspace tab(s)");
+            Workspace.LoadTabs(_workspaceManager.WorkspaceTabs);
         }
     }
 
     public void SaveSession()
     {
-        var layout = Workspace.SaveLayout();
         _workspaceManager.WorkspaceTabs.Clear();
-        _workspaceManager.WorkspaceTabs.Add(new WorkspaceTabLayout
-        {
-            Id = "default",
-            DisplayName = "Workspace 1",
-            Layout = layout,
-            IsActive = true
-        });
+        _workspaceManager.WorkspaceTabs.AddRange(Workspace.SaveTabs());
 
-        // Save sources from SourceManager to WorkspaceManager
-        var sources = SourceManager.Sources.Select(src => new LogSource
-        {
-            Id = src.SourceId,
-            PhysicalPath = src.PhysicalPath,
-            Kind = src.Kind
-        }).ToList();
-        _workspaceManager.SetSources(sources);
+        _workspaceManager.SetSources(SourceManager.CreateSnapshot());
 
         _workspaceManager.Save();
     }
@@ -197,6 +177,23 @@ public partial class MainWindowViewModel : ObservableObject
     {
         Workspace.ActiveLogView?.LoadFile(path);
         SourceManager.AddSource(path, SourceKind.File);
+    }
+
+    public bool LoadPath(string path)
+    {
+        if (File.Exists(path))
+        {
+            LoadFile(path);
+            return true;
+        }
+
+        if (Directory.Exists(path))
+        {
+            LoadFolder(path);
+            return true;
+        }
+
+        return false;
     }
 
     public void LoadFolder(string path)
@@ -245,6 +242,7 @@ public partial class MainWindowViewModel : ObservableObject
     public string StatusFile => Workspace.ActiveLogView?.Title ?? "No file loaded";
     public string StatusLines => $"{Workspace.ActiveLogView?.TotalLineCount ?? 0} lines";
     public string StatusStreaming => Workspace.ActiveLogView?.IsStreaming == true ? "Streaming" : "";
+    public string StatusFollow => Workspace.ActiveLogView?.IsFollowMode == true ? "Follow: On" : "Follow: Off";
 
     [RelayCommand]
     private void ToggleFollow() => Workspace.ActiveLogView?.ToggleFollowCommand.Execute(null);
@@ -275,4 +273,64 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void SimShowcaseSlow() => StartSimulator(1000, showcase: true);
     [RelayCommand] private void SimShowcaseMedium() => StartSimulator(200, showcase: true);
     [RelayCommand] private void SimShowcaseFast() => StartSimulator(50, showcase: true);
+
+    private void OnSettingsChanged()
+    {
+        ApplySettingsToTheme();
+    }
+
+    private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(SettingsViewModel.MainFollowEnabled):
+                Workspace.SetMainFollowDefault(Settings.MainFollowEnabled, applyToExisting: true);
+                RaiseStatusProperties();
+                break;
+            case nameof(SettingsViewModel.FilterFollowEnabled):
+                Workspace.SetFilterFollowDefault(Settings.FilterFollowEnabled, applyToExisting: true);
+                break;
+        }
+    }
+
+    private void OnWorkspacePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(WorkspaceViewModel.ActiveLogView))
+            return;
+
+        AttachActiveLogView(Workspace.ActiveLogView);
+        RaiseStatusProperties();
+    }
+
+    private void AttachActiveLogView(LogViewViewModel? logView)
+    {
+        if (_observedActiveLogView is not null)
+            _observedActiveLogView.PropertyChanged -= OnActiveLogViewPropertyChanged;
+
+        _observedActiveLogView = logView;
+
+        if (_observedActiveLogView is not null)
+            _observedActiveLogView.PropertyChanged += OnActiveLogViewPropertyChanged;
+    }
+
+    private void OnActiveLogViewPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(LogViewViewModel.Title):
+            case nameof(LogViewViewModel.TotalLineCount):
+            case nameof(LogViewViewModel.IsStreaming):
+            case nameof(LogViewViewModel.IsFollowMode):
+                RaiseStatusProperties();
+                break;
+        }
+    }
+
+    private void RaiseStatusProperties()
+    {
+        OnPropertyChanged(nameof(StatusFile));
+        OnPropertyChanged(nameof(StatusLines));
+        OnPropertyChanged(nameof(StatusStreaming));
+        OnPropertyChanged(nameof(StatusFollow));
+    }
 }

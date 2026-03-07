@@ -4,6 +4,7 @@ using global::Avalonia.Input;
 using global::Avalonia.Media;
 using NovaLog.Core.Models;
 using NovaLog.Core.Services;
+using System.Collections.Generic;
 
 namespace NovaLog.Avalonia.Controls;
 
@@ -19,16 +20,16 @@ public class LogMinimap : Control
     public static readonly StyledProperty<NavigationIndex?> NavIndexProperty =
         AvaloniaProperty.Register<LogMinimap, NavigationIndex?>(nameof(NavIndex));
 
-    public static readonly StyledProperty<int> ViewportLineProperty =
-        AvaloniaProperty.Register<LogMinimap, int>(nameof(ViewportLine));
+    public static readonly StyledProperty<double> ViewportTopRatioProperty =
+        AvaloniaProperty.Register<LogMinimap, double>(nameof(ViewportTopRatio));
 
-    public static readonly StyledProperty<int> ViewportHeightLinesProperty =
-        AvaloniaProperty.Register<LogMinimap, int>(nameof(ViewportHeightLines), 50);
+    public static readonly StyledProperty<double> ViewportHeightRatioProperty =
+        AvaloniaProperty.Register<LogMinimap, double>(nameof(ViewportHeightRatio), 1.0);
 
     public int TotalLines { get => GetValue(TotalLinesProperty); set => SetValue(TotalLinesProperty, value); }
     public NavigationIndex? NavIndex { get => GetValue(NavIndexProperty); set => SetValue(NavIndexProperty, value); }
-    public int ViewportLine { get => GetValue(ViewportLineProperty); set => SetValue(ViewportLineProperty, value); }
-    public int ViewportHeightLines { get => GetValue(ViewportHeightLinesProperty); set => SetValue(ViewportHeightLinesProperty, value); }
+    public double ViewportTopRatio { get => GetValue(ViewportTopRatioProperty); set => SetValue(ViewportTopRatioProperty, value); }
+    public double ViewportHeightRatio { get => GetValue(ViewportHeightRatioProperty); set => SetValue(ViewportHeightRatioProperty, value); }
 
     /// <summary>Fired when user clicks/drags to a line index.</summary>
     public event Action<int>? ScrollRequested;
@@ -42,7 +43,7 @@ public class LogMinimap : Control
 
     static LogMinimap()
     {
-        AffectsRender<LogMinimap>(TotalLinesProperty, NavIndexProperty, ViewportLineProperty, ViewportHeightLinesProperty);
+        AffectsRender<LogMinimap>(TotalLinesProperty, NavIndexProperty, ViewportTopRatioProperty, ViewportHeightRatioProperty);
     }
 
     public override void Render(DrawingContext context)
@@ -56,8 +57,10 @@ public class LogMinimap : Control
         double w = bounds.Width;
 
         // Viewport lens
-        double vpTop = (double)ViewportLine / TotalLines * h;
-        double vpHeight = Math.Max(4, (double)ViewportHeightLines / TotalLines * h);
+        double vpTop = Math.Clamp(ViewportTopRatio, 0.0, 1.0) * h;
+        double vpHeight = Math.Clamp(ViewportHeightRatio, 0.0, 1.0) * h;
+        vpHeight = Math.Clamp(vpHeight, Math.Min(4.0, h), h);
+        vpTop = Math.Clamp(vpTop, 0.0, Math.Max(0.0, h - vpHeight));
         context.FillRectangle(ViewportBrush, new Rect(0, vpTop, w, vpHeight));
 
         // Draw ticks for errors
@@ -76,9 +79,16 @@ public class LogMinimap : Control
         if (indices.Count == 0 || TotalLines <= 0) return;
 
         var pen = new Pen(brush, tickHeight);
+        int bucketCount = Math.Max(1, (int)Math.Ceiling(height));
+        var occupiedRows = new HashSet<int>();
+
         foreach (var idx in indices)
         {
-            double y = (double)idx / TotalLines * height;
+            int row = (int)Math.Round((double)idx / TotalLines * (bucketCount - 1));
+            if (!occupiedRows.Add(Math.Clamp(row, 0, bucketCount - 1)))
+                continue;
+
+            double y = row + 0.5;
             context.DrawLine(pen, new Point(0, y), new Point(tickWidth, y));
         }
     }

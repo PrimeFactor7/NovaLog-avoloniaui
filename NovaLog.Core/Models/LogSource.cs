@@ -39,6 +39,9 @@ public sealed class LogSource
     [JsonPropertyName("isExpanded")]
     public bool IsExpanded { get; set; } = true;
 
+    [JsonPropertyName("isChild")]
+    public bool IsChild { get; set; }
+
     [JsonIgnore]
     public string DisplayName => !string.IsNullOrEmpty(Alias)
         ? Alias

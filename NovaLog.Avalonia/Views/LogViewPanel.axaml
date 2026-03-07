@@ -12,9 +12,9 @@
     <KeyBinding Gesture="Ctrl+P" Command="{Binding ShowPickerCommand}" />
   </UserControl.KeyBindings>
 
-  <DockPanel>
+  <Grid x:Name="RootGrid" RowDefinitions="Auto,*,0,0">
     <!-- Header -->
-    <Border DockPanel.Dock="Top" Height="24"
+    <Border Grid.Row="0" Height="24"
             Background="{DynamicResource ToolBarBgBrush}"
             Padding="8,2">
       <DockPanel>
@@ -49,31 +49,25 @@
       </DockPanel>
     </Border>
 
-    <!-- Filter panel (bottom-docked, hidden by default) -->
-    <views:FilterPanel DockPanel.Dock="Bottom"
-                       DataContext="{Binding Filter}"
-                       x:Name="FilterPanelView"
-                       Height="220" />
-
     <!-- Log area + minimap (AllowDrop on children so drag-over hits a valid target and bubbles to this panel) -->
-    <Grid ColumnDefinitions="*,Auto" DragDrop.AllowDrop="True">
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" DragDrop.AllowDrop="True">
       <ScrollViewer x:Name="LogScroller"
                     Grid.Column="0"
                     DragDrop.AllowDrop="True"
                     HorizontalScrollBarVisibility="Auto"
-                    VerticalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible, Converter={x:Static vm:MinimapToVerticalScrollBarVisibilityConverter.Instance}}"
                     Background="{DynamicResource BackgroundBrush}">
         <ItemsRepeater ItemsSource="{Binding ItemsSource}"
                        x:Name="LogRepeater">
           <ItemsRepeater.Layout>
             <StackLayout Orientation="Vertical" Spacing="0" />
           </ItemsRepeater.Layout>
-          <ItemsRepeater.ItemTemplate>
-            <DataTemplate x:DataType="vm:LogLineViewModel">
-              <controls:LogLineRow />
-            </DataTemplate>
-          </ItemsRepeater.ItemTemplate>
-        </ItemsRepeater>
+        <ItemsRepeater.ItemTemplate>
+          <DataTemplate x:DataType="vm:LogLineViewModel">
+              <controls:LogLineRow OwnerLogView="{Binding $parent[views:LogViewPanel].DataContext}" />
+          </DataTemplate>
+        </ItemsRepeater.ItemTemplate>
+      </ItemsRepeater>
         <ScrollViewer.ContextMenu>
           <ContextMenu>
             <MenuItem Header="Toggle Bookmark" x:Name="MenuToggleBookmark" InputGesture="Ctrl+B" />
@@ -100,5 +94,19 @@
       <controls:DropZoneOverlay x:Name="DropOverlay" Grid.ColumnSpan="2" IsVisible="False" />
       <controls:PanePickerOverlay DataContext="{Binding Picker}" Grid.ColumnSpan="2" />
     </Grid>
-  </DockPanel>
+
+    <GridSplitter x:Name="FilterSplitter"
+                  Grid.Row="2"
+                  Height="4"
+                  Background="{DynamicResource SplitterBgBrush}"
+                  ResizeDirection="Rows"
+                  ResizeBehavior="PreviousAndNext" />
+
+    <!-- Filter panel -->
+    <views:FilterPanel Grid.Row="3"
+                       DataContext="{Binding Filter}"
+                       x:Name="FilterPanelView"
+                       MinHeight="120"
+                       VerticalAlignment="Stretch" />
+  </Grid>
 </UserControl>

@@ -32,7 +32,7 @@ public partial class App : Application
             // Support command-line file/folder loading
             if (desktop.Args is { Length: > 0 } && !string.IsNullOrWhiteSpace(desktop.Args[0]))
             {
-                vm.LoadFile(desktop.Args[0]);
+                vm.LoadPath(desktop.Args[0]);
             }
         }
 

@@ -1,4 +1,6 @@
 using System.Globalization;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
@@ -23,6 +25,18 @@ public sealed class BoolToOpacityConverter : IValueConverter
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is true ? 1.0 : 0.6;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Converts minimap visibility to the desired native vertical scrollbar mode.</summary>
+public sealed class MinimapToVerticalScrollBarVisibilityConverter : IValueConverter
+{
+    public static readonly MinimapToVerticalScrollBarVisibilityConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Auto;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();

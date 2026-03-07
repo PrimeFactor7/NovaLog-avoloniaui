@@ -241,6 +241,11 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
         IsVisible = true;
     }
 
+    public void ActivateResult(LogLineViewModel line)
+    {
+        _boundLogView?.NavigateToLine(line.GlobalIndex);
+    }
+
     public void Dispose()
     {
         _debounceTimer.Dispose();

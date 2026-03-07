@@ -10,7 +10,7 @@ public class ThemeServiceTests
     {
         var svc = new ThemeService();
         Assert.True(svc.IsDark);
-        Assert.Equal("Deep Space", svc.CurrentTheme.Name);
+        Assert.Equal("Dark", svc.CurrentTheme.Name);
     }
 
     [Fact]
@@ -20,7 +20,7 @@ public class ThemeServiceTests
         svc.SetTheme(AppConstants.ThemeLight);
 
         Assert.False(svc.IsDark);
-        Assert.Equal("Daylight", svc.CurrentTheme.Name);
+        Assert.Equal("Light", svc.CurrentTheme.Name);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class ThemeServiceTests
         svc.SetTheme(AppConstants.ThemeLight);
 
         Assert.NotNull(received);
-        Assert.Equal("Daylight", received!.Name);
+        Assert.Equal("Light", received!.Name);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class ThemeServiceTests
         var svc = new ThemeService();
         svc.SetTheme(LogThemeData.Light);
 
-        Assert.Equal("Daylight", svc.CurrentTheme.Name);
+        Assert.Equal("Light", svc.CurrentTheme.Name);
         Assert.False(svc.IsDark);
     }
 
@@ -83,7 +83,7 @@ public class LogThemeDataTests
     {
         var dark = LogThemeData.Dark;
 
-        Assert.Equal("Deep Space", dark.Name);
+        Assert.Equal("Dark", dark.Name);
         Assert.NotEmpty(dark.Background);
         Assert.NotEmpty(dark.TextInfo);
         Assert.NotEmpty(dark.TextWarn);
@@ -98,7 +98,7 @@ public class LogThemeDataTests
     {
         var light = LogThemeData.Light;
 
-        Assert.Equal("Daylight", light.Name);
+        Assert.Equal("Light", light.Name);
         Assert.NotEmpty(light.Background);
         Assert.NotEmpty(light.TextInfo);
     }

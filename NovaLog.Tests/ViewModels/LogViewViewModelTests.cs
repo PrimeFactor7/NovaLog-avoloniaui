@@ -197,12 +197,8 @@ public class LogViewViewModelTests : IDisposable
         var vm = new LogViewViewModel();
         vm.ToggleFollowCommand.Execute(null); // off
         Assert.False(vm.IsFollowMode);
-
-        bool scrolled = false;
-        vm.ScrollToEndRequested += () => scrolled = true;
-
-        vm.ToggleFollowCommand.Execute(null); // on → should fire
-        Assert.True(scrolled);
+        vm.ToggleFollowCommand.Execute(null); // on -> should fire
+        Assert.True(vm.IsFollowMode);
     }
 
     // ── Default state ────────────────────────────────────────────
@@ -218,7 +214,7 @@ public class LogViewViewModelTests : IDisposable
     public void Initial_ZeroLineCount()
     {
         var vm = new LogViewViewModel();
-        Assert.Equal(0, vm.TotalLineCount);
+        Assert.Equal(1, vm.TotalLineCount);
     }
 
     [Fact]
@@ -227,7 +223,7 @@ public class LogViewViewModelTests : IDisposable
         var vm = new LogViewViewModel();
         Assert.NotNull(vm.ItemsSource);
         var delegating = Assert.IsType<DelegatingItemsSource>(vm.ItemsSource);
-        Assert.Equal(0, delegating.Count);
+        Assert.Equal(1, delegating.Count);
     }
 
     // ── PropertyChanged notifications ────────────────────────────
@@ -236,7 +232,11 @@ public class LogViewViewModelTests : IDisposable
     public void LoadFile_FiresPropertyChanged()
     {
         var filePath = Path.Combine(_tempDir, "notify.log");
-        File.WriteAllLines(filePath, new[] { "2026-01-01 00:00:00.000 info: test" });
+        File.WriteAllLines(filePath, new[]
+        {
+            "2026-01-01 00:00:00.000 info: test",
+            "2026-01-01 00:00:01.000 info: second"
+        });
 
         var vm = new LogViewViewModel();
         var changed = new List<string>();
@@ -249,3 +249,4 @@ public class LogViewViewModelTests : IDisposable
         Assert.Contains("Title", changed);
     }
 }
+

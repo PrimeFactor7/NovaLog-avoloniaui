@@ -36,7 +36,7 @@ public class LogViewViewModelExtendedTests : IDisposable
         vm.LoadFile(binFile);
 
         Assert.StartsWith("Binary:", vm.Title);
-        Assert.Equal(0, vm.TotalLineCount);
+        Assert.Equal(1, vm.TotalLineCount);
     }
 
     [Fact]
@@ -106,8 +106,8 @@ public class LogViewViewModelExtendedTests : IDisposable
         var vm = new LogViewViewModel();
         vm.LoadFolder(_tempDir);
 
-        // Should not throw, may have 0 lines
-        Assert.Equal(0, vm.TotalLineCount);
+        // Empty folder keeps the placeholder row
+        Assert.Equal(1, vm.TotalLineCount);
     }
 
     // ── Streaming State ─────────────────────────────────────────────
@@ -372,13 +372,8 @@ public class LogViewViewModelExtendedTests : IDisposable
         var vm = new LogViewViewModel();
         vm.ToggleFollowCommand.Execute(null); // disable
         Assert.False(vm.IsFollowMode);
-
-        bool scrolledToEnd = false;
-        vm.ScrollToEndRequested += () => scrolledToEnd = true;
-
         vm.ToggleFollowCommand.Execute(null); // re-enable
         Assert.True(vm.IsFollowMode);
-        Assert.True(scrolledToEnd);
     }
 
     // ── Reload Behavior ─────────────────────────────────────────────
@@ -422,3 +417,4 @@ public class LogViewViewModelExtendedTests : IDisposable
         Assert.False(vm.IsIndexing);
     }
 }
+

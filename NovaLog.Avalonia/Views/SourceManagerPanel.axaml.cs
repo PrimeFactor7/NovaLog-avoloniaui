@@ -37,6 +37,19 @@ public partial class SourceManagerPanel : UserControl
     public void OnAddFileClick(object? sender, RoutedEventArgs e) => AddFileRequested?.Invoke(this, e);
     public void OnAddFolderClick(object? sender, RoutedEventArgs e) => AddFolderRequested?.Invoke(this, e);
 
+    public async void OnRecentHistoryClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not SourceManagerViewModel vm)
+            return;
+
+        var dialog = new RecentHistoryDialog(vm);
+        var owner = TopLevel.GetTopLevel(this) as Window;
+        if (owner is not null)
+            await dialog.ShowDialog(owner);
+        else
+            dialog.Show();
+    }
+
     private void OnSourceDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is SourceManagerViewModel vm && vm.SelectedSource != null)
@@ -159,4 +172,3 @@ public partial class SourceManagerPanel : UserControl
         return listBoxItem?.DataContext as SourceItemViewModel;
     }
 }
-

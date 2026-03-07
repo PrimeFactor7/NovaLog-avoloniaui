@@ -22,9 +22,16 @@ public partial class LogViewViewModel : ObservableObject
     [ObservableProperty] private bool _isFollowMode = true;
     [ObservableProperty] private bool _isLinked = true;
     [ObservableProperty] private int _totalLineCount;
+    [ObservableProperty] private int? _selectedLineIndex;
 
-    private System.Threading.Timer? _scrollThrottleTimer;
     private bool _scrollPending;
+
+    public event Action? SelectedLineChanged;
+
+    partial void OnSelectedLineIndexChanged(int? value)
+    {
+        SelectedLineChanged?.Invoke();
+    }
 
     partial void OnIsFollowModeChanged(bool value)
     {
@@ -37,18 +44,11 @@ public partial class LogViewViewModel : ObservableObject
         if (_scrollPending) return; // Already have a scroll queued
 
         _scrollPending = true;
-        if (_scrollThrottleTimer == null)
+        AvDispatcher.UIThread.Post(() =>
         {
-            _scrollThrottleTimer = new System.Threading.Timer(_ =>
-            {
-                _scrollPending = false;
-                ScrollToEndRequested?.Invoke();
-            }, null, 50, System.Threading.Timeout.Infinite); // Wait 50ms before scrolling
-        }
-        else
-        {
-            _scrollThrottleTimer.Change(50, System.Threading.Timeout.Infinite); // Reset timer
-        }
+            _scrollPending = false;
+            ScrollToEndRequested?.Invoke();
+        }, global::Avalonia.Threading.DispatcherPriority.Render);
     }
 
     [ObservableProperty] private bool _isIndexing;
@@ -171,8 +171,7 @@ public partial class LogViewViewModel : ObservableObject
         var target = NavIndex.GetNext(NavigationCategory.SearchHit, _currentLine, forward);
         if (target >= 0)
         {
-            IsFollowMode = false;
-            ScrollToLineRequested?.Invoke((int)target);
+            NavigateToLine((int)target);
             var (idx, total) = NavIndex.GetPositionInfo(NavigationCategory.SearchHit, target);
             NavStatus = $"Match {idx} of {total}";
         }
@@ -199,8 +198,7 @@ public partial class LogViewViewModel : ObservableObject
         {
             _provider.ScrollToTimestamp(target, idx =>
             {
-                IsFollowMode = false;
-                RequestScrollToLine((int)idx);
+                NavigateToLine((int)idx);
             });
         }
         else if (_memorySource is not null && _memorySource.Count > 0)
@@ -231,8 +229,7 @@ public partial class LogViewViewModel : ObservableObject
                 else if (midTicks > targetTicks) { hi = mid - 1; }
                 else { best = mid; break; }
             }
-            IsFollowMode = false;
-            RequestScrollToLine(best);
+            NavigateToLine(best);
         }
     }
 
@@ -307,13 +304,20 @@ public partial class LogViewViewModel : ObservableObject
     /// <summary>Requests the view to scroll to a specific line.</summary>
     public void RequestScrollToLine(int line) => ScrollToLineRequested?.Invoke(line);
 
+    public void NavigateToLine(int line)
+    {
+        IsFollowMode = false;
+        SelectedLineIndex = line;
+        SetCurrentLine(line);
+        RequestScrollToLine(line);
+    }
+
     public void NavigateBookmark(bool forward)
     {
         var target = NavIndex.GetNext(NavigationCategory.Bookmark, _currentLine, forward);
         if (target >= 0)
         {
-            IsFollowMode = false;
-            ScrollToLineRequested?.Invoke((int)target);
+            NavigateToLine((int)target);
             var (idx, total) = NavIndex.GetPositionInfo(NavigationCategory.Bookmark, target);
             NavStatus = $"Bookmark {idx} of {total}";
         }
@@ -324,8 +328,7 @@ public partial class LogViewViewModel : ObservableObject
         var target = NavIndex.GetNext(NavigationCategory.Error, _currentLine, forward);
         if (target >= 0)
         {
-            IsFollowMode = false;
-            ScrollToLineRequested?.Invoke((int)target);
+            NavigateToLine((int)target);
             var (idx, total) = NavIndex.GetPositionInfo(NavigationCategory.Error, target);
             NavStatus = $"Error {idx} of {total}";
         }
@@ -532,6 +535,18 @@ public partial class LogViewViewModel : ObservableObject
         System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Full path: {Path.GetFullPath(directoryPath)}");
         System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Directory exists: {Directory.Exists(directoryPath)}");
 
+        if (!Directory.Exists(directoryPath))
+        {
+            DisposeProvider();
+            _loadedSourceIds.Clear();
+            _loadedPaths.Clear();
+            _delegatingSource.SetInner(PlaceholderLine);
+            Title = $"Missing: {Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))}";
+            TotalLineCount = PlaceholderLine.Count;
+            Filter.OnSourceChanged(null);
+            return;
+        }
+
         DisposeProvider();
 
         System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Creating AuditLogManager ({sw.ElapsedMilliseconds}ms)");
@@ -684,8 +699,6 @@ public partial class LogViewViewModel : ObservableObject
         _provider = null;
         _virtualSource = null;
         _memorySource = null;
-        _scrollThrottleTimer?.Dispose();
-        _scrollThrottleTimer = null;
         _scrollPending = false;
         IsStreaming = false;
     }

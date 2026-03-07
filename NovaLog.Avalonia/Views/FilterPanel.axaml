@@ -18,6 +18,18 @@
     <Style Selector="ComboBox:pointerover Path">
       <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
     </Style>
+    <Style Selector="ToggleButton.filter-follow">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.filter-follow:checked">
+      <Setter Property="Background" Value="{DynamicResource TabActiveBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource PanelBgBrush}"
@@ -50,6 +62,7 @@
 
           <!-- Follow mode toggle -->
           <ToggleButton DockPanel.Dock="Right"
+                        Classes="filter-follow"
                         IsChecked="{Binding IsFollowMode}"
                         ToolTip.Tip="Follow Mode - Auto-scroll to new matches"
                         FontFamily="{StaticResource CodiconFont}"
@@ -58,9 +71,6 @@
                         Padding="0" Margin="4,0"
                         VerticalContentAlignment="Center"
                         HorizontalContentAlignment="Center">
-            <ToggleButton.Foreground>
-              <SolidColorBrush Color="{DynamicResource AccentColor}" />
-            </ToggleButton.Foreground>
           </ToggleButton>
 
           <!-- Case sensitive toggle -->

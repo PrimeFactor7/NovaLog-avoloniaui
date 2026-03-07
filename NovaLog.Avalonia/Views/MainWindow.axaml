@@ -21,17 +21,26 @@
         <!-- Left Side: Tools & Tabs -->
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
            <!-- Source Manager -->
-           <ToggleButton Classes="neon-action" IsChecked="{Binding IsSidebarVisible}" ToolTip.Tip="Toggle source manager (Ctrl+E)">
+           <ToggleButton Classes="neon-action"
+                         IsChecked="{Binding IsSidebarVisible}"
+                         ToolTip.Tip="Toggle source manager (Ctrl+E)"
+                         AutomationProperties.AutomationId="btnSources">
              <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
            </ToggleButton>
 
            <!-- Search/Filter -->
-           <ToggleButton Classes="neon-action" IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}" ToolTip.Tip="Toggle filter/search panel (Ctrl+F)">
+           <ToggleButton Classes="neon-action"
+                         IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}"
+                         ToolTip.Tip="Toggle filter/search panel (Ctrl+F)"
+                         AutomationProperties.AutomationId="btnFilter">
              <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
            </ToggleButton>
 
            <!-- Follow -->
-           <ToggleButton Classes="neon-action" IsChecked="{Binding Workspace.ActiveLogView.IsFollowMode}" ToolTip.Tip="Auto-scroll to newest lines (F)">
+           <ToggleButton Classes="neon-action"
+                         IsChecked="{Binding Workspace.ActiveLogView.IsFollowMode}"
+                         ToolTip.Tip="Auto-scroll to newest lines (F)"
+                         AutomationProperties.AutomationId="btnFollow">
              <StackPanel Orientation="Horizontal" Spacing="4">
                <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="17" Foreground="{DynamicResource AccentBrush}" />
                <TextBlock Text="Follow" />
@@ -148,7 +157,8 @@
            <!-- Theme -->
            <Button Classes="neon-action"
                    Command="{Binding ToggleThemeCommand}"
-                   ToolTip.Tip="Toggle Theme">
+                   ToolTip.Tip="Toggle Theme"
+                   AutomationProperties.AutomationId="btnTheme">
              <StackPanel Orientation="Horizontal" Spacing="4">
                <TextBlock Text="Theme:" VerticalAlignment="Center" />
                <TextBlock Text="{Binding ThemeLabel}" FontWeight="Bold" VerticalAlignment="Center" />
@@ -200,24 +210,28 @@
                    FontSize="11"
                    TextTrimming="CharacterEllipsis"
                    VerticalAlignment="Center"
+                   AutomationProperties.Name="{Binding StatusFile}"
                    AutomationProperties.AutomationId="lblFile" />
         <TextBlock Grid.Column="1"
                    Text="{Binding StatusStreaming}"
                    Foreground="{DynamicResource AccentBrush}"
                    FontSize="11" Margin="12,0"
                    VerticalAlignment="Center"
+                   AutomationProperties.Name="{Binding StatusStreaming}"
                    AutomationProperties.AutomationId="lblStreaming" />
         <TextBlock Grid.Column="2"
                    Text="{Binding StatusLines}"
                    Foreground="{DynamicResource AccentBrush}"
                    FontSize="11" Margin="12,0"
                    VerticalAlignment="Center"
+                   AutomationProperties.Name="{Binding StatusLines}"
                    AutomationProperties.AutomationId="lblLines" />
         <TextBlock Grid.Column="3"
-                   Text="{Binding Workspace.ActiveLogView.IsFollowMode, StringFormat='Follow: {0}'}"
+                   Text="{Binding StatusFollow}"
                    Foreground="{DynamicResource DimTextBrush}"
                    FontSize="11"
                    VerticalAlignment="Center"
+                   AutomationProperties.Name="{Binding StatusFollow}"
                    AutomationProperties.AutomationId="lblFollow" />
       </Grid>
     </Border>

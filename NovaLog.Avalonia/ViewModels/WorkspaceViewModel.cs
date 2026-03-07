@@ -22,6 +22,8 @@ public partial class WorkspaceViewModel : ObservableObject
     
     private SourceManagerViewModel? _sourceManager;
     private ThemeService? _theme;
+    private bool _defaultMainFollow = true;
+    private bool _defaultFilterFollow;
 
     /// <summary>True when more than one tab exists (shows tab bar).</summary>
     public bool HasMultipleTabs => Tabs.Count > 1;
@@ -32,6 +34,7 @@ public partial class WorkspaceViewModel : ObservableObject
     public WorkspaceViewModel()
     {
         var initialPane = new PaneNodeViewModel();
+        ApplyDefaultFollowState(initialPane);
         _rootNode = initialPane;
         FocusPane(initialPane);
 
@@ -61,6 +64,41 @@ public partial class WorkspaceViewModel : ObservableObject
         }
     }
 
+    public void SetMainFollowDefault(bool value, bool applyToExisting)
+    {
+        _defaultMainFollow = value;
+        if (!applyToExisting)
+            return;
+
+        foreach (var pane in GetAllPanes())
+            pane.LogView.IsFollowMode = value;
+    }
+
+    public void SetFilterFollowDefault(bool value, bool applyToExisting)
+    {
+        _defaultFilterFollow = value;
+        if (!applyToExisting)
+            return;
+
+        foreach (var pane in GetAllPanes())
+            pane.LogView.Filter.IsFollowMode = value;
+    }
+
+    public void SetFollowDefaults(bool mainFollow, bool filterFollow, bool applyToExisting)
+    {
+        _defaultMainFollow = mainFollow;
+        _defaultFilterFollow = filterFollow;
+
+        if (!applyToExisting)
+            return;
+
+        foreach (var pane in GetAllPanes())
+        {
+            pane.LogView.IsFollowMode = mainFollow;
+            pane.LogView.Filter.IsFollowMode = filterFollow;
+        }
+    }
+
     // ── Persistence ──────────────────────────────────────────────────
 
     public SplitLayoutNode SaveLayout()
@@ -75,6 +113,64 @@ public partial class WorkspaceViewModel : ObservableObject
         
         var first = GetFirstPane(RootNode);
         if (first != null) FocusPane(first);
+    }
+
+    public List<WorkspaceTabLayout> SaveTabs()
+    {
+        SyncActiveTabLayout();
+
+        var result = new List<WorkspaceTabLayout>(Tabs.Count);
+        for (int i = 0; i < Tabs.Count; i++)
+        {
+            var tab = Tabs[i];
+            var layoutNode = i == ActiveTabIndex
+                ? RootNode
+                : tab.SavedLayout ?? CreateFreshPaneNode();
+
+            result.Add(new WorkspaceTabLayout
+            {
+                Id = tab.Id,
+                DisplayName = tab.Name,
+                Layout = SerializeNode(layoutNode),
+                IsActive = i == ActiveTabIndex
+            });
+        }
+
+        return result;
+    }
+
+    public void LoadTabs(IEnumerable<WorkspaceTabLayout> tabs)
+    {
+        Tabs.Clear();
+
+        var layouts = tabs.ToList();
+        if (layouts.Count == 0)
+        {
+            ResetToSingleTab();
+            return;
+        }
+
+        foreach (var layout in layouts)
+        {
+            var savedLayout = layout.Layout is not null
+                ? DeserializeNode(layout.Layout)
+                : CreateFreshPaneNode();
+
+            var tab = new WorkspaceTabItem(layout.DisplayName, false, layout.Id)
+            {
+                SavedLayout = savedLayout
+            };
+
+            Tabs.Add(tab);
+        }
+
+        OnPropertyChanged(nameof(HasMultipleTabs));
+
+        var activeIndex = layouts.FindIndex(t => t.IsActive);
+        if (activeIndex < 0)
+            activeIndex = 0;
+
+        ActivateTab(activeIndex, saveCurrent: false);
     }
 
     private SplitLayoutNode SerializeNode(SplitNodeViewModel node)
@@ -104,12 +200,14 @@ public partial class WorkspaceViewModel : ObservableObject
         {
             System.Diagnostics.Debug.WriteLine($"[RESTORE] Deserializing leaf node, sourceId: {node.SourceId ?? "(null)"}, followMode: {node.IsFollowMode}");
             var pane = new PaneNodeViewModel();
+            ApplyDefaultFollowState(pane);
             if (_sourceManager != null && _theme != null)
             {
                 pane.LogView.Initialize(Clock, _sourceManager, _theme);
 
                 // Restore the follow mode state
                 pane.LogView.IsFollowMode = node.IsFollowMode;
+                pane.LogView.Filter.IsFollowMode = _defaultFilterFollow;
 
                 // Restore the source if one was saved
                 if (!string.IsNullOrEmpty(node.SourceId))
@@ -126,16 +224,23 @@ public partial class WorkspaceViewModel : ObservableObject
                     {
                         System.Diagnostics.Debug.WriteLine($"[RESTORE] Found source, loading {source.Kind}: {source.PhysicalPath}");
                         // Load the source based on its type
-                        if (source.Kind == SourceKind.File)
+                        if (source.Kind == SourceKind.File && File.Exists(source.PhysicalPath))
                             pane.LogView.LoadFile(source.PhysicalPath);
-                        else if (source.Kind == SourceKind.Folder)
+                        else if (source.Kind == SourceKind.Folder && Directory.Exists(source.PhysicalPath))
                             pane.LogView.LoadFolder(source.PhysicalPath);
                         else if (source.Kind == SourceKind.Merge && source.PhysicalPath.StartsWith("merge://"))
                         {
                             var ids = source.PhysicalPath.Substring(8).Split('|');
                             var sourcesToMerge = _sourceManager.Sources.Where(s => ids.Contains(s.SourceId)).ToList();
-                            System.Diagnostics.Debug.WriteLine($"[RESTORE] Loading merge with {sourcesToMerge.Count} sources");
-                            pane.LogView.LoadMerge(sourcesToMerge);
+                            if (sourcesToMerge.Count > 0)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[RESTORE] Loading merge with {sourcesToMerge.Count} sources");
+                                pane.LogView.LoadMerge(sourcesToMerge);
+                            }
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[RESTORE] Skipping missing source: {source.PhysicalPath}");
                         }
                     }
                     else
@@ -177,6 +282,7 @@ public partial class WorkspaceViewModel : ObservableObject
     private PaneNodeViewModel SplitPane(PaneNodeViewModel target, bool horizontal)
     {
         var newPane = new PaneNodeViewModel();
+        ApplyDefaultFollowState(newPane);
         if (_sourceManager != null && _theme != null)
             newPane.LogView.Initialize(Clock, _sourceManager, _theme);
         
@@ -214,6 +320,7 @@ public partial class WorkspaceViewModel : ObservableObject
         if (parent is null)
         {
             var fresh = new PaneNodeViewModel();
+            ApplyDefaultFollowState(fresh);
             if (_sourceManager != null && _theme != null)
                 fresh.LogView.Initialize(Clock, _sourceManager, _theme);
             RootNode = fresh;
@@ -266,16 +373,12 @@ public partial class WorkspaceViewModel : ObservableObject
 
     public void AddTab(string name)
     {
-        // Save current tab's layout before switching
-        if (ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count)
-            Tabs[ActiveTabIndex].SavedLayout = RootNode;
+        SyncActiveTabLayout();
 
-        foreach (var t in Tabs) t.IsActive = false;
+        foreach (var t in Tabs)
+            t.IsActive = false;
 
-        var fresh = new PaneNodeViewModel();
-        if (_sourceManager != null && _theme != null)
-            fresh.LogView.Initialize(Clock, _sourceManager, _theme);
-
+        var fresh = CreateFreshPaneNode();
         var newTab = new WorkspaceTabItem(name, true);
         newTab.SavedLayout = fresh;
         Tabs.Add(newTab);
@@ -292,43 +395,29 @@ public partial class WorkspaceViewModel : ObservableObject
         if (index < 0 || index >= Tabs.Count) return;
         if (index == ActiveTabIndex) return; // Already on this tab
 
-        // Save current tab's layout
-        if (ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count)
-            Tabs[ActiveTabIndex].SavedLayout = RootNode;
-
-        // Switch to new tab
-        foreach (var t in Tabs) t.IsActive = false;
-        Tabs[index].IsActive = true;
-        ActiveTabIndex = index;
-
-        // Restore new tab's layout
-        var newLayout = Tabs[index].SavedLayout;
-        if (newLayout != null)
-        {
-            RootNode = newLayout;
-            var firstPane = GetFirstPane(RootNode);
-            if (firstPane != null)
-                FocusPane(firstPane);
-        }
-        else
-        {
-            // Tab has no saved layout - create a fresh one
-            var fresh = new PaneNodeViewModel();
-            if (_sourceManager != null && _theme != null)
-                fresh.LogView.Initialize(Clock, _sourceManager, _theme);
-            RootNode = fresh;
-            Tabs[index].SavedLayout = fresh;
-            FocusPane(fresh);
-        }
+        ActivateTab(index, saveCurrent: true);
     }
 
     public void CloseTab(int index)
     {
         if (Tabs.Count <= 1) return;
+
+        bool closingActive = index == ActiveTabIndex;
+        if (closingActive)
+            SyncActiveTabLayout();
+
         Tabs.RemoveAt(index);
-        if (ActiveTabIndex >= Tabs.Count)
-            ActiveTabIndex = Tabs.Count - 1;
-        SwitchTab(ActiveTabIndex);
+
+        if (closingActive)
+        {
+            var nextIndex = Math.Clamp(index, 0, Tabs.Count - 1);
+            ActivateTab(nextIndex, saveCurrent: false);
+        }
+        else if (index < ActiveTabIndex)
+        {
+            ActiveTabIndex--;
+        }
+
         OnPropertyChanged(nameof(HasMultipleTabs));
     }
 
@@ -336,49 +425,20 @@ public partial class WorkspaceViewModel : ObservableObject
     {
         if (keepIndex < 0 || keepIndex >= Tabs.Count) return;
 
-        // Save current tab's layout if it's not the one we're keeping
-        if (ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count && ActiveTabIndex != keepIndex)
-            Tabs[ActiveTabIndex].SavedLayout = RootNode;
+        SyncActiveTabLayout();
 
         var keep = Tabs[keepIndex];
 
-        // If we're keeping a tab that's not currently active, make sure its layout is up to date
-        if (keepIndex == ActiveTabIndex)
-            keep.SavedLayout = RootNode;
-
         Tabs.Clear();
         Tabs.Add(keep);
-        keep.IsActive = true;
-        ActiveTabIndex = 0;
-
-        // Restore the kept tab's layout
-        if (keep.SavedLayout != null)
-        {
-            RootNode = keep.SavedLayout;
-            var firstPane = GetFirstPane(RootNode);
-            if (firstPane != null)
-                FocusPane(firstPane);
-        }
+        ActivateTab(0, saveCurrent: false);
 
         OnPropertyChanged(nameof(HasMultipleTabs));
     }
 
     public void CloseAllTabs()
     {
-        Tabs.Clear();
-
-        var fresh = new PaneNodeViewModel();
-        if (_sourceManager != null && _theme != null)
-            fresh.LogView.Initialize(Clock, _sourceManager, _theme);
-
-        var newTab = new WorkspaceTabItem("Workspace 1", true);
-        newTab.SavedLayout = fresh;
-        Tabs.Add(newTab);
-
-        ActiveTabIndex = 0;
-        RootNode = fresh;
-        FocusPane(fresh);
-        OnPropertyChanged(nameof(HasMultipleTabs));
+        ResetToSingleTab();
     }
 
     public void RenameTab(int index, string newName)
@@ -436,19 +496,85 @@ public partial class WorkspaceViewModel : ObservableObject
     }
 
     public int PaneCount => GetAllPanes().Count;
+
+    private PaneNodeViewModel CreateFreshPaneNode()
+    {
+        var pane = new PaneNodeViewModel();
+        ApplyDefaultFollowState(pane);
+        if (_sourceManager != null && _theme != null)
+            pane.LogView.Initialize(Clock, _sourceManager, _theme);
+        return pane;
+    }
+
+    private void ApplyDefaultFollowState(PaneNodeViewModel pane)
+    {
+        pane.LogView.IsFollowMode = _defaultMainFollow;
+        pane.LogView.Filter.IsFollowMode = _defaultFilterFollow;
+    }
+
+    private void SyncActiveTabLayout()
+    {
+        if (ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count)
+            Tabs[ActiveTabIndex].SavedLayout = RootNode;
+    }
+
+    private void ActivateTab(int index, bool saveCurrent)
+    {
+        if (index < 0 || index >= Tabs.Count)
+            return;
+
+        if (saveCurrent)
+            SyncActiveTabLayout();
+
+        for (int i = 0; i < Tabs.Count; i++)
+            Tabs[i].IsActive = i == index;
+
+        ActiveTabIndex = index;
+
+        var layout = Tabs[index].SavedLayout;
+        if (layout is null)
+        {
+            layout = CreateFreshPaneNode();
+            Tabs[index].SavedLayout = layout;
+        }
+
+        RootNode = layout;
+        var firstPane = GetFirstPane(RootNode);
+        if (firstPane != null)
+            FocusPane(firstPane);
+    }
+
+    private void ResetToSingleTab()
+    {
+        Tabs.Clear();
+
+        var fresh = CreateFreshPaneNode();
+        var newTab = new WorkspaceTabItem("Workspace 1", true)
+        {
+            SavedLayout = fresh
+        };
+
+        Tabs.Add(newTab);
+        ActiveTabIndex = 0;
+        RootNode = fresh;
+        FocusPane(fresh);
+        OnPropertyChanged(nameof(HasMultipleTabs));
+    }
 }
 
 /// <summary>Tab bar item.</summary>
 public partial class WorkspaceTabItem : ObservableObject
 {
+    [ObservableProperty] private string _id;
     [ObservableProperty] private string _name;
     [ObservableProperty] private bool _isActive;
 
     /// <summary>Stores this tab's workspace layout (split tree structure).</summary>
     public SplitNodeViewModel? SavedLayout { get; set; }
 
-    public WorkspaceTabItem(string name, bool isActive)
+    public WorkspaceTabItem(string name, bool isActive, string? id = null)
     {
+        _id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString() : id;
         _name = name;
         _isActive = isActive;
     }

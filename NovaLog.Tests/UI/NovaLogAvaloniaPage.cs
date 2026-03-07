@@ -12,6 +12,15 @@ namespace NovaLog.Tests.UI;
 /// </summary>
 public sealed class NovaLogAvaloniaPage : IDisposable
 {
+    private static readonly object IsolatedHostLock = new();
+    private static string? _isolatedHostDir;
+    private static readonly HashSet<string> MutableHostFiles =
+    [
+        "workspace.json",
+        "workspace.json.old",
+        "novalog-settings.json"
+    ];
+
     private readonly Application _app;
     private readonly UIA3Automation _automation;
     private readonly Window _window;
@@ -31,6 +40,7 @@ public sealed class NovaLogAvaloniaPage : IDisposable
     public static NovaLogAvaloniaPage Launch(string? exePath = null, string? fileArg = null)
     {
         exePath ??= FindExePath();
+        exePath = PrepareIsolatedExe(exePath);
 
         Application app;
         if (fileArg != null)
@@ -43,24 +53,68 @@ public sealed class NovaLogAvaloniaPage : IDisposable
             ?? throw new InvalidOperationException("NovaLog Avalonia main window did not appear in time.");
         window.WaitUntilClickable(TimeSpan.FromSeconds(5));
 
-        // Give Avalonia a moment to finish rendering
         Wait.UntilInputIsProcessed(TimeSpan.FromMilliseconds(500));
         return new NovaLogAvaloniaPage(app, automation, window);
     }
 
     private static string FindExePath()
     {
-        // Walk up from test bin to find the main project's output
         var testBin = AppContext.BaseDirectory;
         var projectRoot = Path.GetFullPath(Path.Combine(testBin, "..", "..", "..", ".."));
-        var exePath = Path.Combine(projectRoot, "NovaLog.Avalonia", "bin", "Debug", "net9.0", "NovaLog.Avalonia.exe");
+        var exePath = Path.Combine(projectRoot, "NovaLog.Avalonia", "bin", "Debug", "net10.0", "NovaLog.Avalonia.exe");
         if (!File.Exists(exePath))
             throw new FileNotFoundException(
                 $"NovaLog.Avalonia.exe not found at: {exePath}. Build the main project first (dotnet build).");
         return exePath;
     }
 
-    // ── Element lookup ────────────────────────────────────────────
+    private static string PrepareIsolatedExe(string builtExePath)
+    {
+        lock (IsolatedHostLock)
+        {
+            var sourceDir = Path.GetDirectoryName(builtExePath)
+                ?? throw new InvalidOperationException("Could not determine Avalonia output directory.");
+
+            _isolatedHostDir ??= Path.Combine(Path.GetTempPath(), $"NovaLogAvaloniaUiHost_{Guid.NewGuid():N}");
+            CopyDirectory(sourceDir, _isolatedHostDir);
+
+            ResetMutableState(_isolatedHostDir);
+            return Path.Combine(_isolatedHostDir, Path.GetFileName(builtExePath));
+        }
+    }
+
+    private static void ResetMutableState(string hostDir)
+    {
+        foreach (var fileName in MutableHostFiles)
+        {
+            var path = Path.Combine(hostDir, fileName);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+
+        var logsDir = Path.Combine(hostDir, "logs");
+        if (Directory.Exists(logsDir))
+            Directory.Delete(logsDir, recursive: true);
+    }
+
+    private static void CopyDirectory(string sourceDir, string destinationDir)
+    {
+        Directory.CreateDirectory(destinationDir);
+
+        foreach (var directory in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(sourceDir, directory);
+            Directory.CreateDirectory(Path.Combine(destinationDir, relative));
+        }
+
+        foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(sourceDir, file);
+            var destination = Path.Combine(destinationDir, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination, overwrite: true);
+        }
+    }
 
     public AutomationElement? FindByName(string name)
         => _window.FindFirstDescendant(cf => cf.ByName(name));
@@ -68,29 +122,21 @@ public sealed class NovaLogAvaloniaPage : IDisposable
     public AutomationElement? FindById(string automationId)
         => _window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
 
-    // ── Toolbar buttons (use AutomationProperties.Name) ─────────
-
-    public AutomationElement OpenFileButton
-        => FindByName("btnOpenFile")
-           ?? throw new ElementNotFoundException("btnOpenFile");
-
-    public AutomationElement OpenFolderButton
-        => FindByName("btnOpenFolder")
-           ?? throw new ElementNotFoundException("btnOpenFolder");
-
     public AutomationElement FollowButton
-        => FindByName("btnFollow")
+        => FindById("btnFollow")
            ?? throw new ElementNotFoundException("btnFollow");
 
     public AutomationElement SourcesButton
-        => FindByName("btnSources")
+        => FindById("btnSources")
            ?? throw new ElementNotFoundException("btnSources");
 
-    public AutomationElement ThemeButton
-        => FindByName("btnTheme")
-           ?? throw new ElementNotFoundException("btnTheme");
+    public AutomationElement FilterButton
+        => FindById("btnFilter")
+           ?? throw new ElementNotFoundException("btnFilter");
 
-    // ── Status bar (use AutomationId so Name returns text) ──────
+    public AutomationElement ThemeButton
+        => FindById("btnTheme")
+           ?? throw new ElementNotFoundException("btnTheme");
 
     public AutomationElement? StatusFileLabel => FindById("lblFile");
     public AutomationElement? StatusLinesLabel => FindById("lblLines");
@@ -99,8 +145,6 @@ public sealed class NovaLogAvaloniaPage : IDisposable
     public string StatusFile => StatusFileLabel?.Name ?? "";
     public string StatusLines => StatusLinesLabel?.Name ?? "";
     public string StatusFollow => StatusFollowLabel?.Name ?? "";
-
-    // ── Panels (use AutomationId) ───────────────────────────────
 
     public AutomationElement? SourceManagerPanel => FindById("sourceManagerPanel");
     public AutomationElement? LogViewPanel => FindById("logViewPanel");
@@ -113,8 +157,6 @@ public sealed class NovaLogAvaloniaPage : IDisposable
             return panel != null && !panel.IsOffscreen;
         }
     }
-
-    // ── Actions ──────────────────────────────────────────────────
 
     public void ToggleSources()
     {
@@ -134,30 +176,27 @@ public sealed class NovaLogAvaloniaPage : IDisposable
         WaitForUi(200);
     }
 
-    /// <summary>Parse the line count from the status bar (e.g. "2 lines" → 2).</summary>
     public int ParseLineCount()
     {
-        var text = StatusLines; // e.g. "1,234 lines" or "0 lines"
+        var text = StatusLines;
         var numPart = text.Split(' ')[0].Replace(",", "");
         return int.TryParse(numPart, out var n) ? n : 0;
     }
 
-    /// <summary>Wait for a brief period to let the UI settle.</summary>
     public void WaitForUi(int ms = 500)
         => Wait.UntilInputIsProcessed(TimeSpan.FromMilliseconds(ms));
 
-    /// <summary>Get the window title.</summary>
     public string Title => _window.Title;
 
-    /// <summary>Check if the application process is still running.</summary>
     public bool IsRunning => !_app.HasExited;
 
-    /// <summary>Returns true if the main window (or log area) contains visible text matching the given substring.</summary>
     public bool LogContentContainsText(string substring)
     {
         var root = LogViewPanel ?? _window;
         var found = root.FindFirstDescendant(cf => cf.ByName(substring));
-        if (found != null) return true;
+        if (found != null)
+            return true;
+
         var all = root.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Text));
         foreach (var el in all)
         {
@@ -179,3 +218,4 @@ public class ElementNotFoundException : Exception
 {
     public ElementNotFoundException(string name) : base($"UI element '{name}' not found") { }
 }
+

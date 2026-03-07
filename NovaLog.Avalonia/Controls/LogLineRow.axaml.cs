@@ -7,8 +7,8 @@ using NovaLog.Core.Models;
 using NovaLog.Core.Services;
 using NovaLog.Core.Theme;
 using AvaloniaApplication = Avalonia.Application;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
-using Avalonia.VisualTree;
 
 namespace NovaLog.Avalonia.Controls;
 
@@ -22,11 +22,53 @@ public partial class LogLineRow : Control
     private const double LevelCharsMax = 8;
     private const double GapChars = 2;
     private const double LeftPad = 4;
+    private static readonly IBrush SelectedLineBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x4F, 0xC3, 0xF7));
+    private static readonly IPen SelectedLinePen = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x4F, 0xC3, 0xF7)), 1);
+    private static readonly ConcurrentDictionary<string, IBrush> ParsedBrushes = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Regex StackMethodPattern = new(@"(?<atkw>at)\s+(?<method>[\w.+<>\[\]`,]+)\((?<args>[^)]*)\)", RegexOptions.Compiled);
+    private static readonly Regex StackFilePattern = new(@"(?:(?<inkw>in)\s+)?(?<path>\w:[\\\/][^\s:]+|[\\\/][^\s:]+):(?:line\s+)?(?<line>\d+)", RegexOptions.Compiled);
+    private static readonly Regex StackExceptionPattern = new(@"(?<extype>[\w.]+Exception)\b", RegexOptions.Compiled);
+    private static readonly Regex HexPattern = new(@"\b0x[0-9a-fA-F]+\b", RegexOptions.Compiled);
+    private static readonly Regex NumberPattern = new(@"\b\d+\.?\d*(?:[eE][-+]?\d+)?\b", RegexOptions.Compiled);
+    private static readonly Regex GuidPattern = new(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex IpPattern = new(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled);
+    private static readonly Regex UrlPattern = new(@"\b(?:https?|ftp)://[^\s]+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SqlKeywordPattern = new(
+        @"\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|AND|OR|NOT|IN|INTO|VALUES|SET|CREATE|DROP|ALTER|TABLE|INDEX|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|BETWEEN|LIKE|IS|NULL|EXISTS|UNION|CASE|WHEN|THEN|ELSE|END|EXEC|EXECUTE|TOP|ASC|DESC)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SqlStringPattern = new(@"'(?:[^'\\]|\\.)*'", RegexOptions.Compiled);
+    private static readonly Regex SqlOperatorPattern = new(@"[=<>!]+|[(),;*]", RegexOptions.Compiled);
+    private static readonly Regex SqlNumberPattern = new(@"\b\d+\.?\d*\b", RegexOptions.Compiled);
+    private static readonly IBrush FallbackText = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x41));
+    private static readonly IBrush FallbackDim = new SolidColorBrush(Color.FromRgb(0x78, 0x78, 0x96));
+    private static readonly IBrush FallbackTimestamp = new SolidColorBrush(Color.FromRgb(0x5A, 0x5A, 0x82));
+    private static readonly IBrush FallbackStackArgs = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+    private static readonly IBrush FallbackStackPath = new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90));
+    private static readonly IBrush FallbackGuidBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
+    private static readonly IBrush FallbackUrlBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
+    private static readonly IBrush FallbackIpBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
+    private static readonly IBrush FallbackHexBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xA5, 0x00));
+    private static readonly IBrush FallbackJsonBraceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
+    private static readonly IBrush FallbackJsonBracketBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
+    private static readonly IBrush FallbackSqlKeywordBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
 
     private LogLineViewModel? _vm;
+    public static readonly StyledProperty<LogViewViewModel?> OwnerLogViewProperty =
+        AvaloniaProperty.Register<LogLineRow, LogViewViewModel?>(nameof(OwnerLogView));
+
+    static LogLineRow()
+    {
+        OwnerLogViewProperty.Changed.AddClassHandler<LogLineRow>((row, _) => row.InvalidateVisual());
+    }
 
     public LogLineRow()
     {
+    }
+
+    public LogViewViewModel? OwnerLogView
+    {
+        get => GetValue(OwnerLogViewProperty);
+        set => SetValue(OwnerLogViewProperty, value);
     }
 
     protected override void OnDataContextChanged(System.EventArgs e)
@@ -55,16 +97,12 @@ public partial class LogLineRow : Control
         _vm = null;
     }
 
-    private (IEnumerable<HighlightRule>? Rules, ThemeService? Theme) GetContext()
+    private (IEnumerable<HighlightRule>? Rules, ThemeService? Theme, int? SelectedLineIndex) GetContext()
     {
-        var parent = this.GetVisualParent();
-        while (parent != null && parent is not Views.LogViewPanel)
-            parent = parent.GetVisualParent();
-        
-        if (parent is Views.LogViewPanel panel && panel.DataContext is LogViewViewModel lvm)
-            return (lvm.HighlightRules, lvm.Theme);
-        
-        return (null, null);
+        var owner = OwnerLogView;
+        return owner is null
+            ? (null, null, null)
+            : (owner.HighlightRules, owner.Theme, owner.SelectedLineIndex);
     }
 
     public override void Render(DrawingContext context)
@@ -72,16 +110,22 @@ public partial class LogLineRow : Control
         var bounds = Bounds;
         if (_vm is null) return;
 
-        var (rules, theme) = GetContext();
+        var (rules, theme, selectedLineIndex) = GetContext();
 
         double y = (bounds.Height - LogFontSize) / 2;
         if (y < 1) y = 1;
+
+        if (selectedLineIndex == _vm.GlobalIndex)
+        {
+            context.FillRectangle(SelectedLineBrush, bounds);
+            context.DrawRectangle(SelectedLinePen, bounds.Deflate(0.5));
+        }
 
         // 1. Log Level Row background tint (prioritize theme override)
         string? bgHex = theme?.GetLevelBgColorHex(_vm.Level);
         if (!string.IsNullOrEmpty(bgHex))
         {
-            context.FillRectangle(Brush.Parse(bgHex), new Rect(0, 0, bounds.Width, bounds.Height));
+            context.FillRectangle(ParseBrush(bgHex), new Rect(0, 0, bounds.Width, bounds.Height));
         }
 
         // 2. Custom Highlight Rule Line Backgrounds
@@ -92,7 +136,7 @@ public partial class LogLineRow : Control
                 if (!rule.Enabled || rule.RuleType != HighlightRuleType.LineHighlight || string.IsNullOrEmpty(rule.BackgroundHex)) continue;
                 if (rule.CompiledRegex?.IsMatch(_vm.RawText) == true)
                 {
-                    var brush = Brush.Parse(rule.BackgroundHex);
+                    var brush = ParseBrush(rule.BackgroundHex);
                     context.FillRectangle(brush, new Rect(0, 0, bounds.Width, bounds.Height));
                 }
             }
@@ -116,7 +160,7 @@ public partial class LogLineRow : Control
         if (!_vm.IsContinuation && !string.IsNullOrEmpty(_vm.TimestampText))
         {
             IBrush tsBrush = theme != null 
-                ? Brush.Parse(theme.GetTimestampColor())
+                ? ParseBrush(theme.GetTimestampColor())
                 : GetBrush("TimestampBrush") ?? FallbackTimestamp;
             
             var ft = CreateFormattedText(_vm.TimestampText, tsBrush);
@@ -128,7 +172,7 @@ public partial class LogLineRow : Control
         if (!_vm.IsContinuation && !string.IsNullOrEmpty(_vm.LevelText))
         {
             IBrush levelBrush = theme != null
-                ? Brush.Parse(theme.GetLevelColorHex(_vm.Level))
+                ? ParseBrush(theme.GetLevelColorHex(_vm.Level))
                 : GetLevelBrush(_vm.Level);
 
             var ft = CreateFormattedText(_vm.LevelText, levelBrush);
@@ -157,11 +201,13 @@ public partial class LogLineRow : Control
 
                     if (!string.IsNullOrEmpty(rule.BackgroundHex))
                     {
-                        var bg = Brush.Parse(rule.BackgroundHex);
+                        var bg = ParseBrush(rule.BackgroundHex);
                         context.FillRectangle(bg, new Rect(xMessageStart + xOff, 0, mWidth, RowHeight));
                     }
 
-                    var fg = Brush.Parse(rule.ForegroundHex);
+                    var fg = string.IsNullOrEmpty(rule.ForegroundHex)
+                        ? GetBrush("TextDefaultBrush") ?? FallbackText
+                        : ParseBrush(rule.ForegroundHex);
                     var ft = CreateFormattedText(m.Value, fg);
                     context.DrawText(ft, new Point(xMessageStart + xOff, y));
                 }
@@ -201,7 +247,7 @@ public partial class LogLineRow : Control
                 else
                 {
                     brush = theme != null 
-                        ? Brush.Parse(theme.GetMessageColor())
+                        ? ParseBrush(theme.GetMessageColor())
                         : GetBrush("TextDefaultBrush") ?? Brushes.Green;
                 }
                 RenderMessageWithHighlights(context, x, y, vm.Message, brush);
@@ -211,35 +257,30 @@ public partial class LogLineRow : Control
 
     private void RenderStackTraceMessage(DrawingContext context, double startX, double y, string message)
     {
-        // Regex patterns for stack trace highlighting
-        var stackMethodPattern = new Regex(@"(?<atkw>at)\s+(?<method>[\w.+<>\[\]`,]+)\((?<args>[^)]*)\)");
-        var stackFilePattern = new Regex(@"(?:(?<inkw>in)\s+)?(?<path>\w:[\\\/][^\s:]+|[\\\/][^\s:]+):(?:line\s+)?(?<line>\d+)");
-        var stackExceptionPattern = new Regex(@"(?<extype>[\w.]+Exception)\b");
-
         var tokens = new List<(int Index, int Length, IBrush Brush, string Type)>();
 
         // Exception types
-        foreach (Match m in stackExceptionPattern.Matches(message))
+        foreach (Match m in StackExceptionPattern.Matches(message))
             tokens.Add((m.Index, m.Length, GetBrush("StackExceptionBrush") ?? Brushes.Red, "exception"));
 
         // Method calls
-        foreach (Match m in stackMethodPattern.Matches(message))
+        foreach (Match m in StackMethodPattern.Matches(message))
         {
             if (m.Groups["atkw"].Success)
                 tokens.Add((m.Groups["atkw"].Index, m.Groups["atkw"].Length, GetBrush("StackKeywordBrush") ?? Brushes.Gray, "keyword"));
             if (m.Groups["method"].Success)
                 tokens.Add((m.Groups["method"].Index, m.Groups["method"].Length, GetBrush("StackMethodBrush") ?? Brushes.Cyan, "method"));
             if (m.Groups["args"].Success && m.Groups["args"].Length > 0)
-                tokens.Add((m.Groups["args"].Index, m.Groups["args"].Length, GetBrush("StackArgsBrush") ?? new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)), "args"));
+                tokens.Add((m.Groups["args"].Index, m.Groups["args"].Length, GetBrush("StackArgsBrush") ?? FallbackStackArgs, "args"));
         }
 
         // File paths and line numbers
-        foreach (Match m in stackFilePattern.Matches(message))
+        foreach (Match m in StackFilePattern.Matches(message))
         {
             if (m.Groups["inkw"].Success)
                 tokens.Add((m.Groups["inkw"].Index, m.Groups["inkw"].Length, GetBrush("StackKeywordBrush") ?? Brushes.Gray, "keyword"));
             if (m.Groups["path"].Success)
-                tokens.Add((m.Groups["path"].Index, m.Groups["path"].Length, GetBrush("StackPathBrush") ?? new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "path"));
+                tokens.Add((m.Groups["path"].Index, m.Groups["path"].Length, GetBrush("StackPathBrush") ?? FallbackStackPath, "path"));
             if (m.Groups["line"].Success)
                 tokens.Add((m.Groups["line"].Index, m.Groups["line"].Length, GetBrush("StackLineNumberBrush") ?? Brushes.Orange, "line"));
         }
@@ -287,45 +328,38 @@ public partial class LogLineRow : Control
 
     private void RenderMessageWithHighlights(DrawingContext context, double startX, double y, string message, IBrush defaultBrush)
     {
-        // Patterns for numbers, hex, GUIDs, IP addresses, URLs
-        var hexPattern = new Regex(@"\b0x[0-9a-fA-F]+\b");
-        var numberPattern = new Regex(@"\b\d+\.?\d*(?:[eE][-+]?\d+)?\b");
-        var guidPattern = new Regex(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.IgnoreCase);
-        var ipPattern = new Regex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b");
-        var urlPattern = new Regex(@"\b(?:https?|ftp)://[^\s]+\b", RegexOptions.IgnoreCase);
-
         var tokens = new List<(int Index, int Length, IBrush Brush)>();
 
         // GUIDs (highest priority)
-        foreach (Match m in guidPattern.Matches(message))
-            tokens.Add((m.Index, m.Length, GetBrush("GuidBrush") ?? new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6)))); // Orchid
+        foreach (Match m in GuidPattern.Matches(message))
+            tokens.Add((m.Index, m.Length, GetBrush("GuidBrush") ?? FallbackGuidBrush));
 
         // URLs
-        foreach (Match m in urlPattern.Matches(message))
+        foreach (Match m in UrlPattern.Matches(message))
         {
             bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
             if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("UrlBrush") ?? new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF)))); // Deep Sky Blue
+                tokens.Add((m.Index, m.Length, GetBrush("UrlBrush") ?? FallbackUrlBrush));
         }
 
         // IP addresses
-        foreach (Match m in ipPattern.Matches(message))
+        foreach (Match m in IpPattern.Matches(message))
         {
             bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
             if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("IpAddressBrush") ?? new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00)))); // Gold
+                tokens.Add((m.Index, m.Length, GetBrush("IpAddressBrush") ?? FallbackIpBrush));
         }
 
         // Hex values (before regular numbers)
-        foreach (Match m in hexPattern.Matches(message))
+        foreach (Match m in HexPattern.Matches(message))
         {
             bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
             if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("HexBrush") ?? new SolidColorBrush(Color.FromRgb(0xFF, 0xA5, 0x00)))); // Orange
+                tokens.Add((m.Index, m.Length, GetBrush("HexBrush") ?? FallbackHexBrush));
         }
 
         // Regular numbers
-        foreach (Match m in numberPattern.Matches(message))
+        foreach (Match m in NumberPattern.Matches(message))
         {
             bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
             if (!overlaps)
@@ -390,28 +424,20 @@ public partial class LogLineRow : Control
 
     private void RenderSqlMessage(DrawingContext context, double startX, double y, string message)
     {
-        // Regex patterns for SQL highlighting
-        var sqlKeywordPattern = new Regex(
-            @"\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|AND|OR|NOT|IN|INTO|VALUES|SET|CREATE|DROP|ALTER|TABLE|INDEX|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|BETWEEN|LIKE|IS|NULL|EXISTS|UNION|CASE|WHEN|THEN|ELSE|END|EXEC|EXECUTE|TOP|ASC|DESC)\b",
-            RegexOptions.IgnoreCase);
-        var sqlStringPattern = new Regex(@"'(?:[^'\\]|\\.)*'");
-        var sqlOperatorPattern = new Regex(@"[=<>!]+|[(),;*]");
-        var sqlNumberPattern = new Regex(@"\b\d+\.?\d*\b");
-
         // Collect all tokens
         var tokens = new List<(int Index, int Length, IBrush Brush)>();
 
-        foreach (Match m in sqlKeywordPattern.Matches(message))
-            tokens.Add((m.Index, m.Length, GetBrush("SqlKeywordBrush") ?? new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF)))); // Deep Sky Blue
-        foreach (Match m in sqlStringPattern.Matches(message))
+        foreach (Match m in SqlKeywordPattern.Matches(message))
+            tokens.Add((m.Index, m.Length, GetBrush("SqlKeywordBrush") ?? FallbackSqlKeywordBrush));
+        foreach (Match m in SqlStringPattern.Matches(message))
             tokens.Add((m.Index, m.Length, GetBrush("SqlStringBrush") ?? Brushes.Green));
-        foreach (Match m in sqlOperatorPattern.Matches(message))
+        foreach (Match m in SqlOperatorPattern.Matches(message))
         {
             bool overlaps = tokens.Any(t => m.Index >= t.Index && m.Index < t.Index + t.Length);
             if (!overlaps)
                 tokens.Add((m.Index, m.Length, GetBrush("SqlOperatorBrush") ?? Brushes.Gray));
         }
-        foreach (Match m in sqlNumberPattern.Matches(message))
+        foreach (Match m in SqlNumberPattern.Matches(message))
         {
             bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
             if (!overlaps)
@@ -472,8 +498,8 @@ public partial class LogLineRow : Control
         {
             return segment[0] switch
             {
-                '{' or '}' => GetBrush("JsonBraceBrush") ?? new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00)), // Gold
-                '[' or ']' => GetBrush("JsonBracketBrush") ?? new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6)), // Orchid
+                '{' or '}' => GetBrush("JsonBraceBrush") ?? FallbackJsonBraceBrush,
+                '[' or ']' => GetBrush("JsonBracketBrush") ?? FallbackJsonBracketBrush,
                 ':' or ',' => GetBrush("JsonPunctuationBrush") ?? Brushes.Gray,
                 _ => GetBrush("JsonPunctuationBrush") ?? Brushes.Gray
             };
@@ -503,10 +529,6 @@ public partial class LogLineRow : Control
         _                => GetBrush("TextDefaultBrush") ?? Brushes.Green
     };
 
-    private static readonly IBrush FallbackText = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x41));
-    private static readonly IBrush FallbackDim = new SolidColorBrush(Color.FromRgb(0x78, 0x78, 0x96));
-    private static readonly IBrush FallbackTimestamp = new SolidColorBrush(Color.FromRgb(0x5A, 0x5A, 0x82));
-
     private IBrush? GetBrush(string key)
     {
         if (this.TryFindResource(key, out var resource) && resource is IBrush brush)
@@ -521,6 +543,9 @@ public partial class LogLineRow : Control
             _ => null
         };
     }
+
+    private static IBrush ParseBrush(string hex)
+        => ParsedBrushes.GetOrAdd(hex, static value => Brush.Parse(value));
 
     private static FormattedText CreateFormattedText(string text, IBrush foreground)
     {

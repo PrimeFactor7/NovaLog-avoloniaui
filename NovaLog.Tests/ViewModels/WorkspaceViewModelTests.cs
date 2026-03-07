@@ -337,6 +337,29 @@ public class WorkspaceViewModelTests
     }
 
     [Fact]
+    public void SaveTabs_LoadTabs_RestoresMultipleTabLayouts()
+    {
+        var ws = new WorkspaceViewModel();
+        ws.SplitFocused(horizontal: true); // tab 0 has two panes
+        ws.AddTab("Tab 2");
+        ws.SplitFocused(horizontal: false); // tab 1 has two panes
+
+        var saved = ws.SaveTabs();
+
+        var restored = new WorkspaceViewModel();
+        restored.LoadTabs(saved);
+
+        Assert.Equal(2, restored.Tabs.Count);
+        Assert.Equal("Workspace 1", restored.Tabs[0].Name);
+        Assert.Equal("Tab 2", restored.Tabs[1].Name);
+        Assert.Equal(1, restored.ActiveTabIndex);
+        Assert.Equal(2, restored.PaneCount);
+
+        restored.SwitchTab(0);
+        Assert.Equal(2, restored.PaneCount);
+    }
+
+    [Fact]
     public void CloseTab_RemovesTab()
     {
         var ws = new WorkspaceViewModel();
@@ -349,6 +372,22 @@ public class WorkspaceViewModelTests
         Assert.Equal(2, ws.Tabs.Count);
         Assert.Equal("Workspace 1", ws.Tabs[0].Name);
         Assert.Equal("Tab 3", ws.Tabs[1].Name);
+    }
+
+    [Fact]
+    public void CloseTab_ActiveTab_RestoresAdjacentLayout()
+    {
+        var ws = new WorkspaceViewModel();
+        ws.SplitFocused(horizontal: true); // tab 0 => two panes
+        ws.AddTab("Tab 2");
+        Assert.Equal(1, ws.PaneCount); // active tab is fresh
+
+        ws.CloseTab(1);
+
+        Assert.Single(ws.Tabs);
+        Assert.Equal(0, ws.ActiveTabIndex);
+        Assert.Equal(2, ws.PaneCount);
+        Assert.Equal("Workspace 1", ws.Tabs[0].Name);
     }
 
     [Fact]
@@ -480,5 +519,35 @@ public class WorkspaceViewModelTests
     {
         var ws = new WorkspaceViewModel();
         Assert.NotNull(ws.Clock);
+    }
+
+    [Fact]
+    public void SetMainFollowDefault_AppliesToExistingAndNewPanes()
+    {
+        var ws = new WorkspaceViewModel();
+        ws.SplitFocused(horizontal: true);
+
+        ws.SetMainFollowDefault(false, applyToExisting: true);
+
+        Assert.All(ws.GetAllPanes(), pane => Assert.False(pane.LogView.IsFollowMode));
+
+        var newPane = ws.SplitFocused(horizontal: false);
+        Assert.NotNull(newPane);
+        Assert.False(newPane!.LogView.IsFollowMode);
+    }
+
+    [Fact]
+    public void SetFilterFollowDefault_AppliesToExistingAndNewPanes()
+    {
+        var ws = new WorkspaceViewModel();
+        ws.SplitFocused(horizontal: true);
+
+        ws.SetFilterFollowDefault(true, applyToExisting: true);
+
+        Assert.All(ws.GetAllPanes(), pane => Assert.True(pane.LogView.Filter.IsFollowMode));
+
+        var newPane = ws.SplitFocused(horizontal: false);
+        Assert.NotNull(newPane);
+        Assert.True(newPane!.LogView.Filter.IsFollowMode);
     }
 }

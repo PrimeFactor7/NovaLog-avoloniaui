@@ -5,6 +5,7 @@ using global::Avalonia.Input;
 using global::Avalonia.Threading;
 using global::Avalonia.VisualTree;
 using global::Avalonia.Interactivity;
+using System.ComponentModel;
 using NovaLog.Avalonia.Controls;
 using NovaLog.Avalonia.ViewModels;
 using NovaLog.Core.Models;
@@ -18,6 +19,11 @@ public partial class LogViewPanel : UserControl
 {
     private ItemsRepeater? _repeater;
     private ScrollViewer? _scroller;
+    private LogMinimap? _minimap;
+    private LogViewViewModel? _attachedViewModel;
+    private FilterPanelViewModel? _attachedFilterViewModel;
+    private bool _minimapRefreshPending;
+    private double _filterPanelHeight = 220;
 
     public event Action<string>? NewFileDropped;
     public event Action<string, bool>? SplitRequested;
@@ -83,6 +89,8 @@ public partial class LogViewPanel : UserControl
 
         _repeater = this.FindControl<ItemsRepeater>("LogRepeater");
         _scroller = this.FindControl<ScrollViewer>("LogScroller");
+        _minimap = this.FindControl<LogMinimap>("Minimap");
+        FilterPanelView.SizeChanged += OnFilterPanelSizeChanged;
 
         if (_repeater is not null)
         {
@@ -103,25 +111,28 @@ public partial class LogViewPanel : UserControl
                     int visibleCount = (int)(_scroller.Viewport.Height / 18.0);
                     vm.SetCurrentLine(topIdx + visibleCount / 2);
 
-                    var minimap = this.FindControl<LogMinimap>("Minimap");
-                    if (minimap is not null)
-                    {
-                        minimap.ViewportLine = topIdx;
-                        minimap.ViewportHeightLines = visibleCount;
-                    }
+                    if (_minimap is not null)
+                        UpdateMinimapViewport(_minimap);
 
-                    // Auto-disable follow mode when user manually scrolls up/away from end
-                    if (vm.IsFollowMode && _scroller.Extent.Height > 0)
+                    if (_scroller.Extent.Height <= 0)
+                        return;
+
+                    double maxScroll = _scroller.Extent.Height - _scroller.Viewport.Height;
+                    double currentScroll = _scroller.Offset.Y;
+
+                    // Only disable follow when the user actually scrolls upward away from the bottom.
+                    // Extent changes from new lines arriving should not count as manual scrolling.
+                    if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1 && maxScroll - currentScroll > 36.0)
                     {
-                        double maxScroll = _scroller.Extent.Height - _scroller.Viewport.Height;
-                        double currentScroll = _scroller.Offset.Y;
-                        // If user is scrolled more than 2 rows away from the bottom, disable follow mode
-                        if (maxScroll - currentScroll > 36.0) // 2 rows * 18px
-                        {
-                            vm.IsFollowMode = false;
-                        }
+                        vm.IsFollowMode = false;
                     }
                 }
+            };
+
+            _scroller.SizeChanged += (_, _) =>
+            {
+                if (_minimap is not null)
+                    UpdateMinimapViewport(_minimap);
             };
         }
 
@@ -287,38 +298,145 @@ public partial class LogViewPanel : UserControl
     {
         base.OnDataContextChanged(e);
 
-        if (DataContext is LogViewViewModel vm)
+        if (_attachedViewModel is not null)
         {
-            vm.ScrollToEndRequested += () =>
-            {
-                Dispatcher.UIThread.Post(() => _scroller?.ScrollToEnd());
-            };
-
-            vm.ScrollToLineRequested += lineIndex =>
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    if (_scroller is null) return;
-                    _scroller.Offset = new global::Avalonia.Vector(
-                        _scroller.Offset.X,
-                        lineIndex * 18.0);
-                });
-            };
-
-            var minimap = this.FindControl<LogMinimap>("Minimap");
-            if (minimap is not null)
-            {
-                minimap.NavIndex = vm.NavIndex;
-                minimap.ScrollRequested += line =>
-                {
-                    vm.IsFollowMode = false;
-                    vm.RequestScrollToLine(line);
-                };
-
-                vm.NavIndex.IndicesChanged += () =>
-                    Dispatcher.UIThread.Post(() => minimap.InvalidateVisual());
-            }
+            _attachedViewModel.ScrollToEndRequested -= OnScrollToEndRequested;
+            _attachedViewModel.ScrollToLineRequested -= OnScrollToLineRequested;
+            _attachedViewModel.NavIndex.IndicesChanged -= OnNavIndexChanged;
+            _attachedViewModel.SelectedLineChanged -= OnSelectedLineChanged;
         }
+
+        if (_attachedFilterViewModel is not null)
+            _attachedFilterViewModel.PropertyChanged -= OnFilterViewModelPropertyChanged;
+
+        if (_minimap is not null)
+            _minimap.ScrollRequested -= OnMinimapScrollRequested;
+
+        _attachedViewModel = DataContext as LogViewViewModel;
+        _attachedFilterViewModel = _attachedViewModel?.Filter;
+
+        if (_attachedViewModel is not null)
+        {
+            _attachedViewModel.ScrollToEndRequested += OnScrollToEndRequested;
+            _attachedViewModel.ScrollToLineRequested += OnScrollToLineRequested;
+            _attachedViewModel.NavIndex.IndicesChanged += OnNavIndexChanged;
+            _attachedViewModel.SelectedLineChanged += OnSelectedLineChanged;
+            _attachedFilterViewModel?.PropertyChanged += OnFilterViewModelPropertyChanged;
+
+            if (_minimap is not null)
+            {
+                _minimap.NavIndex = _attachedViewModel.NavIndex;
+                UpdateMinimapViewport(_minimap);
+                _minimap.ScrollRequested += OnMinimapScrollRequested;
+            }
+
+            UpdateFilterLayout(_attachedFilterViewModel?.IsVisible == true);
+        }
+        else if (_minimap is not null)
+        {
+            _minimap.NavIndex = null;
+            UpdateFilterLayout(false);
+        }
+    }
+
+    private void OnScrollToEndRequested()
+    {
+        Dispatcher.UIThread.Post(() => _scroller?.ScrollToEnd());
+    }
+
+    private void OnScrollToLineRequested(int lineIndex)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_scroller is null) return;
+            _scroller.Offset = new global::Avalonia.Vector(
+                _scroller.Offset.X,
+                lineIndex * 18.0);
+        });
+    }
+
+    private void OnMinimapScrollRequested(int line)
+    {
+        if (_attachedViewModel is null)
+            return;
+
+        _attachedViewModel.IsFollowMode = false;
+        _attachedViewModel.RequestScrollToLine(line);
+    }
+
+    private void OnNavIndexChanged()
+    {
+        if (_minimap is null || _minimapRefreshPending)
+            return;
+
+        _minimapRefreshPending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _minimapRefreshPending = false;
+            _minimap?.InvalidateVisual();
+        }, DispatcherPriority.Background);
+    }
+
+    private void OnSelectedLineChanged()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            InvalidateVisual();
+            _repeater?.InvalidateVisual();
+        }, DispatcherPriority.Background);
+    }
+
+    private void OnFilterViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FilterPanelViewModel.IsVisible))
+        {
+            Dispatcher.UIThread.Post(() =>
+                UpdateFilterLayout(_attachedFilterViewModel?.IsVisible == true));
+        }
+    }
+
+    private void OnFilterPanelSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (_attachedFilterViewModel?.IsVisible == true && e.NewSize.Height >= FilterPanelView.MinHeight)
+            _filterPanelHeight = e.NewSize.Height;
+    }
+
+    private void UpdateFilterLayout(bool isVisible)
+    {
+        if (RootGrid.RowDefinitions.Count < 4)
+            return;
+
+        RootGrid.RowDefinitions[2].Height = new GridLength(isVisible ? 4 : 0, GridUnitType.Pixel);
+        RootGrid.RowDefinitions[3].Height = new GridLength(isVisible ? Math.Max(FilterPanelView.MinHeight, _filterPanelHeight) : 0, GridUnitType.Pixel);
+        FilterSplitter.IsVisible = isVisible;
+        FilterPanelView.IsVisible = isVisible;
+    }
+
+    private void UpdateMinimapViewport(LogMinimap minimap)
+    {
+        if (_scroller is null)
+            return;
+
+        double extentHeight = _scroller.Extent.Height;
+        double viewportHeight = _scroller.Viewport.Height;
+
+        if (extentHeight <= 0 || viewportHeight <= 0)
+        {
+            minimap.ViewportTopRatio = 0;
+            minimap.ViewportHeightRatio = 1;
+            return;
+        }
+
+        double maxOffset = Math.Max(0.0, extentHeight - viewportHeight);
+        double clampedOffset = Math.Clamp(_scroller.Offset.Y, 0.0, maxOffset);
+        double heightRatio = viewportHeight / extentHeight;
+        bool pinToBottom = _attachedViewModel?.IsFollowMode == true && maxOffset > 0;
+        double topRatio = pinToBottom
+            ? Math.Max(0.0, 1.0 - heightRatio)
+            : clampedOffset / extentHeight;
+
+        minimap.ViewportTopRatio = topRatio;
+        minimap.ViewportHeightRatio = heightRatio;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

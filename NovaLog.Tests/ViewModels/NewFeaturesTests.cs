@@ -113,6 +113,76 @@ public class NewFeaturesTests
     }
 
     [Fact]
+    public void PreviewRecent_LoadsWithoutAddingSource()
+    {
+        var vm = new SourceManagerViewModel();
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            string? selectedPath = null;
+            SourceKind? selectedKind = null;
+            vm.SourceSelected += (path, kind) =>
+            {
+                selectedPath = path;
+                selectedKind = kind;
+            };
+
+            vm.AddToRecentHistory(tempFile, SourceKind.File);
+
+            var result = vm.PreviewRecent(vm.RecentSources[0]);
+
+            Assert.True(result);
+            Assert.Empty(vm.Sources);
+            Assert.Equal(tempFile, selectedPath);
+            Assert.Equal(SourceKind.File, selectedKind);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public void AddRecentToSources_AddsAndSelectsSource()
+    {
+        var vm = new SourceManagerViewModel();
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            string? selectedPath = null;
+            vm.SourceSelected += (path, _) => selectedPath = path;
+            vm.AddToRecentHistory(tempFile, SourceKind.File);
+
+            var result = vm.AddRecentToSources(vm.RecentSources[0]);
+
+            Assert.True(result);
+            Assert.Single(vm.Sources);
+            Assert.Equal(tempFile, vm.Sources[0].PhysicalPath);
+            Assert.Same(vm.Sources[0], vm.SelectedSource);
+            Assert.Equal(tempFile, selectedPath);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public void BuildRecentHistoryItems_ReportsMissingStatus()
+    {
+        var vm = new SourceManagerViewModel();
+        var missingPath = Path.Combine(Path.GetTempPath(), $"novalog_missing_{Guid.NewGuid():N}.log");
+        vm.AddToRecentHistory(missingPath, SourceKind.File);
+
+        var items = vm.BuildRecentHistoryItems();
+
+        Assert.Single(items);
+        Assert.True(items[0].IsMissing);
+        Assert.Equal("Missing", items[0].StatusText);
+        Assert.Equal("FILE", items[0].KindLabel);
+    }
+
+    [Fact]
     public void ShowRecents_DefaultsToFalse()
     {
         var vm = new SourceManagerViewModel();

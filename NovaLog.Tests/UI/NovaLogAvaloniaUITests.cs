@@ -66,10 +66,9 @@ public class NovaLogAvaloniaUITests : IDisposable
     public void App_Launches_ToolbarButtonsExist()
     {
         _page = NovaLogAvaloniaPage.Launch();
-        Assert.NotNull(_page.OpenFileButton);
-        Assert.NotNull(_page.OpenFolderButton);
-        Assert.NotNull(_page.FollowButton);
         Assert.NotNull(_page.SourcesButton);
+        Assert.NotNull(_page.FilterButton);
+        Assert.NotNull(_page.FollowButton);
         Assert.NotNull(_page.ThemeButton);
     }
 

@@ -1,7 +1,9 @@
 using System;
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Avalonia.Threading;
 using NovaLog.Avalonia.ViewModels;
@@ -23,6 +25,10 @@ public partial class FilterPanel : UserControl
         {
             input.KeyDown += OnSearchInputKeyDown;
         }
+
+        var results = this.FindControl<ItemsControl>("FilterResultsControl");
+        results?.AddHandler(InputElement.PointerPressedEvent, OnFilterResultPointerPressed,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -122,5 +128,24 @@ public partial class FilterPanel : UserControl
     {
         var input = this.FindControl<TextBox>("SearchInput");
         input?.Focus();
+    }
+
+    private void OnFilterResultPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_attachedViewModel is null || e.Source is not Visual element)
+            return;
+
+        Visual? current = element;
+        while (current is not null)
+        {
+            if (current is StyledElement styled && styled.DataContext is LogLineViewModel line)
+            {
+                _attachedViewModel.ActivateResult(line);
+                e.Handled = true;
+                return;
+            }
+
+            current = current.GetVisualParent();
+        }
     }
 }

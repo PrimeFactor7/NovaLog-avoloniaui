@@ -37,6 +37,18 @@ public partial class SourceItemViewModel : ObservableObject
     };
 }
 
+public sealed class RecentHistoryItemViewModel
+{
+    public required RecentSourceEntry Entry { get; init; }
+    public required string DisplayName { get; init; }
+    public required string Location { get; init; }
+    public required string KindLabel { get; init; }
+    public required string LastUsedText { get; init; }
+    public required string LastModifiedText { get; init; }
+    public required string StatusText { get; init; }
+    public bool IsMissing { get; init; }
+}
+
 public partial class SourceManagerViewModel : ObservableObject
 {
     [ObservableProperty] private SourceItemViewModel? _selectedSource;
@@ -70,36 +82,65 @@ public partial class SourceManagerViewModel : ObservableObject
     {
         if (Sources.Any(s => s.PhysicalPath == path && !s.IsChild)) return;
 
-        var item = new SourceItemViewModel
-        {
-            DisplayName = kind == SourceKind.Folder
-                ? new DirectoryInfo(path).Name
-                : Path.GetFileName(path),
-            PhysicalPath = path,
-            Kind = kind,
-            SourceColorHex = GetNextColor(Sources.Count)
-        };
-
-        // Preserve the source ID if provided (for session restore)
-        if (!string.IsNullOrEmpty(sourceId))
-            item.SourceId = sourceId;
-
-        item.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(SourceItemViewModel.IsSelectedForMerge))
-            {
-                OnPropertyChanged(nameof(MergeStatusText));
-                OnPropertyChanged(nameof(CanMerge));
-                OnPropertyChanged(nameof(CanClear));
-            }
-            if (e.PropertyName == nameof(SourceItemViewModel.IsExpanded))
-            {
-                UpdateDisplayList();
-            }
-        };
-
+        var item = CreateSourceItem(path, kind, sourceId);
         Sources.Add(item);
         AddToRecentHistory(path, kind);
+    }
+
+    public void RestoreSources(IEnumerable<LogSource> sources)
+    {
+        Sources.Clear();
+
+        var sourceList = sources.ToList();
+        foreach (var source in sourceList)
+        {
+            var item = CreateSourceItem(source);
+            Sources.Add(item);
+        }
+
+        foreach (var source in sourceList)
+        {
+            var item = Sources.FirstOrDefault(s => s.SourceId == source.Id);
+            if (item is null)
+                continue;
+
+            item.IsChild = source.IsChild;
+            item.IsMissing = source.Kind switch
+            {
+                SourceKind.File => !File.Exists(source.PhysicalPath),
+                SourceKind.Folder => !Directory.Exists(source.PhysicalPath),
+                _ => false
+            };
+
+            item.ChildSourceIds.Clear();
+            if (source.ChildSourceIds is { Count: > 0 })
+            {
+                foreach (var childId in source.ChildSourceIds)
+                    item.ChildSourceIds.Add(childId);
+            }
+        }
+
+        UpdateDisplayList();
+        OnPropertyChanged(nameof(MergeStatusText));
+        OnPropertyChanged(nameof(CanMerge));
+        OnPropertyChanged(nameof(CanClear));
+    }
+
+    public List<LogSource> CreateSnapshot()
+    {
+        return Sources.Select(src => new LogSource
+        {
+            Id = src.SourceId,
+            PhysicalPath = src.PhysicalPath,
+            Alias = GetPersistedAlias(src),
+            SourceColorHex = src.SourceColorHex,
+            IsSelectedForMerge = src.IsSelectedForMerge,
+            Status = src.IsMissing ? SourceStatus.Missing : SourceStatus.Active,
+            Kind = src.Kind,
+            ChildSourceIds = src.ChildSourceIds.ToList(),
+            IsExpanded = src.IsExpanded,
+            IsChild = src.IsChild
+        }).ToList();
     }
 
     public void AddToRecentHistory(string path, SourceKind kind)
@@ -122,6 +163,13 @@ public partial class SourceManagerViewModel : ObservableObject
             RecentSources.RemoveAt(RecentSources.Count - 1);
     }
 
+    public IReadOnlyList<RecentHistoryItemViewModel> BuildRecentHistoryItems()
+    {
+        return RecentSources
+            .Select(CreateRecentHistoryItem)
+            .ToList();
+    }
+
     [RelayCommand]
     private void ToggleRecents()
     {
@@ -131,12 +179,36 @@ public partial class SourceManagerViewModel : ObservableObject
     [RelayCommand]
     private void LoadRecent(RecentSourceEntry recent)
     {
-        if (!File.Exists(recent.Path) && !Directory.Exists(recent.Path))
-            return;
+        PreviewRecent(recent, trackUsage: true);
+    }
 
-        var kind = Enum.Parse<SourceKind>(recent.Kind);
+    public bool PreviewRecent(RecentSourceEntry recent, bool trackUsage = false)
+    {
+        if (!TryResolveRecentSource(recent, out var kind))
+            return false;
+
         SourceSelected?.Invoke(recent.Path, kind);
+        if (trackUsage)
+            AddToRecentHistory(recent.Path, kind);
+
+        return true;
+    }
+
+    public bool AddRecentToSources(RecentSourceEntry recent)
+    {
+        if (!TryResolveRecentSource(recent, out var kind))
+            return false;
+
+        AddSource(recent.Path, kind);
         AddToRecentHistory(recent.Path, kind);
+
+        var existing = Sources.FirstOrDefault(s =>
+            !s.IsChild && PathsEqual(s.PhysicalPath, recent.Path));
+        if (existing != null)
+            SelectedSource = existing;
+
+        SourceSelected?.Invoke(recent.Path, kind);
+        return true;
     }
 
     private void UpdateDisplayList()
@@ -275,6 +347,161 @@ public partial class SourceManagerViewModel : ObservableObject
     {
         string[] palette = ["#00FF41", "#00D4FF", "#FF00FF", "#FFB000", "#FF3E3E", "#FFD700"];
         return palette[index % palette.Length];
+    }
+
+    private SourceItemViewModel CreateSourceItem(string path, SourceKind kind, string? sourceId)
+    {
+        var item = new SourceItemViewModel
+        {
+            DisplayName = GetDefaultDisplayName(path, kind),
+            PhysicalPath = path,
+            Kind = kind,
+            SourceColorHex = GetNextColor(Sources.Count)
+        };
+
+        if (!string.IsNullOrEmpty(sourceId))
+            item.SourceId = sourceId;
+
+        AttachSourceHandlers(item);
+        return item;
+    }
+
+    private SourceItemViewModel CreateSourceItem(LogSource source)
+    {
+        var item = new SourceItemViewModel
+        {
+            DisplayName = !string.IsNullOrWhiteSpace(source.Alias)
+                ? source.Alias
+                : GetDefaultDisplayName(source.PhysicalPath, source.Kind),
+            PhysicalPath = source.PhysicalPath,
+            Kind = source.Kind,
+            SourceColorHex = string.IsNullOrWhiteSpace(source.SourceColorHex)
+                ? GetNextColor(Sources.Count)
+                : source.SourceColorHex,
+            IsSelectedForMerge = source.IsSelectedForMerge,
+            IsExpanded = source.IsExpanded
+        };
+
+        if (!string.IsNullOrEmpty(source.Id))
+            item.SourceId = source.Id;
+
+        AttachSourceHandlers(item);
+        return item;
+    }
+
+    private void AttachSourceHandlers(SourceItemViewModel item)
+    {
+        item.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SourceItemViewModel.IsSelectedForMerge))
+            {
+                OnPropertyChanged(nameof(MergeStatusText));
+                OnPropertyChanged(nameof(CanMerge));
+                OnPropertyChanged(nameof(CanClear));
+            }
+            if (e.PropertyName == nameof(SourceItemViewModel.IsExpanded))
+            {
+                UpdateDisplayList();
+            }
+        };
+    }
+
+    private static string GetDefaultDisplayName(string path, SourceKind kind) => kind switch
+    {
+        SourceKind.Folder => new DirectoryInfo(path).Name,
+        SourceKind.File => Path.GetFileName(path),
+        SourceKind.Merge => "Merged View",
+        _ => Path.GetFileName(path)
+    };
+
+    private static string? GetPersistedAlias(SourceItemViewModel src)
+    {
+        if (src.Kind == SourceKind.Merge)
+            return src.DisplayName;
+
+        var defaultName = GetDefaultDisplayName(src.PhysicalPath, src.Kind);
+        return string.Equals(src.DisplayName, defaultName, StringComparison.Ordinal)
+            ? null
+            : src.DisplayName;
+    }
+
+    private RecentHistoryItemViewModel CreateRecentHistoryItem(RecentSourceEntry recent)
+    {
+        var kind = ParseRecentKind(recent);
+        var exists = kind switch
+        {
+            SourceKind.Folder => Directory.Exists(recent.Path),
+            _ => File.Exists(recent.Path)
+        };
+
+        DateTime? lastModified = null;
+        if (exists)
+        {
+            lastModified = kind switch
+            {
+                SourceKind.Folder => Directory.GetLastWriteTime(recent.Path),
+                _ => File.GetLastWriteTime(recent.Path)
+            };
+        }
+
+        var inSources = Sources.Any(s => !s.IsChild && PathsEqual(s.PhysicalPath, recent.Path));
+        var displayName = GetDefaultDisplayName(recent.Path, kind);
+        var lastUsed = recent.LastAccessed.Kind == DateTimeKind.Utc
+            ? recent.LastAccessed.ToLocalTime()
+            : recent.LastAccessed;
+
+        return new RecentHistoryItemViewModel
+        {
+            Entry = recent,
+            DisplayName = displayName,
+            Location = Path.GetDirectoryName(recent.Path) ?? recent.Path,
+            KindLabel = kind switch
+            {
+                SourceKind.Folder => "DIR",
+                SourceKind.Merge => "MERGE",
+                _ => "FILE"
+            },
+            LastUsedText = lastUsed.ToString("yyyy-MM-dd HH:mm"),
+            LastModifiedText = lastModified?.ToString("yyyy-MM-dd HH:mm") ?? "Missing",
+            StatusText = !exists ? "Missing" : inSources ? "In Sources" : "Available",
+            IsMissing = !exists
+        };
+    }
+
+    private static SourceKind ParseRecentKind(RecentSourceEntry recent)
+    {
+        if (Enum.TryParse<SourceKind>(recent.Kind, ignoreCase: true, out var parsed))
+            return parsed;
+
+        return Directory.Exists(recent.Path) ? SourceKind.Folder : SourceKind.File;
+    }
+
+    private static bool TryResolveRecentSource(RecentSourceEntry recent, out SourceKind kind)
+    {
+        kind = ParseRecentKind(recent);
+        return kind switch
+        {
+            SourceKind.Folder => Directory.Exists(recent.Path),
+            _ => File.Exists(recent.Path)
+        };
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            return false;
+
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(left),
+                Path.GetFullPath(right),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
 
