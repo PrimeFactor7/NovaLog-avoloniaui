@@ -104,7 +104,15 @@
                     CanUserResizeColumns="True"
                     CanUserSortColumns="False"
                     ShowColumnHeaders="True"
-                    Background="{DynamicResource BackgroundBrush}" />
+                    Classes.gridlines="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.GridLinesVisible}"
+                    Background="{DynamicResource BackgroundBrush}">
+        <TreeDataGrid.Styles>
+          <Style Selector="TreeDataGrid.gridlines :is(TreeDataGridCell)">
+            <Setter Property="BorderBrush" Value="{DynamicResource SplitterBgBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+          </Style>
+        </TreeDataGrid.Styles>
+      </TreeDataGrid>
 
       <controls:LogMinimap x:Name="Minimap"
                            Grid.Column="1"

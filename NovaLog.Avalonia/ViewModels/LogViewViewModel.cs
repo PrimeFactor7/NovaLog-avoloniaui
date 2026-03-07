@@ -53,7 +53,7 @@ public partial class LogViewViewModel : ObservableObject
         }, global::Avalonia.Threading.DispatcherPriority.Render);
     }
 
-    [ObservableProperty] private bool _isGridMode;
+    [ObservableProperty] private bool _isGridMode = true;
     [ObservableProperty] private bool _isIndexing;
     [ObservableProperty] private double _indexingProgress;
     [ObservableProperty] private bool _isStreaming;
