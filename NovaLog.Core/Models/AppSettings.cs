@@ -115,6 +115,13 @@ public sealed class AppSettings
 
     [JsonPropertyName("bookmarks")]
     public Dictionary<string, List<long>> Bookmarks { get; set; } = new();
+
+    // Grid View
+    [JsonPropertyName("gridLinesVisible")]
+    public bool GridLinesVisible { get; set; } = true;
+
+    [JsonPropertyName("sectionGridExpanded")]
+    public bool SectionGridExpanded { get; set; } = false;
 }
 
 public sealed class LevelColorEntry

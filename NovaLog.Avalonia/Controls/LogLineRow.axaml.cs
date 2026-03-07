@@ -175,12 +175,40 @@ public partial class LogLineRow : Control
 
         if (_vm.IsFileSeparator)
         {
+            // Draw header bar background
+            var headerBg = GetBrush("ToolBarBgBrush") ?? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x1C));
+            context.FillRectangle(headerBg, bounds);
+
+            // Bottom separator line
             var sepBrush = GetBrush("SeparatorBrush") ?? Brushes.Gray;
-            context.DrawLine(new Pen(sepBrush, 1), new Point(0, bounds.Height / 2), new Point(bounds.Width, bounds.Height / 2));
+            context.DrawLine(new Pen(sepBrush, 1), new Point(0, bounds.Height - 0.5), new Point(bounds.Width, bounds.Height - 0.5));
+
             if (!string.IsNullOrEmpty(_vm.Message))
             {
-                var ft = CreateFormattedText(_vm.Message, GetBrush("DimTextBrush") ?? Brushes.Gray);
-                context.DrawText(ft, new Point(LeftPad, y));
+                double xPos = LeftPad + 4;
+
+                // File icon (codicon)
+                var iconFt = new FormattedText("\uEA7B", System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("codicon"), LogFontSize, GetBrush("DimTextBrush") ?? Brushes.Gray);
+                context.DrawText(iconFt, new Point(xPos, y));
+                xPos += iconFt.Width + 6;
+
+                // Filename in accent color
+                var accentBrush = GetBrush("AccentBrush") ?? Brushes.Cyan;
+                var nameFt = new FormattedText(_vm.Message, System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Cascadia Mono, Consolas, Courier New", FontStyle.Normal, FontWeight.Bold),
+                    LogFontSize, accentBrush);
+                context.DrawText(nameFt, new Point(xPos, y));
+                xPos += nameFt.Width + 12;
+
+                // File size (if available)
+                if (!string.IsNullOrEmpty(_vm.FileSizeText))
+                {
+                    var sizeFt = CreateFormattedText(_vm.FileSizeText, GetBrush("DimTextBrush") ?? Brushes.Gray);
+                    context.DrawText(sizeFt, new Point(xPos, y));
+                }
             }
             return;
         }

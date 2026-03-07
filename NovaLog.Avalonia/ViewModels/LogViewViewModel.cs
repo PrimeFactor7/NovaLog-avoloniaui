@@ -53,10 +53,108 @@ public partial class LogViewViewModel : ObservableObject
         }, global::Avalonia.Threading.DispatcherPriority.Render);
     }
 
+    [ObservableProperty] private bool _isGridMode;
     [ObservableProperty] private bool _isIndexing;
     [ObservableProperty] private double _indexingProgress;
     [ObservableProperty] private bool _isStreaming;
     [ObservableProperty] private string _navStatus = "";
+
+    [RelayCommand]
+    private void ToggleViewMode() => IsGridMode = !IsGridMode;
+
+    [RelayCommand]
+    private void ExpandAllFiles()
+    {
+        if (GridDataSource is global::Avalonia.Controls.HierarchicalTreeDataGridSource<GridRowViewModel> hs)
+            hs.ExpandAll();
+    }
+
+    [RelayCommand]
+    private void CollapseAllFiles()
+    {
+        if (GridDataSource is global::Avalonia.Controls.HierarchicalTreeDataGridSource<GridRowViewModel> hs)
+            hs.CollapseAll();
+    }
+
+    partial void OnIsGridModeChanged(bool value)
+    {
+        if (value)
+            RebuildGridSource();
+        else
+            GridDataSource = null;
+    }
+
+    [ObservableProperty] private global::Avalonia.Controls.ITreeDataGridSource? _gridDataSource;
+
+    private List<GridRowViewModel>? _gridRootRows;
+
+    private void RebuildGridSource()
+    {
+        if (!IsGridMode) return;
+
+        if (_memorySource is not null)
+        {
+            _gridRootRows = GridSourceBuilder.BuildHierarchical(
+                _memorySource, Title);
+            GridDataSource = CreateHierarchicalGridSource(_gridRootRows);
+        }
+        else if (_virtualSource is not null)
+        {
+            // Virtual sources use flat grid (too many lines for tree nodes)
+            var rows = GridSourceBuilder.BuildFlat(_virtualSource);
+            GridDataSource = CreateFlatGridSource(rows);
+        }
+    }
+
+    private global::Avalonia.Controls.ITreeDataGridSource CreateFlatGridSource(
+        IReadOnlyList<GridRowViewModel> rows)
+    {
+        return new global::Avalonia.Controls.FlatTreeDataGridSource<GridRowViewModel>(rows)
+        {
+            Columns =
+            {
+                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
+                    "Timestamp", x => x.TimestampText, width: new global::Avalonia.Controls.GridLength(180)),
+                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
+                    "Level", x => x.LevelText, width: new global::Avalonia.Controls.GridLength(70)),
+                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
+                    "Message", x => x.Message, width: new global::Avalonia.Controls.GridLength(1, global::Avalonia.Controls.GridUnitType.Star)),
+            }
+        };
+    }
+
+    private global::Avalonia.Controls.ITreeDataGridSource CreateHierarchicalGridSource(
+        IReadOnlyList<GridRowViewModel> rootRows)
+    {
+        var source = new global::Avalonia.Controls.HierarchicalTreeDataGridSource<GridRowViewModel>(rootRows)
+        {
+            Columns =
+            {
+                new global::Avalonia.Controls.Models.TreeDataGrid.HierarchicalExpanderColumn<GridRowViewModel>(
+                    new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
+                        "File / Timestamp",
+                        x => x.IsFileHeader
+                            ? (string.IsNullOrEmpty(x.FileSizeText)
+                                ? $"{x.FileName}  ({x.ChildCount} lines)"
+                                : $"{x.FileName}  ({x.FileSizeText}, {x.ChildCount} lines)")
+                            : x.TimestampText,
+                        width: new global::Avalonia.Controls.GridLength(260)),
+                    x => x.Children),
+                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
+                    "Level", x => x.LevelText, width: new global::Avalonia.Controls.GridLength(70)),
+                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
+                    "Message", x => x.IsFileHeader ? "" : x.Message,
+                    width: new global::Avalonia.Controls.GridLength(1, global::Avalonia.Controls.GridUnitType.Star)),
+            }
+        };
+
+        // "Recent Only": collapse all, expand last file
+        source.CollapseAll();
+        if (rootRows.Count > 0)
+            source.Expand(new global::Avalonia.Controls.IndexPath(rootRows.Count - 1));
+
+        return source;
+    }
 
     private readonly DelegatingItemsSource _delegatingSource = new();
     private InMemoryLogItemsSource? _memorySource;
@@ -458,6 +556,7 @@ public partial class LogViewViewModel : ObservableObject
 
         // Notify filter that source changed
         Filter.OnSourceChanged(_memorySource);
+        RebuildGridSource();
     }
 
     /// <summary>Load from a virtual provider (BigFile mode).</summary>
@@ -494,6 +593,7 @@ public partial class LogViewViewModel : ObservableObject
 
         // Notify filter that source changed (virtual sources don't support incremental search yet)
         Filter.OnSourceChanged(null);
+        RebuildGridSource();
     }
 
     private const long BigFileThreshold = 512 * 1024; // 512 KB - balance between indexing overhead and memory usage
@@ -622,6 +722,7 @@ public partial class LogViewViewModel : ObservableObject
 
         // Notify filter that source changed (merged sources use virtual provider)
         Filter.OnSourceChanged(null);
+        RebuildGridSource();
     }
 
     /// <summary>Load a folder, discovering audit JSON or log files, with streaming.</summary>
@@ -770,9 +871,24 @@ public partial class LogViewViewModel : ObservableObject
             if (_memorySource is null) return;
 
             var baseIndex = _memorySource.Count;
-            var parsed = rawLines.Select((raw, i) => LogLineParser.Parse(raw, baseIndex + i));
+            var parsed = rawLines.Select((raw, i) => LogLineParser.Parse(raw, baseIndex + i)).ToList();
             _memorySource.AppendLines(parsed);
             TotalLineCount = _memorySource.Count;
+
+            // Update grid source incrementally
+            if (IsGridMode && _gridRootRows is { Count: > 0 })
+            {
+                var lastGroup = _gridRootRows[^1];
+                if (lastGroup.Children is not null)
+                {
+                    foreach (var line in parsed)
+                    {
+                        if (!line.IsFileSeparator)
+                            lastGroup.Children.Add(new GridRowViewModel { Line = new LogLineViewModel(line) });
+                    }
+                    lastGroup.ChildCount = lastGroup.Children.Count;
+                }
+            }
 
             if (IsFollowMode)
                 RequestScrollToEndThrottled();

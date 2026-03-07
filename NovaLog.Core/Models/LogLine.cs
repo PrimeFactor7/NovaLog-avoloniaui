@@ -29,6 +29,7 @@ public readonly record struct LogLine
     public bool IsContinuation { get; init; }
     public SyntaxFlavor Flavor { get; init; }
     public bool IsFileSeparator { get; init; }
+    public long FileSize { get; init; }
 
     public LogLine()
     {

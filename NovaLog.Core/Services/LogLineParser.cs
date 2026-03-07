@@ -20,14 +20,18 @@ public static partial class LogLineParser
     {
         if (rawText.StartsWith(FileSepPrefix, StringComparison.Ordinal))
         {
-            var parts = rawText[FileSepPrefix.Length..].Split("::", 2);
+            var parts = rawText[FileSepPrefix.Length..].Split("::", 3);
             var label = parts.Length >= 2 ? $"{parts[0]}  ({parts[1]})" : parts[0];
+            long fileSize = 0;
+            if (parts.Length >= 3)
+                long.TryParse(parts[2], out fileSize);
             return new LogLine
             {
                 GlobalIndex = globalIndex,
                 RawText = rawText,
                 Message = label,
-                IsFileSeparator = true
+                IsFileSeparator = true,
+                FileSize = fileSize
             };
         }
 

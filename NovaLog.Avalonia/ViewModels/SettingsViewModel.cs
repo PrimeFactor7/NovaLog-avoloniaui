@@ -57,7 +57,11 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _minimapVisible = true;
     [ObservableProperty] private bool _filterPanelVisible;
 
+    // Grid View
+    [ObservableProperty] private bool _gridLinesVisible = true;
+
     // Sections (Expanders)
+    [ObservableProperty] private bool _sectionGridExpanded;
     [ObservableProperty] private bool _sectionColumnColorsExpanded;
     [ObservableProperty] private bool _sectionLogLevelsExpanded;
     [ObservableProperty] private bool _sectionHighlightRulesExpanded;
@@ -115,6 +119,8 @@ public partial class SettingsViewModel : ObservableObject
         MinimapVisible = settings.MinimapVisible;
         FilterPanelVisible = settings.FilterPanelVisible;
 
+        GridLinesVisible = settings.GridLinesVisible;
+        SectionGridExpanded = settings.SectionGridExpanded;
         SectionColumnColorsExpanded = settings.SectionColumnColorsExpanded;
         SectionLogLevelsExpanded = settings.SectionLogLevelsExpanded;
         SectionHighlightRulesExpanded = settings.SectionHighlightRulesExpanded;
@@ -161,6 +167,8 @@ public partial class SettingsViewModel : ObservableObject
         settings.MinimapVisible = MinimapVisible;
         settings.FilterPanelVisible = FilterPanelVisible;
 
+        settings.GridLinesVisible = GridLinesVisible;
+        settings.SectionGridExpanded = SectionGridExpanded;
         settings.SectionColumnColorsExpanded = SectionColumnColorsExpanded;
         settings.SectionLogLevelsExpanded = SectionLogLevelsExpanded;
         settings.SectionHighlightRulesExpanded = SectionHighlightRulesExpanded;

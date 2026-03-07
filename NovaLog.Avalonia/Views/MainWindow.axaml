@@ -47,6 +47,13 @@
              </StackPanel>
            </ToggleButton>
 
+           <!-- Grid View -->
+           <ToggleButton Classes="neon-action"
+                         IsChecked="{Binding Workspace.ActiveLogView.IsGridMode}"
+                         ToolTip.Tip="Toggle grid view (G)">
+             <TextBlock Text="&#xEB91;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </ToggleButton>
+
            <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
 
            <!-- Split Panes -->

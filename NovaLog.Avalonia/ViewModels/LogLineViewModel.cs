@@ -15,6 +15,8 @@ public sealed class LogLineViewModel
     public SyntaxFlavor Flavor { get; set; }
     public bool IsContinuation { get; }
     public bool IsFileSeparator { get; }
+    public long FileSize { get; }
+    public string FileSizeText { get; }
     public int GlobalIndex { get; }
     public string RawText { get; }
     public string? MergeSourceTag { get; }
@@ -29,6 +31,8 @@ public sealed class LogLineViewModel
         Flavor = line.Flavor;
         IsContinuation = line.IsContinuation;
         IsFileSeparator = line.IsFileSeparator;
+        FileSize = line.FileSize;
+        FileSizeText = FormatFileSize(line.FileSize);
         Message = line.Message;
         MergeSourceTag = mergeSourceTag;
         MergeSourceColorHex = mergeSourceColorHex;
@@ -39,6 +43,15 @@ public sealed class LogLineViewModel
 
         LevelText = line.IsContinuation ? string.Empty : LevelToString(line.Level);
     }
+
+    private static string FormatFileSize(long bytes) => bytes switch
+    {
+        0 => "",
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        < 1024 * 1024 * 1024 => $"{bytes / (1024.0 * 1024.0):F1} MB",
+        _ => $"{bytes / (1024.0 * 1024.0 * 1024.0):F1} GB"
+    };
 
     private static string LevelToString(LogLevel level) => level switch
     {

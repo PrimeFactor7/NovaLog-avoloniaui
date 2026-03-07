@@ -201,6 +201,19 @@
             </StackPanel>
           </Expander>
 
+          <!-- Grid View -->
+          <Expander IsExpanded="{Binding SectionGridExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x2637;" Classes="expander-icon" />
+                <TextBlock Text="Grid View" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="6" Margin="8,4">
+              <CheckBox IsChecked="{Binding GridLinesVisible}" Content="Grid lines" />
+            </StackPanel>
+          </Expander>
+
         </StackPanel>
       </ScrollViewer>
     </DockPanel>

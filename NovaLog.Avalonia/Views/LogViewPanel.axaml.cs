@@ -558,6 +558,11 @@ public partial class LogViewPanel : UserControl
             vm.NavigateError(forward: false);
             e.Handled = true;
         }
+        else if (e.Key == Key.G && !ctrl && !e.KeyModifiers.HasFlag(KeyModifiers.Shift) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            vm.ToggleViewModeCommand.Execute(null);
+            e.Handled = true;
+        }
         else
         {
             base.OnKeyDown(e);

@@ -64,6 +64,7 @@
     <Grid Grid.Row="1" ColumnDefinitions="*,Auto" DragDrop.AllowDrop="True">
       <ScrollViewer x:Name="LogScroller"
                     Grid.Column="0"
+                    IsVisible="{Binding !IsGridMode}"
                     DragDrop.AllowDrop="True"
                     HorizontalScrollBarVisibility="Auto"
                     VerticalScrollBarVisibility="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible, Converter={x:Static vm:MinimapToVerticalScrollBarVisibilityConverter.Instance}}"
@@ -94,6 +95,16 @@
           </ContextMenu>
         </ScrollViewer.ContextMenu>
       </ScrollViewer>
+
+      <!-- Grid mode: TreeDataGrid (toggled by G key or toolbar button) -->
+      <TreeDataGrid x:Name="LogGrid"
+                    Grid.Column="0"
+                    IsVisible="{Binding IsGridMode}"
+                    Source="{Binding GridDataSource}"
+                    CanUserResizeColumns="True"
+                    CanUserSortColumns="False"
+                    ShowColumnHeaders="True"
+                    Background="{DynamicResource BackgroundBrush}" />
 
       <controls:LogMinimap x:Name="Minimap"
                            Grid.Column="1"

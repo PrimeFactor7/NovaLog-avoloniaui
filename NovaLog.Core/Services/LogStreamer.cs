@@ -57,7 +57,8 @@ public sealed class LogStreamer : IDisposable
                 if (!first)
                 {
                     var created = File.GetCreationTime(path);
-                    lines.Add($"$$FILE_SEP::{Path.GetFileName(path)}::{created:yyyy-MM-dd HH:mm:ss}");
+                    var fileSize = new FileInfo(path).Length;
+                    lines.Add($"$$FILE_SEP::{Path.GetFileName(path)}::{created:yyyy-MM-dd HH:mm:ss}::{fileSize}");
                 }
                 first = false;
 
