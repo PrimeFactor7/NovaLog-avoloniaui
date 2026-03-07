@@ -1,0 +1,104 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             xmlns:controls="using:NovaLog.Avalonia.Controls"
+             xmlns:views="using:NovaLog.Avalonia.Views"
+             x:Class="NovaLog.Avalonia.Views.LogViewPanel"
+             x:DataType="vm:LogViewViewModel"
+             Focusable="True"
+             DragDrop.AllowDrop="True">
+
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Ctrl+P" Command="{Binding ShowPickerCommand}" />
+  </UserControl.KeyBindings>
+
+  <DockPanel>
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Height="24"
+            Background="{DynamicResource ToolBarBgBrush}"
+            Padding="8,2">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Classes="neon-action" Content="&#x2715;"
+                Command="{Binding ClosePaneCommand}"
+                Width="20" Height="20" Padding="0" Margin="0,-2,-4,-2"
+                Background="Transparent" BorderThickness="0"
+                Foreground="{DynamicResource DimTextBrush}"
+                ToolTip.Tip="Close pane (source stays in list)" />
+        <TextBlock DockPanel.Dock="Right"
+                   Text="&#xEB4B;"
+                   FontFamily="{StaticResource CodiconFont}"
+                   FontSize="14"
+                   Margin="0,0,8,0"
+                   Foreground="{DynamicResource AccentBrush}"
+                   VerticalAlignment="Center"
+                   IsVisible="{Binding IsLinked}"
+                   ToolTip.Tip="Linked to time sync (Ctrl+L to unlink)" />
+        <TextBlock DockPanel.Dock="Right"
+                   Text="&#xEB4C;"
+                   FontFamily="{StaticResource CodiconFont}"
+                   FontSize="14"
+                   Margin="0,0,8,0"
+                   Foreground="{DynamicResource DimTextBrush}"
+                   VerticalAlignment="Center"
+                   IsVisible="{Binding !IsLinked}"
+                   ToolTip.Tip="Unlinked from time sync (Ctrl+L to link)" />
+        <TextBlock Text="{Binding Title}"
+                   Foreground="{DynamicResource DimTextBrush}"
+                   VerticalAlignment="Center"
+                   FontSize="11" />
+      </DockPanel>
+    </Border>
+
+    <!-- Filter panel (bottom-docked, hidden by default) -->
+    <views:FilterPanel DockPanel.Dock="Bottom"
+                       DataContext="{Binding Filter}"
+                       x:Name="FilterPanelView"
+                       Height="220" />
+
+    <!-- Log area + minimap (AllowDrop on children so drag-over hits a valid target and bubbles to this panel) -->
+    <Grid ColumnDefinitions="*,Auto" DragDrop.AllowDrop="True">
+      <ScrollViewer x:Name="LogScroller"
+                    Grid.Column="0"
+                    DragDrop.AllowDrop="True"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto"
+                    Background="{DynamicResource BackgroundBrush}">
+        <ItemsRepeater ItemsSource="{Binding ItemsSource}"
+                       x:Name="LogRepeater">
+          <ItemsRepeater.Layout>
+            <StackLayout Orientation="Vertical" Spacing="0" />
+          </ItemsRepeater.Layout>
+          <ItemsRepeater.ItemTemplate>
+            <DataTemplate x:DataType="vm:LogLineViewModel">
+              <controls:LogLineRow />
+            </DataTemplate>
+          </ItemsRepeater.ItemTemplate>
+        </ItemsRepeater>
+        <ScrollViewer.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Toggle Bookmark" x:Name="MenuToggleBookmark" InputGesture="Ctrl+B" />
+            <MenuItem Header="Copy Line" x:Name="MenuCopyLine" />
+            <MenuItem Header="Copy Formatted JSON" x:Name="MenuCopyFormattedJson" />
+            <Separator />
+            <MenuItem Header="Go to Timestamp..." x:Name="MenuGoToTimestamp" InputGesture="Ctrl+G" />
+            <MenuItem Header="Time Travel (Sync Others)" x:Name="MenuTimeTravel" InputGesture="Ctrl+T" />
+            <MenuItem Header="Pin Timestamp" x:Name="MenuPinTimestamp" InputGesture="Ctrl+Shift+P" />
+            <Separator />
+            <MenuItem Header="Source Picker..." Command="{Binding ShowPickerCommand}" InputGesture="Ctrl+P" />
+            <MenuItem Header="Highlight Rules..." x:Name="MenuHighlightRules" />
+          </ContextMenu>
+        </ScrollViewer.ContextMenu>
+      </ScrollViewer>
+
+      <controls:LogMinimap x:Name="Minimap"
+                           Grid.Column="1"
+                           DragDrop.AllowDrop="True"
+                           TotalLines="{Binding TotalLineCount}"
+                           IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible}" />
+
+      <!-- Overlays -->
+      <controls:DropZoneOverlay x:Name="DropOverlay" Grid.ColumnSpan="2" IsVisible="False" />
+      <controls:PanePickerOverlay DataContext="{Binding Picker}" Grid.ColumnSpan="2" />
+    </Grid>
+  </DockPanel>
+</UserControl>

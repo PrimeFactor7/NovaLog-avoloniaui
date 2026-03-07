@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="NovaLog.Avalonia.Views.GoToTimestampDialog"
+        Title="Go to Timestamp"
+        Width="400" Height="180"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        TextElement.Foreground="{DynamicResource TextDefaultBrush}">
+
+  <StackPanel Margin="20" Spacing="16">
+    <TextBlock Text="Enter target timestamp (yyyy-MM-dd HH:mm:ss.fff):"
+               Foreground="{DynamicResource TextDefaultBrush}" />
+    
+    <TextBox x:Name="TimestampBox"
+             FontFamily="Cascadia Mono, Consolas"
+             Watermark="2026-03-05 12:00:00.000" />
+
+    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+      <Button Content="Go" Width="100" x:Name="BtnGo" Classes="accent" IsDefault="True" />
+      <Button Content="Cancel" Width="80" x:Name="BtnCancel" IsCancel="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             x:Class="NovaLog.Avalonia.Controls.PanePickerOverlay"
+             x:DataType="vm:PanePickerViewModel"
+             IsVisible="{Binding IsVisible}"
+             Width="350" Height="320"
+             HorizontalAlignment="Center" VerticalAlignment="Center">
+  <Border Background="{DynamicResource ToolBarBgBrush}"
+          BorderBrush="{DynamicResource AccentBrush}"
+          BorderThickness="1"
+          BoxShadow="0 4 20 0 #80000000"
+          CornerRadius="4">
+    <DockPanel>
+      <!-- Search Box -->
+      <TextBox DockPanel.Dock="Top"
+               Text="{Binding SearchText}"
+               Watermark="Search sources..."
+               BorderThickness="0,0,0,1"
+               Padding="10,8"
+               x:Name="SearchBox"
+               FontFamily="Segoe UI" />
+
+      <!-- Items List -->
+      <ListBox ItemsSource="{Binding FilteredItems}"
+               SelectedItem="{Binding SelectedItem}"
+               Background="{DynamicResource PanelBgBrush}"
+               BorderThickness="0">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:PanePickerItem">
+            <Grid ColumnDefinitions="Auto,*" Margin="4">
+              <TextBlock Grid.Column="0" 
+                         Text="{Binding Kind, Converter={x:Static vm:SourceKindToIconConverter.Instance}}" 
+                         FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter"
+                         FontSize="14"
+                         Foreground="{DynamicResource AccentBrush}"
+                         VerticalAlignment="Center"
+                         Width="24" />
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding DisplayName}" FontSize="12" />
+                <TextBlock Text="{Binding Path}" FontSize="10" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+  </Border>
+</UserControl>

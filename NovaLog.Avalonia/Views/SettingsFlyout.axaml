@@ -1,0 +1,208 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             x:Class="NovaLog.Avalonia.Views.SettingsFlyout"
+             x:DataType="vm:SettingsViewModel"
+             TextElement.Foreground="{DynamicResource TextDefaultBrush}"
+             IsVisible="{Binding IsVisible}">
+
+  <UserControl.Styles>
+    <Style Selector="Expander">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+      <Setter Property="Padding" Value="4" />
+    </Style>
+    <Style Selector="Expander /template/ ToggleButton#PART_toggle">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Expander TextBlock.expander-header">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Expander TextBlock.expander-icon">
+      <Setter Property="FontFamily" Value="Segoe MDL2 Assets, Avalonia.Fonts.Inter" />
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+      <Setter Property="Margin" Value="0,-5,8,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource ToolBarBgBrush}"
+          BorderBrush="{DynamicResource SeparatorBrush}"
+          BorderThickness="1,0,0,0"
+          Padding="8"
+          Width="320">
+    <DockPanel>
+      <!-- Header -->
+      <DockPanel DockPanel.Dock="Top" Margin="4,0,4,12">
+        <Button DockPanel.Dock="Right"
+                Classes="neon-action"
+                Content="X"
+                Command="{Binding CloseCommand}"
+                Width="28" Height="28"
+                Padding="0"
+                HorizontalContentAlignment="Center" />
+        <TextBlock Text="Settings"
+                   FontSize="14" FontWeight="Bold"
+                   Foreground="{DynamicResource AccentBrush}"
+                   VerticalAlignment="Center" />
+      </DockPanel>
+
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+          
+          <!-- Column Colors -->
+          <Expander IsExpanded="{Binding SectionColumnColorsExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x2261;" Classes="expander-icon" />
+                <TextBlock Text="Column Colors" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <Grid ColumnDefinitions="*,Auto">
+                <CheckBox Grid.Column="0" Content="Timestamp color" IsChecked="{Binding TimestampColorEnabled}" />
+                <ColorPicker Grid.Column="1" Color="{Binding TimestampColor}" IsEnabled="{Binding TimestampColorEnabled}" />
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto">
+                <CheckBox Grid.Column="0" Content="Message color" IsChecked="{Binding MessageColorEnabled}" />
+                <ColorPicker Grid.Column="1" Color="{Binding MessageColor}" IsEnabled="{Binding MessageColorEnabled}" />
+              </Grid>
+            </StackPanel>
+          </Expander>
+
+          <!-- Log Levels -->
+          <Expander IsExpanded="{Binding SectionLogLevelsExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x26A0;" Classes="expander-icon" />
+                <TextBlock Text="Log Levels" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <ItemsControl ItemsSource="{Binding LevelColors}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LevelColorViewModel">
+                    <Grid ColumnDefinitions="50,*,Auto,Auto" Margin="0,2">
+                      <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" FontSize="11" FontFamily="Cascadia Mono" Foreground="{DynamicResource DimTextBrush}" />
+                      <ColorPicker Grid.Column="1" Color="{Binding Foreground}" HorizontalAlignment="Right" Margin="0,0,8,0" />
+                      <CheckBox Grid.Column="2" Content="bg" IsChecked="{Binding BackgroundEnabled}" FontSize="10" Margin="0,0,8,0" />
+                      <ColorPicker Grid.Column="3" Color="{Binding Background}" IsEnabled="{Binding BackgroundEnabled}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <CheckBox Content="Color entire line" IsChecked="{Binding LevelEntireLineEnabled}" FontSize="11" />
+            </StackPanel>
+          </Expander>
+
+          <!-- Highlight Rules -->
+          <Expander IsExpanded="{Binding SectionHighlightRulesExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x270F;" Classes="expander-icon" />
+                <TextBlock Text="Highlight Rules" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <Button Content="&#x2699; Edit Rules..." 
+                      Command="{Binding EditHighlightRulesCommand}" 
+                      Classes="neon-action" 
+                      HorizontalAlignment="Left" />
+            </StackPanel>
+          </Expander>
+
+          <!-- Minimap -->
+          <Expander IsExpanded="{Binding SectionMinimapExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x2503;" Classes="expander-icon" />
+                <TextBlock Text="Minimap" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <CheckBox Content="Show minimap (M)" IsChecked="{Binding MinimapVisible}" />
+              <CheckBox Content="Search hits" IsChecked="{Binding MinimapShowSearch}" />
+              <CheckBox Content="Errors" IsChecked="{Binding MinimapShowErrors}" />
+              <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,4" />
+              <CheckBox Content="Show filter panel" IsChecked="{Binding FilterPanelVisible}" />
+            </StackPanel>
+          </Expander>
+
+          <!-- Theme -->
+          <Expander IsExpanded="{Binding SectionThemeExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x263E;" Classes="expander-icon" />
+                <TextBlock Text="Theme" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <ComboBox ItemsSource="{Binding AvailableThemes}"
+                        SelectedItem="{Binding Theme}"
+                        HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </Expander>
+
+          <!-- Follow -->
+          <Expander IsExpanded="{Binding SectionFollowExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x21E9;" Classes="expander-icon" />
+                <TextBlock Text="Follow" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <CheckBox Content="Main view follow (F)" IsChecked="{Binding MainFollowEnabled}" />
+              <CheckBox Content="Filter results follow" IsChecked="{Binding FilterFollowEnabled}" />
+            </StackPanel>
+          </Expander>
+
+          <!-- Display -->
+          <Expander IsExpanded="{Binding SectionDisplayExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="A" Classes="expander-icon" FontWeight="Bold" FontFamily="Segoe UI" />
+                <TextBlock Text="Display" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="8,4">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right"
+                           Text="{Binding FontSize, StringFormat={}{0:F0}pt}"
+                           FontSize="11"
+                           Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock Text="Font Size" FontSize="11" Foreground="{DynamicResource DimTextBrush}" />
+              </DockPanel>
+              <Slider Minimum="7" Maximum="16"
+                      Value="{Binding FontSize}"
+                      TickFrequency="1"
+                      IsSnapToTickEnabled="True" />
+            </StackPanel>
+          </Expander>
+
+          <!-- Syntax Highlighting -->
+          <Expander IsExpanded="{Binding SectionSyntaxHighlightingExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x2726;" Classes="expander-icon" />
+                <TextBlock Text="Syntax Highlighting" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="6" Margin="8,4">
+              <CheckBox IsChecked="{Binding JsonHighlightEnabled}" Content="JSON" />
+              <CheckBox IsChecked="{Binding SqlHighlightEnabled}" Content="SQL queries" />
+              <CheckBox IsChecked="{Binding StackTraceHighlightEnabled}" Content="Stack traces" />
+              <CheckBox IsChecked="{Binding NumberHighlightEnabled}" Content="Numbers &amp; hex values" />
+            </StackPanel>
+          </Expander>
+
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

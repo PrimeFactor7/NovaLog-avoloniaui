@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             x:Class="NovaLog.Avalonia.Controls.TimeSyncBar"
+             x:DataType="vm:TimeSyncBarViewModel"
+             Height="24"
+             IsVisible="{Binding IsVisible}"
+             Background="{DynamicResource ToolBarBgBrush}">
+  <Grid>
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
+      <!-- Clock Icon -->
+      <TextBlock Text="&#xE823;" 
+                 FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" 
+                 FontSize="12" 
+                 Foreground="{DynamicResource AccentBrush}"
+                 VerticalAlignment="Center" />
+      
+      <!-- Timestamp Text -->
+      <TextBlock Text="{Binding TimestampText}"
+                 FontFamily="Cascadia Mono, Consolas, Courier New"
+                 FontSize="11"
+                 Foreground="{DynamicResource AccentBrush}"
+                 Margin="8,0"
+                 VerticalAlignment="Center" />
+
+      <!-- Clear Button -->
+      <Button Command="{Binding ClearCommand}"
+              Background="Transparent"
+              BorderThickness="0"
+              Padding="4"
+              VerticalAlignment="Center"
+              Cursor="Hand">
+        <TextBlock Text="&#xE711;" 
+                   FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" 
+                   FontSize="10" 
+                   Foreground="{DynamicResource DimTextBrush}" />
+      </Button>
+    </StackPanel>
+    
+    <!-- Bottom Separator -->
+    <Border Height="1" 
+            Background="{DynamicResource SeparatorBrush}" 
+            VerticalAlignment="Bottom" />
+  </Grid>
+</UserControl>

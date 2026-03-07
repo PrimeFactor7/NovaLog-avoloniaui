@@ -1,0 +1,59 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Default brushes (Dark theme). Overwritten at runtime by ThemeMapper. -->
+  <SolidColorBrush x:Key="BackgroundBrush" Color="#020205" />
+  <SolidColorBrush x:Key="PanelBgBrush" Color="#0E0E14" />
+  <SolidColorBrush x:Key="ToolBarBgBrush" Color="#14141C" />
+  <SolidColorBrush x:Key="StatusBarBgBrush" Color="#0A0A10" />
+  <SolidColorBrush x:Key="TabActiveBgBrush" Color="#232332" />
+  <SolidColorBrush x:Key="TabHoverBgBrush" Color="#2D2D3C" />
+  <SolidColorBrush x:Key="SeparatorBrush" Color="#323241" />
+  <SolidColorBrush x:Key="SplitterBgBrush" Color="#282837" />
+
+  <SolidColorBrush x:Key="TextTraceBrush" Color="#606060" />
+  <SolidColorBrush x:Key="TextVerboseBrush" Color="#6A6A8A" />
+  <SolidColorBrush x:Key="TextDebugBrush" Color="#808080" />
+  <SolidColorBrush x:Key="TextInfoBrush" Color="#00D4FF" />
+  <SolidColorBrush x:Key="TextWarnBrush" Color="#FFB000" />
+  <SolidColorBrush x:Key="TextErrorBrush" Color="#FF3E3E" />
+  <SolidColorBrush x:Key="TextFatalBrush" Color="#FF2060" />
+  <SolidColorBrush x:Key="TextDefaultBrush" Color="#00FF41" />
+
+  <SolidColorBrush x:Key="AccentBrush" Color="#00D4FF" />
+  <SolidColorBrush x:Key="TimestampBrush" Color="#5A5A82" />
+  <SolidColorBrush x:Key="DimTextBrush" Color="#787896" />
+
+  <SolidColorBrush x:Key="WarnLineBgBrush" Color="#12FFB000" />
+  <SolidColorBrush x:Key="ErrorLineBgBrush" Color="#1CFF3E3E" />
+  <SolidColorBrush x:Key="FatalLineBgBrush" Color="#30FF2060" />
+
+  <SolidColorBrush x:Key="JsonKeyBrush" Color="#00D4FF" />
+  <SolidColorBrush x:Key="JsonStringBrush" Color="#00FF41" />
+  <SolidColorBrush x:Key="JsonNumberBrush" Color="#FFB000" />
+  <SolidColorBrush x:Key="JsonBoolBrush" Color="#FF3E3E" />
+  <SolidColorBrush x:Key="JsonPunctuationBrush" Color="#A0A0A8" />
+  <SolidColorBrush x:Key="JsonBraceBrush" Color="#FFD700" />
+
+  <SolidColorBrush x:Key="SqlKeywordBrush" Color="#FF00FF" />
+  <SolidColorBrush x:Key="SqlTableBrush" Color="#00D4FF" />
+  <SolidColorBrush x:Key="SqlValueBrush" Color="#00FF41" />
+  <SolidColorBrush x:Key="SqlOperatorBrush" Color="#808080" />
+
+  <SolidColorBrush x:Key="StackMethodBrush" Color="#FF3E3E" />
+  <SolidColorBrush x:Key="StackFilePathBrush" Color="#00D4FF" />
+  <SolidColorBrush x:Key="StackLineNumberBrush" Color="#FFB000" />
+  <SolidColorBrush x:Key="StackKeywordBrush" Color="#A0A0A8" />
+
+  <SolidColorBrush x:Key="NumberLiteralBrush" Color="#FFB000" />
+  <SolidColorBrush x:Key="BookmarkMarkerBrush" Color="#0078FF" />
+  <SolidColorBrush x:Key="SearchHitMarkerBrush" Color="#00FF41" />
+
+  <!-- Neon Acrylic material for sidebar -->
+  <ExperimentalAcrylicMaterial x:Key="NeonAcrylicMaterial"
+    BackgroundSource="Digger"
+    TintColor="#0A0A14"
+    TintOpacity="0.85"
+    MaterialOpacity="0.3" />
+
+</ResourceDictionary>

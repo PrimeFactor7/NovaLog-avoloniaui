@@ -1,0 +1,5 @@
+2026-03-05 10:00:01.000 info: Application started
+2026-03-05 10:00:02.000 debug: Loading config from appsettings.json
+2026-03-05 10:00:03.000 warn: Deprecated option 'LegacyMode' will be removed in v2
+2026-03-05 10:00:04.000 info: Listening on http://localhost:5000
+2026-03-05 10:00:05.000 error: Connection refused to redis://localhost:6379

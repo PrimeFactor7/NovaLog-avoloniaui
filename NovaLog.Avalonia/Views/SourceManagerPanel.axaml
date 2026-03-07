@@ -1,0 +1,188 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             xmlns:models="using:NovaLog.Core.Models"
+             x:Class="NovaLog.Avalonia.Views.SourceManagerPanel"
+             x:DataType="vm:SourceManagerViewModel">
+
+  <ExperimentalAcrylicBorder Material="{StaticResource NeonAcrylicMaterial}">
+    <Border Classes="neon-sidebar">
+      <DockPanel>
+        
+        <!-- Header -->
+        <Border Classes="neon-header" DockPanel.Dock="Top">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Classes="neon-action" Content="&#x2715;" 
+                    Command="{Binding CloseSidebarCommand}" 
+                    Width="24" Height="24" Padding="0" Margin="0,0,-4,0" />
+            <TextBlock Classes="neon-title" Text="&#x2630;  Sources" VerticalAlignment="Center" />
+          </DockPanel>
+        </Border>
+
+        <!-- Action bar -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                    Spacing="4" Margin="6,6">
+          <Button Classes="neon-action" Click="OnAddFolderClick"
+                  ToolTip.Tip="Add Folder">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="Folder" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="neon-action" Click="OnAddFileClick"
+                  ToolTip.Tip="Add File">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="&#xE8E5;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="File" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="2" />
+
+          <ToggleButton Classes="neon-action" IsChecked="{Binding ShowRecents}" ToolTip.Tip="Toggle Recent Files">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="Recent" VerticalAlignment="Center" />
+            </StackPanel>
+          </ToggleButton>
+
+          <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="2" />
+
+          <Button Classes="neon-action" Command="{Binding ToggleSelectAllCommand}" ToolTip.Tip="Select All">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="&#xE762;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="All" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="neon-action" Command="{Binding ClearSelectedCommand}" IsEnabled="{Binding CanClear}" ToolTip.Tip="Clear Selected">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="Clear" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <Border Classes="neon-separator" DockPanel.Dock="Top" />
+
+        <!-- Recent sources panel -->
+        <Border DockPanel.Dock="Top" IsVisible="{Binding ShowRecents}" Background="{DynamicResource ToolBarBgBrush}" Padding="6" Margin="4,4,4,0">
+          <StackPanel>
+            <TextBlock Text="Recent Files" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding RecentSources}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:RecentSourceEntry">
+                  <Button Classes="neon-action" Command="{Binding $parent[UserControl].((vm:SourceManagerViewModel)DataContext).LoadRecentCommand}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,1">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <TextBlock Grid.Column="0" Text="&#xE8E5;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="10" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Path}" FontSize="10" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="8" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="neon-separator" DockPanel.Dock="Top" IsVisible="{Binding ShowRecents}" />
+
+        <!-- Footer -->
+        <Border DockPanel.Dock="Bottom" Classes="neon-header">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="neon-status"
+                       Text="{Binding MergeStatusText}"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="neon-action"
+                    Content="Merge"
+                    Command="{Binding MergeSelectedCommand}"
+                    IsEnabled="{Binding CanMerge}" />
+          </Grid>
+        </Border>
+
+        <!-- Source list -->
+        <ListBox x:Name="SourceListBox"
+                 ItemsSource="{Binding DisplaySources}"
+                 SelectedItem="{Binding SelectedSource}"
+                 Background="Transparent"
+                 DoubleTapped="OnSourceDoubleTapped">
+          <ListBox.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Load" Command="{Binding LoadSelectedCommand}" />
+              <MenuItem Header="Open in New Tab" Command="{Binding OpenInNewTabCommand}" />
+              <Separator />
+              <MenuItem Header="Set Alias..." Command="{Binding SetAliasCommand}" />
+              <MenuItem Header="Remove" Command="{Binding RemoveSelectedCommand}" />
+              <Separator />
+              <MenuItem Header="Show in Explorer" Command="{Binding ShowInExplorerCommand}" />
+            </ContextMenu>
+          </ListBox.ContextMenu>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SourceItemViewModel">
+              <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="{Binding IsChild, Converter={x:Static vm:IndentConverter.Instance}}">
+                
+                <!-- Checkbox for non-child, non-merge items -->
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForMerge}" 
+                          IsVisible="{Binding Kind, Converter={x:Static vm:NotMergeKindConverter.Instance}}" 
+                          Margin="0,0,6,0" VerticalAlignment="Center" />
+                          
+                <!-- Chevron for merge groups -->
+                <ToggleButton Grid.Column="0" IsChecked="{Binding IsExpanded}"
+                              IsVisible="{Binding Kind, Converter={x:Static vm:MergeKindConverter.Instance}}"
+                              Classes="neon-action" Width="20" Height="20" Padding="0" Margin="0,0,4,0" Background="Transparent">
+                  <TextBlock Text="{Binding IsExpanded, Converter={x:Static vm:ChevronConverter.Instance}}"
+                             FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="10"
+                             Foreground="{DynamicResource DimTextBrush}" />
+                </ToggleButton>
+
+                <!-- Color Pip / Bar -->
+                <Ellipse Grid.Column="1" Classes="neon-pip"
+                         IsVisible="{Binding !IsChild}"
+                         Margin="0,0,6,0"
+                         VerticalAlignment="Center"
+                         Width="10" Height="10">
+                  <Ellipse.Fill>
+                    <SolidColorBrush Color="{Binding SourceColorHex}" />
+                  </Ellipse.Fill>
+                </Ellipse>
+                <Border Grid.Column="1" Width="4" Height="14" CornerRadius="2"
+                        IsVisible="{Binding IsChild}" Margin="6,0,6,0" VerticalAlignment="Center">
+                  <Border.Background>
+                    <SolidColorBrush Color="{Binding SourceColorHex}" />
+                  </Border.Background>
+                </Border>
+
+                <!-- Name -->
+                <TextBlock Grid.Column="2" Text="{Binding DisplayName}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" 
+                           Opacity="{Binding IsMissing, Converter={x:Static vm:MissingOpacityConverter.Instance}}"
+                           FontStyle="{Binding IsMissing, Converter={x:Static vm:MissingFontStyleConverter.Instance}}" />
+                           
+                <!-- Kind Label -->
+                <TextBlock Grid.Column="3" Text="{Binding KindLabel}"
+                           Foreground="{DynamicResource DimTextBrush}" FontSize="9"
+                           VerticalAlignment="Center" Margin="4,0" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="4" />
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+              <Setter Property="CornerRadius" Value="3" />
+              <Setter Property="Margin" Value="2,1" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover">
+              <Setter Property="Background" Value="{DynamicResource TabHoverBgBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:selected">
+              <Setter Property="Background" Value="{DynamicResource TabActiveBgBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            </Style>
+          </ListBox.Styles>
+        </ListBox>
+      </DockPanel>
+    </Border>
+  </ExperimentalAcrylicBorder>
+</UserControl>

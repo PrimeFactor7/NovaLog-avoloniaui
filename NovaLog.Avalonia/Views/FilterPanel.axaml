@@ -1,0 +1,121 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             xmlns:controls="using:NovaLog.Avalonia.Controls"
+             x:Class="NovaLog.Avalonia.Views.FilterPanel"
+             x:DataType="vm:FilterPanelViewModel"
+             IsVisible="{Binding IsVisible}">
+
+  <UserControl.Styles>
+    <Style Selector="ComboBox">
+      <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ToolBarBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+    </Style>
+    <Style Selector="ComboBox Path">
+      <Setter Property="Fill" Value="{DynamicResource DimTextBrush}" />
+    </Style>
+    <Style Selector="ComboBox:pointerover Path">
+      <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource PanelBgBrush}"
+          BorderBrush="{DynamicResource SeparatorBrush}"
+          BorderThickness="0,1,0,0">
+    <DockPanel>
+
+      <!-- Search bar (top) -->
+      <Border DockPanel.Dock="Top" Height="32"
+              Background="{DynamicResource ToolBarBgBrush}"
+              Padding="6,2">
+        <DockPanel>
+          <!-- Close button -->
+          <Button DockPanel.Dock="Right"
+                  Content="&#x2715;"
+                  Command="{Binding CloseCommand}"
+                  FontSize="11" Width="24" Height="24"
+                  Background="Transparent"
+                  Foreground="{DynamicResource DimTextBrush}"
+                  HorizontalContentAlignment="Center"
+                  VerticalContentAlignment="Center"
+                  Padding="0" Margin="4,0,0,0" />
+
+          <!-- Status text -->
+          <TextBlock DockPanel.Dock="Right"
+                     Text="{Binding StatusText}"
+                     Foreground="{DynamicResource AccentBrush}"
+                     VerticalAlignment="Center"
+                     FontSize="11" Margin="8,0" />
+
+          <!-- Follow mode toggle -->
+          <ToggleButton DockPanel.Dock="Right"
+                        IsChecked="{Binding IsFollowMode}"
+                        ToolTip.Tip="Follow Mode - Auto-scroll to new matches"
+                        FontFamily="{StaticResource CodiconFont}"
+                        Content="&#xEA9A;"
+                        FontSize="13" Width="28" Height="24"
+                        Padding="0" Margin="4,0"
+                        VerticalContentAlignment="Center"
+                        HorizontalContentAlignment="Center">
+            <ToggleButton.Foreground>
+              <SolidColorBrush Color="{DynamicResource AccentColor}" />
+            </ToggleButton.Foreground>
+          </ToggleButton>
+
+          <!-- Case sensitive toggle -->
+          <ToggleButton DockPanel.Dock="Right"
+                        IsChecked="{Binding CaseSensitive}"
+                        Content="Aa"
+                        FontSize="11" Width="28" Height="24"
+                        Padding="0" Margin="4,0"
+                        VerticalContentAlignment="Center"
+                        HorizontalContentAlignment="Center" />
+
+          <!-- Search mode -->
+          <ComboBox DockPanel.Dock="Right"
+                    ItemsSource="{Binding AvailableModes}"
+                    SelectedItem="{Binding SearchMode}"
+                    Width="90" Height="24"
+                    FontSize="11" Margin="4,0"
+                    VerticalContentAlignment="Center" />
+
+          <!-- Search input -->
+          <TextBox x:Name="SearchInput"
+                   Text="{Binding SearchText, Mode=TwoWay}"
+                   Watermark="Search..."
+                   FontFamily="Cascadia Mono, Consolas, Courier New"
+                   FontSize="12" Height="24"
+                   VerticalContentAlignment="Center" />
+        </DockPanel>
+      </Border>
+
+      <!-- Filter results -->
+      <ItemsControl x:Name="FilterResultsControl"
+                    ItemsSource="{Binding ResultItems}"
+                    Background="{DynamicResource BackgroundBrush}">
+        <ItemsControl.Template>
+          <ControlTemplate>
+            <ScrollViewer x:Name="ResultsScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          Background="{TemplateBinding Background}">
+              <ItemsPresenter />
+            </ScrollViewer>
+          </ControlTemplate>
+        </ItemsControl.Template>
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel Orientation="Vertical" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:LogLineViewModel">
+            <controls:LogLineRow />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+    </DockPanel>
+  </Border>
+</UserControl>

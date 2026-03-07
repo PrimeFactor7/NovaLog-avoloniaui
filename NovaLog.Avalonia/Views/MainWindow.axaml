@@ -1,0 +1,225 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+        xmlns:views="using:NovaLog.Avalonia.Views"
+        xmlns:controls="using:NovaLog.Avalonia.Controls"
+        x:Class="NovaLog.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="NovaLog (Avalonia)"
+        Width="1280" Height="800"
+        Background="{DynamicResource BackgroundBrush}"
+        Topmost="{Binding IsTopmost}"
+        TransparencyLevelHint="AcrylicBlur">
+
+  <Grid RowDefinitions="Auto,Auto,*,24">
+    <!-- Toolbar (matches WinForms layout exactly) -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource ToolBarBgBrush}"
+            Padding="6,3">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        
+        <!-- Left Side: Tools & Tabs -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+           <!-- Source Manager -->
+           <ToggleButton Classes="neon-action" IsChecked="{Binding IsSidebarVisible}" ToolTip.Tip="Toggle source manager (Ctrl+E)">
+             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </ToggleButton>
+
+           <!-- Search/Filter -->
+           <ToggleButton Classes="neon-action" IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}" ToolTip.Tip="Toggle filter/search panel (Ctrl+F)">
+             <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </ToggleButton>
+
+           <!-- Follow -->
+           <ToggleButton Classes="neon-action" IsChecked="{Binding Workspace.ActiveLogView.IsFollowMode}" ToolTip.Tip="Auto-scroll to newest lines (F)">
+             <StackPanel Orientation="Horizontal" Spacing="4">
+               <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="17" Foreground="{DynamicResource AccentBrush}" />
+               <TextBlock Text="Follow" />
+             </StackPanel>
+           </ToggleButton>
+
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+
+           <!-- Split Panes -->
+           <Button Classes="neon-action" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally (side-by-side)">
+             <TextBlock Text="&#xEB56;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </Button>
+           <Button Classes="neon-action" Command="{Binding SplitVerticalCommand}" ToolTip.Tip="Split vertically (stacked)">
+             <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </Button>
+
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+
+           <!-- TABS (inlined in toolbar) -->
+           <ItemsControl ItemsSource="{Binding Workspace.Tabs}" x:Name="TabBar" VerticalAlignment="Center">
+             <ItemsControl.ItemsPanel>
+               <ItemsPanelTemplate>
+                 <StackPanel Orientation="Horizontal" Spacing="2" />
+               </ItemsPanelTemplate>
+             </ItemsControl.ItemsPanel>
+             <ItemsControl.ItemTemplate>
+               <DataTemplate x:DataType="vm:WorkspaceTabItem">
+                 <Button Classes="neon-tab"
+                         Content="{Binding Name}"
+                         FontWeight="{Binding IsActive, Converter={x:Static vm:BoolToFontWeightConverter.Instance}}"
+                         Opacity="{Binding IsActive, Converter={x:Static vm:BoolToOpacityConverter.Instance}}">
+                   <Button.ContextMenu>
+                     <ContextMenu>
+                       <MenuItem Header="Rename" Tag="rename" />
+                       <MenuItem Header="Close Others" Tag="closeothers" />
+                       <MenuItem Header="Close All" Tag="closeall" />
+                       <Separator />
+                       <MenuItem Header="Close" Tag="close" />
+                     </ContextMenu>
+                   </Button.ContextMenu>
+                 </Button>
+               </DataTemplate>
+             </ItemsControl.ItemTemplate>
+           </ItemsControl>
+
+           <Button Classes="neon-action" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close all panes in this tab (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
+           <Button Classes="neon-action" Content="Close tabs" Command="{Binding CloseTabsCommand}" ToolTip.Tip="Close all tabs (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
+        </StackPanel>
+
+        <!-- Right Side: Navigation, Simulator, Pin, Settings -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+           
+           <TextBlock Text="{Binding Workspace.ActiveLogView.NavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+
+           <!-- Bookmarks -->
+           <Button Classes="neon-action" Command="{Binding ToggleBookmarkCommand}" ToolTip.Tip="Toggle Bookmark (Ctrl+B)">
+             <TextBlock Text="&#xEAA5;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource BookmarkMarkerBrush}" />
+           </Button>
+           <Button Classes="neon-action" Command="{Binding BookmarkPrevCommand}" ToolTip.Tip="Prev Bookmark (Shift+F2)">
+             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource BookmarkMarkerBrush}" />
+           </Button>
+           <Button Classes="neon-action" Command="{Binding BookmarkNextCommand}" ToolTip.Tip="Next Bookmark (F2)">
+             <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource BookmarkMarkerBrush}" />
+           </Button>
+
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+
+           <!-- Errors -->
+           <Button Classes="neon-action" Command="{Binding ErrorPrevCommand}" ToolTip.Tip="Previous error (Alt+PgUp)">
+             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource TextErrorBrush}" />
+           </Button>
+           <Button Classes="neon-action" Command="{Binding ErrorNextCommand}" ToolTip.Tip="Next error (Alt+PgDn)">
+             <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource TextErrorBrush}" />
+           </Button>
+
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+
+           <!-- Search Hits -->
+           <Button Classes="neon-action" Command="{Binding SearchPrevCommand}" ToolTip.Tip="Previous search hit (Shift+F3)">
+             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource SearchHitMarkerBrush}" />
+           </Button>
+           <Button Classes="neon-action" Command="{Binding SearchNextCommand}" ToolTip.Tip="Next search hit (F3)">
+             <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource SearchHitMarkerBrush}" />
+           </Button>
+
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+
+           <!-- Pin -->
+           <ToggleButton Classes="neon-action" IsChecked="{Binding IsTopmost}" ToolTip.Tip="Stay on top (T)">
+             <TextBlock Text="&#xEB2B;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </ToggleButton>
+
+           <!-- Simulator dropdown -->
+           <DropDownButton Classes="neon-action" Content="Gen"
+                           Foreground="{DynamicResource DimTextBrush}"
+                           ToolTip.Tip="Log generator for testing">
+             <DropDownButton.Flyout>
+               <MenuFlyout>
+                 <MenuItem Header="Slow (1/s)" Command="{Binding SimSlowCommand}" />
+                 <MenuItem Header="Med (5/s)" Command="{Binding SimMediumCommand}" />
+                 <MenuItem Header="Fast (20/s)" Command="{Binding SimFastCommand}" />
+                 <Separator />
+                 <MenuItem Header="Showcase Slow" Command="{Binding SimShowcaseSlowCommand}" ToolTip.Tip="All syntax types (JSON, SQL, stack traces, numbers)" />
+                 <MenuItem Header="Showcase Med" Command="{Binding SimShowcaseMediumCommand}" ToolTip.Tip="All syntax types (JSON, SQL, stack traces, numbers)" />
+                 <MenuItem Header="Showcase Fast" Command="{Binding SimShowcaseFastCommand}" ToolTip.Tip="All syntax types (JSON, SQL, stack traces, numbers)" />
+                 <Separator />
+                 <MenuItem Header="Stop" Command="{Binding StopSimulatorCommand}" Foreground="{DynamicResource TextErrorBrush}" />
+               </MenuFlyout>
+             </DropDownButton.Flyout>
+           </DropDownButton>
+
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+
+           <!-- Theme -->
+           <Button Classes="neon-action"
+                   Command="{Binding ToggleThemeCommand}"
+                   ToolTip.Tip="Toggle Theme">
+             <StackPanel Orientation="Horizontal" Spacing="4">
+               <TextBlock Text="Theme:" VerticalAlignment="Center" />
+               <TextBlock Text="{Binding ThemeLabel}" FontWeight="Bold" VerticalAlignment="Center" />
+             </StackPanel>
+           </Button>
+
+           <!-- Settings -->
+           <ToggleButton Classes="neon-action" IsChecked="{Binding Settings.IsVisible}" ToolTip.Tip="Settings (Ctrl+,)">
+             <TextBlock Text="&#xEAF8;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           </ToggleButton>
+
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- Time Sync Bar -->
+    <controls:TimeSyncBar Grid.Row="1" DataContext="{Binding Workspace.TimeSync}" />
+
+    <!-- Content area -->
+    <Grid Grid.Row="2" ColumnDefinitions="260,Auto,*,Auto">
+      <views:SourceManagerPanel Grid.Column="0"
+                                 MinWidth="200"
+                                 IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsSidebarVisible}"
+                                 DataContext="{Binding SourceManager}"
+                                 x:Name="SidebarPanel"
+                                 AutomationProperties.AutomationId="sourceManagerPanel" />
+
+      <GridSplitter Grid.Column="1" Width="3"
+                    Background="{DynamicResource SplitterBgBrush}"
+                    IsVisible="{Binding IsSidebarVisible}" />
+
+      <controls:SplitPanelHost Grid.Column="2"
+                               Node="{Binding Workspace.RootNode}"
+                               AutomationProperties.AutomationId="logViewPanel" />
+
+      <!-- Settings flyout (right-docked) -->
+      <views:SettingsFlyout Grid.Column="3"
+                            DataContext="{Binding Settings}" />
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="3"
+            Background="{DynamicResource StatusBarBgBrush}"
+            Padding="8,2">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+        <TextBlock Text="{Binding StatusFile}"
+                   Foreground="{DynamicResource DimTextBrush}"
+                   FontSize="11"
+                   TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="lblFile" />
+        <TextBlock Grid.Column="1"
+                   Text="{Binding StatusStreaming}"
+                   Foreground="{DynamicResource AccentBrush}"
+                   FontSize="11" Margin="12,0"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="lblStreaming" />
+        <TextBlock Grid.Column="2"
+                   Text="{Binding StatusLines}"
+                   Foreground="{DynamicResource AccentBrush}"
+                   FontSize="11" Margin="12,0"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="lblLines" />
+        <TextBlock Grid.Column="3"
+                   Text="{Binding Workspace.ActiveLogView.IsFollowMode, StringFormat='Follow: {0}'}"
+                   Foreground="{DynamicResource DimTextBrush}"
+                   FontSize="11"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="lblFollow" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

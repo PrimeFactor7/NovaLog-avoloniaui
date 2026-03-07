@@ -1,0 +1,8 @@
+<Control xmlns="https://github.com/avaloniaui"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+         x:Class="NovaLog.Avalonia.Controls.LogLineRow"
+         x:DataType="vm:LogLineViewModel"
+         Height="18"
+         ClipToBounds="True">
+</Control>

@@ -1,0 +1,757 @@
+using System.Collections;
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using NovaLog.Avalonia.Controls;
+using NovaLog.Core.Models;
+using NovaLog.Core.Services;
+using NovaLog.Core.Theme;
+using AvDispatcher = global::Avalonia.Threading.Dispatcher;
+using Avalonia.Data.Converters;
+using System.Globalization;
+
+namespace NovaLog.Avalonia.ViewModels;
+
+/// <summary>
+/// View model for a single log viewing pane. Always uses a list-based
+/// items source (single code path for both small and large files).
+/// </summary>
+public partial class LogViewViewModel : ObservableObject
+{
+    [ObservableProperty] private string _title = "No file loaded";
+    [ObservableProperty] private bool _isFollowMode = true;
+    [ObservableProperty] private bool _isLinked = true;
+    [ObservableProperty] private int _totalLineCount;
+
+    private System.Threading.Timer? _scrollThrottleTimer;
+    private bool _scrollPending;
+
+    partial void OnIsFollowModeChanged(bool value)
+    {
+        if (value)
+            RequestScrollToEndThrottled();
+    }
+
+    private void RequestScrollToEndThrottled()
+    {
+        if (_scrollPending) return; // Already have a scroll queued
+
+        _scrollPending = true;
+        if (_scrollThrottleTimer == null)
+        {
+            _scrollThrottleTimer = new System.Threading.Timer(_ =>
+            {
+                _scrollPending = false;
+                ScrollToEndRequested?.Invoke();
+            }, null, 50, System.Threading.Timeout.Infinite); // Wait 50ms before scrolling
+        }
+        else
+        {
+            _scrollThrottleTimer.Change(50, System.Threading.Timeout.Infinite); // Reset timer
+        }
+    }
+
+    [ObservableProperty] private bool _isIndexing;
+    [ObservableProperty] private double _indexingProgress;
+    [ObservableProperty] private bool _isStreaming;
+    [ObservableProperty] private string _navStatus = "";
+
+    private readonly DelegatingItemsSource _delegatingSource = new();
+    private InMemoryLogItemsSource? _memorySource;
+    private VirtualLogItemsSource? _virtualSource;
+    private IVirtualLogProvider? _provider;
+
+    // Expose for FilterPanelViewModel to access the actual source
+    internal InMemoryLogItemsSource? MemorySource => _memorySource;
+    internal VirtualLogItemsSource? VirtualSource => _virtualSource;
+    private LogStreamer? _streamer;
+    private LogWatcher? _watcher;
+    private GlobalClockService? _clock;
+    private SourceManagerViewModel? _sourceManager;
+
+    /// <summary>Tracks which source IDs are currently loaded in this pane (for clearing when source is removed).</summary>
+    private readonly HashSet<string> _loadedSourceIds = new();
+
+    /// <summary>Tracks the physical path(s) loaded in this pane as a fallback for tracking.</summary>
+    private readonly HashSet<string> _loadedPaths = new();
+
+    /// <summary>Gets the primary loaded source ID for persistence. Returns null if no source loaded.</summary>
+    public string? GetLoadedSourceId()
+    {
+        if (_loadedSourceIds.Count > 0)
+            return _loadedSourceIds.First();
+
+        // Fallback: try to find source by path
+        if (_loadedPaths.Count > 0 && _sourceManager != null)
+        {
+            var path = _loadedPaths.First();
+            var source = _sourceManager.Sources.FirstOrDefault(s =>
+                Path.GetFullPath(s.PhysicalPath).Equals(path, StringComparison.OrdinalIgnoreCase));
+            return source?.SourceId;
+        }
+
+        return null;
+    }
+
+    /// <summary>Theme service for runtime color overrides.</summary>
+    public ThemeService? Theme { get; private set; }
+
+    /// <summary>
+    /// Stable items source bound by the view. The object reference never changes;
+    /// only its inner delegate is swapped, which fires CollectionChanged.Reset.
+    /// </summary>
+    public IEnumerable ItemsSource { get; }
+
+    public FilterPanelViewModel Filter { get; } = new();
+    public NavigationIndex NavIndex { get; } = new();
+    public ObservableCollection<HighlightRule> HighlightRules { get; } = [];
+    public PanePickerViewModel Picker { get; } = new();
+
+    public event Action? CloseRequested;
+    
+    [RelayCommand]
+    private void ClosePane() => CloseRequested?.Invoke();
+
+    public event Action? ScrollToEndRequested;
+    /// <summary>Fired when the view should scroll to a specific line index.</summary>
+    public event Action<int>? ScrollToLineRequested;
+
+    /// <summary>Single placeholder line so the list is never empty and we can verify rendering.</summary>
+    private static readonly IReadOnlyList<LogLineViewModel> PlaceholderLine = [
+        new LogLineViewModel(new LogLine { GlobalIndex = 0, Message = "No file loaded — Open a file or use Gen to see logs.", RawText = "No file loaded" })
+    ];
+
+    public LogViewViewModel()
+    {
+        ItemsSource = _delegatingSource;
+        _delegatingSource.SetInner(PlaceholderLine);
+        TotalLineCount = 1;
+
+        Filter.SearchHitsChanged += hits =>
+        {
+            NavIndex.SetSearchHits(hits);
+        };
+        Filter.BindTo(this);
+
+        Picker.ItemSelected += item =>
+        {
+            if (item.Kind == SourceKind.File) LoadFile(item.Path);
+            else if (item.Kind == SourceKind.Folder) LoadFolder(item.Path);
+        };
+    }
+
+    public void Initialize(GlobalClockService clock, SourceManagerViewModel sourceManager, ThemeService theme)
+    {
+        _clock = clock;
+        _sourceManager = sourceManager;
+        Theme = theme;
+    }
+
+    public void ToggleFilter()
+    {
+        if (Filter.IsVisible)
+            Filter.CloseCommand.Execute(null);
+        else
+            Filter.Show();
+    }
+
+    [RelayCommand]
+    public void ShowPicker()
+    {
+        if (_sourceManager == null) return;
+
+        var items = _sourceManager.Sources.Select(s => new PanePickerItem(
+            s.SourceId, s.DisplayName, s.PhysicalPath, s.Kind, false));
+        
+        Picker.Show(items);
+    }
+
+    public void NavigateSearchHit(bool forward)
+    {
+        var target = NavIndex.GetNext(NavigationCategory.SearchHit, _currentLine, forward);
+        if (target >= 0)
+        {
+            IsFollowMode = false;
+            ScrollToLineRequested?.Invoke((int)target);
+            var (idx, total) = NavIndex.GetPositionInfo(NavigationCategory.SearchHit, target);
+            NavStatus = $"Match {idx} of {total}";
+        }
+    }
+
+    private int _currentLine;
+    /// <summary>Set by the view to track the current viewport center line.</summary>
+    public void SetCurrentLine(int line) => _currentLine = line;
+
+    /// <summary>Returns the timestamp of the current line, if any.</summary>
+    public DateTime? GetCurrentTimestamp()
+    {
+        if (_memorySource is not null && _currentLine >= 0 && _currentLine < _memorySource.Count)
+            return _memorySource[_currentLine].Timestamp;
+        if (_virtualSource is not null && _provider is not null && _currentLine >= 0 && _currentLine < _virtualSource.Count)
+            return _provider.GetLine(_currentLine)?.Timestamp;
+        return null;
+    }
+
+    /// <summary>Seeks to the nearest line at or before the given timestamp.</summary>
+    public void SeekToTimestamp(DateTime target)
+    {
+        if (_provider is not null)
+        {
+            _provider.ScrollToTimestamp(target, idx =>
+            {
+                IsFollowMode = false;
+                RequestScrollToLine((int)idx);
+            });
+        }
+        else if (_memorySource is not null && _memorySource.Count > 0)
+        {
+            // Binary search in memory
+            int lo = 0, hi = _memorySource.Count - 1, best = 0;
+            long targetTicks = target.Ticks;
+
+            while (lo <= hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+                var ts = _memorySource[mid].Timestamp;
+                
+                if (ts == null)
+                {
+                    int probe = mid - 1;
+                    while (probe >= lo && _memorySource[probe].Timestamp == null) probe--;
+                    if (probe >= lo)
+                    {
+                        ts = _memorySource[probe].Timestamp;
+                        mid = probe;
+                    }
+                    else { lo = mid + 1; continue; }
+                }
+
+                long midTicks = ts!.Value.Ticks;
+                if (midTicks < targetTicks) { best = mid; lo = mid + 1; }
+                else if (midTicks > targetTicks) { hi = mid - 1; }
+                else { best = mid; break; }
+            }
+            IsFollowMode = false;
+            RequestScrollToLine(best);
+        }
+    }
+
+    [RelayCommand]
+    private void TimeTravel()
+    {
+        var ts = GetCurrentTimestamp();
+        if (ts.HasValue)
+        {
+            _clock?.NotifyTimeChanged(ts.Value, this);
+        }
+    }
+
+    /// <summary>Pins the current line's timestamp and broadcasts it to all linked panes.</summary>
+    public void PinCurrentTimestamp()
+    {
+        var ts = GetCurrentTimestamp();
+        if (ts.HasValue)
+        {
+            _clock?.NotifyTimeChanged(ts.Value, this);
+        }
+    }
+
+    /// <summary>Returns the raw text of the current line, or null if unavailable.</summary>
+    public string? GetCurrentLineText()
+    {
+        if (_memorySource is not null && _currentLine >= 0 && _currentLine < _memorySource.Count)
+            return _memorySource[_currentLine].RawText;
+        if (_virtualSource is not null && _provider is not null && _currentLine >= 0 && _currentLine < _virtualSource.Count)
+            return _provider.GetRawLine(_currentLine);
+        return null;
+    }
+
+    /// <summary>Extracts and formats JSON from the current line, or returns null if no valid JSON found.</summary>
+    public string? GetFormattedJson()
+    {
+        var text = GetCurrentLineText();
+        if (string.IsNullOrWhiteSpace(text)) return null;
+
+        // Try to find JSON in the line (look for { or [)
+        int startBrace = text.IndexOf('{');
+        int startBracket = text.IndexOf('[');
+        int jsonStart = -1;
+
+        if (startBrace >= 0 && startBracket >= 0)
+            jsonStart = Math.Min(startBrace, startBracket);
+        else if (startBrace >= 0)
+            jsonStart = startBrace;
+        else if (startBracket >= 0)
+            jsonStart = startBracket;
+
+        if (jsonStart < 0) return null;
+
+        var jsonText = text.Substring(jsonStart);
+
+        try
+        {
+            // Parse and reformat JSON
+            using var doc = System.Text.Json.JsonDocument.Parse(jsonText);
+            return System.Text.Json.JsonSerializer.Serialize(doc.RootElement, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            // If parsing fails, return null
+            return null;
+        }
+    }
+
+    /// <summary>Requests the view to scroll to a specific line.</summary>
+    public void RequestScrollToLine(int line) => ScrollToLineRequested?.Invoke(line);
+
+    public void NavigateBookmark(bool forward)
+    {
+        var target = NavIndex.GetNext(NavigationCategory.Bookmark, _currentLine, forward);
+        if (target >= 0)
+        {
+            IsFollowMode = false;
+            ScrollToLineRequested?.Invoke((int)target);
+            var (idx, total) = NavIndex.GetPositionInfo(NavigationCategory.Bookmark, target);
+            NavStatus = $"Bookmark {idx} of {total}";
+        }
+    }
+
+    public void NavigateError(bool forward)
+    {
+        var target = NavIndex.GetNext(NavigationCategory.Error, _currentLine, forward);
+        if (target >= 0)
+        {
+            IsFollowMode = false;
+            ScrollToLineRequested?.Invoke((int)target);
+            var (idx, total) = NavIndex.GetPositionInfo(NavigationCategory.Error, target);
+            NavStatus = $"Error {idx} of {total}";
+        }
+    }
+
+    public void ToggleBookmark()
+    {
+        NavIndex.ToggleBookmark(_currentLine);
+        var total = NavIndex.GetPositionInfo(NavigationCategory.Bookmark, _currentLine).TotalCount;
+        NavStatus = total > 0 ? $"{total} Bookmarks" : "";
+    }
+
+    /// <summary>Load lines from raw text (small file, all in memory).</summary>
+    public void LoadFromLines(string filePath, IReadOnlyList<string> rawLines)
+    {
+        DisposeProvider();
+        _loadedSourceIds.Clear();
+        _loadedPaths.Clear();
+
+        _memorySource = new InMemoryLogItemsSource();
+        var parsed = rawLines.Select((raw, i) => LogLineParser.Parse(raw, i));
+        _memorySource.AddRange(parsed);
+
+        _delegatingSource.SetInner(_memorySource);
+        TotalLineCount = _memorySource.Count;
+        Title = Path.GetFileName(filePath);
+
+        // Track the physical path
+        _loadedPaths.Add(Path.GetFullPath(filePath));
+        // Also try to track by source ID if available
+        TrackSourceByPath(filePath);
+
+        // Notify filter that source changed
+        Filter.OnSourceChanged(_memorySource);
+    }
+
+    /// <summary>Load from a virtual provider (BigFile mode).</summary>
+    public void LoadFromProvider(IVirtualLogProvider provider)
+    {
+        DisposeProvider();
+        _loadedSourceIds.Clear();
+        _loadedPaths.Clear();
+
+        _provider = provider;
+        _virtualSource = new VirtualLogItemsSource(provider);
+
+        provider.LinesAppended += _ =>
+        {
+            TotalLineCount = _virtualSource.Count;
+            if (IsFollowMode)
+                RequestScrollToEndThrottled();
+        };
+
+        provider.IndexingCompleted += () =>
+        {
+            TotalLineCount = _virtualSource.Count;
+        };
+
+        _delegatingSource.SetInner(_virtualSource);
+        TotalLineCount = _virtualSource.Count;
+        Title = Path.GetFileName(provider.FilePath);
+
+        // Track the physical path
+        _loadedPaths.Add(Path.GetFullPath(provider.FilePath));
+        // Also try to track by source ID if available
+        TrackSourceByPath(provider.FilePath);
+
+        // Notify filter that source changed (virtual sources don't support incremental search yet)
+        Filter.OnSourceChanged(null);
+    }
+
+    private const long BigFileThreshold = 512 * 1024; // 512 KB - balance between indexing overhead and memory usage
+
+    /// <summary>Load a file. Uses BigFileLogProvider (memory-mapped) for files > 512 KB, else reads into memory.</summary>
+    public void LoadFile(string filePath)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        System.Diagnostics.Debug.WriteLine($"[LOAD] Start loading: {Path.GetFileName(filePath)}");
+
+        if (BinaryDetector.IsBinary(filePath))
+        {
+            Title = $"Binary: {Path.GetFileName(filePath)}";
+            return;
+        }
+
+        try
+        {
+            var fileInfo = new FileInfo(filePath);
+            System.Diagnostics.Debug.WriteLine($"[LOAD] File size: {fileInfo.Length:N0} bytes ({sw.ElapsedMilliseconds}ms)");
+
+            if (fileInfo.Length > BigFileThreshold)
+            {
+                // Large file: use memory-mapped provider with indexing
+                System.Diagnostics.Debug.WriteLine($"[LOAD] Using BigFileLogProvider ({sw.ElapsedMilliseconds}ms)");
+                var provider = new BigFileLogProvider(filePath);
+                provider.IndexingProgressChanged += _ =>
+                {
+                    IndexingProgress = provider.IndexingProgress;
+                    IsIndexing = true;
+                };
+                provider.IndexingCompleted += () =>
+                {
+                    IsIndexing = false;
+                    IndexingProgress = 1.0;
+                };
+
+                System.Diagnostics.Debug.WriteLine($"[LOAD] Calling provider.Open() ({sw.ElapsedMilliseconds}ms)");
+                provider.Open(); // Start indexing FIRST
+                System.Diagnostics.Debug.WriteLine($"[LOAD] provider.Open() returned ({sw.ElapsedMilliseconds}ms)");
+
+                LoadFromProvider(provider); // Then setup UI binding
+                System.Diagnostics.Debug.WriteLine($"[LOAD] LoadFromProvider completed ({sw.ElapsedMilliseconds}ms)");
+            }
+            else
+            {
+                // Small file: read into memory (faster for files < 512KB, no indexing overhead)
+                System.Diagnostics.Debug.WriteLine($"[LOAD] Using in-memory LogStreamer ({sw.ElapsedMilliseconds}ms)");
+                var streamer = new LogStreamer([filePath]);
+                System.Diagnostics.Debug.WriteLine($"[LOAD] Calling LoadHistory() ({sw.ElapsedMilliseconds}ms)");
+                var rawLines = streamer.LoadHistory();
+                System.Diagnostics.Debug.WriteLine($"[LOAD] LoadHistory returned {rawLines.Count} lines ({sw.ElapsedMilliseconds}ms)");
+                LoadFromLines(filePath, rawLines);
+                System.Diagnostics.Debug.WriteLine($"[LOAD] LoadFromLines completed ({sw.ElapsedMilliseconds}ms)");
+                StartStreaming(streamer);
+                System.Diagnostics.Debug.WriteLine($"[LOAD] StartStreaming completed ({sw.ElapsedMilliseconds}ms)");
+            }
+            System.Diagnostics.Debug.WriteLine($"[LOAD] Total load time: {sw.ElapsedMilliseconds}ms");
+        }
+        catch (Exception ex)
+        {
+            Title = $"Error: {Path.GetFileName(filePath)}";
+            TotalLineCount = 0;
+            _delegatingSource.SetInner(Array.Empty<LogLineViewModel>());
+            System.Diagnostics.Debug.WriteLine($"LoadFile failed: {ex.Message}");
+        }
+    }
+
+    public void LoadMerge(IEnumerable<SourceItemViewModel> sources)
+    {
+        DisposeProvider();
+        _loadedSourceIds.Clear();
+        _loadedPaths.Clear();
+
+        var engine = new ChronoMergeEngine();
+        int priority = 0;
+
+        foreach (var src in sources)
+        {
+            // Track each source ID in the merge
+            _loadedSourceIds.Add(src.SourceId);
+            // Also track physical paths
+            if (!string.IsNullOrEmpty(src.PhysicalPath) && !src.PhysicalPath.StartsWith("merge://"))
+                _loadedPaths.Add(Path.GetFullPath(src.PhysicalPath));
+
+            LogStreamer streamer;
+            if (src.Kind == SourceKind.Folder)
+            {
+                var auditManager = new AuditLogManager(src.PhysicalPath);
+                auditManager.Refresh();
+                var prefixMap = auditManager.GetPrefixToAuditMap();
+                if (prefixMap.Count > 0)
+                    streamer = new LogStreamer(auditManager, prefixMap.Values.First());
+                else
+                {
+                    var logFiles = System.IO.Directory.GetFiles(src.PhysicalPath, "*.log").OrderBy(f => f).ToList();
+                    if (logFiles.Count == 0)
+                        logFiles = System.IO.Directory.GetFiles(src.PhysicalPath, "*.txt").OrderBy(f => f).ToList();
+                    streamer = new LogStreamer(logFiles);
+                }
+            }
+            else
+            {
+                streamer = new LogStreamer([src.PhysicalPath]);
+            }
+
+            int srcIdx = engine.AddSource(streamer, src.DisplayName, src.SourceColorHex, priority++);
+            var history = streamer.LoadHistory();
+            engine.PushHistory(srcIdx, history);
+        }
+
+        engine.IndexingProgressChanged += p => { IndexingProgress = engine.IndexingProgress; IsIndexing = true; };
+        engine.IndexingCompleted += () => { IsIndexing = false; IndexingProgress = 1.0; TotalLineCount = (int)engine.LineCount; };
+        engine.LinesAppended += _ => { TotalLineCount = (int)engine.LineCount; if (IsFollowMode) RequestScrollToEndThrottled(); };
+
+        engine.Build();
+        engine.StartTailing();
+
+        _provider = engine;
+        _virtualSource = new VirtualLogItemsSource(engine);
+        _delegatingSource.SetInner(_virtualSource);
+        TotalLineCount = (int)engine.LineCount;
+        Title = $"Merged ({sources.Count()} sources)";
+        IsStreaming = true;
+
+        // Notify filter that source changed (merged sources use virtual provider)
+        Filter.OnSourceChanged(null);
+    }
+
+    /// <summary>Load a folder, discovering audit JSON or log files, with streaming.</summary>
+    public void LoadFolder(string directoryPath)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] ====== Start loading: {directoryPath} ======");
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Full path: {Path.GetFullPath(directoryPath)}");
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Directory exists: {Directory.Exists(directoryPath)}");
+
+        DisposeProvider();
+
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Creating AuditLogManager ({sw.ElapsedMilliseconds}ms)");
+        var auditManager = new AuditLogManager(directoryPath);
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Calling auditManager.Refresh() ({sw.ElapsedMilliseconds}ms)");
+        auditManager.Refresh();
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] auditManager.Refresh() returned ({sw.ElapsedMilliseconds}ms)");
+
+        var prefixMap = auditManager.GetPrefixToAuditMap();
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Audit map count: {prefixMap.Count}");
+
+        bool loadedFromAudit = false;
+        if (prefixMap.Count > 0)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: Using audit JSON files");
+            // Use the first audit source
+            var auditPath = prefixMap.Values.First();
+            System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Audit path: {auditPath}");
+            var streamer = new LogStreamer(auditManager, auditPath);
+
+            // Try to load history from audit JSON
+            var history = streamer.LoadHistory();
+            System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Audit JSON LoadHistory returned {history.Count} lines");
+
+            // If audit JSON has current files with content, use it
+            if (history.Count > 0)
+            {
+                LoadFromLines(directoryPath, history);
+                Title = Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                StartStreaming(streamer);
+
+                // Set up rotation watching
+                var watcher = new LogWatcher(auditManager);
+                var strategy = watcher.CreateStrategy(AppConstants.RotationStrategyAuditJson);
+                watcher.UseStrategy(strategy);
+                watcher.ActiveFileChanged += (_, e) => streamer.PivotToNewFile(e.NewFile);
+                watcher.Start();
+                _watcher = watcher;
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: Audit loading complete with {history.Count} lines");
+                loadedFromAudit = true;
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] WARNING: Audit JSON returned 0 lines (files may be rotated out)");
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Falling back to pattern/file discovery");
+            }
+        }
+        // If we didn't load from audit JSON (either no audit files or they returned 0 lines), fall back to pattern/file discovery
+        if (!loadedFromAudit)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: Trying pattern discovery as fallback");
+            // Fallback: discover by filename pattern
+            var groups = AuditLogManager.DiscoverByPattern(directoryPath);
+            System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Pattern discovery groups: {groups.Count}");
+
+            if (groups.Count > 0)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: Using pattern-discovered files");
+                var files = groups.Values.First();
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Discovered {files.Count} files");
+                var streamer = new LogStreamer(files);
+                LoadHistoryAndStream(streamer, directoryPath);
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: Pattern loading complete");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: No patterns, trying .log and .txt files");
+                // Last resort: find any .log or .txt file
+                var logFiles = Directory.GetFiles(directoryPath, "*.log").OrderBy(f => f).ToList();
+                System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Found {logFiles.Count} .log files");
+
+                if (logFiles.Count == 0)
+                {
+                    logFiles = Directory.GetFiles(directoryPath, "*.txt").OrderBy(f => f).ToList();
+                    System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Found {logFiles.Count} .txt files");
+                }
+
+                if (logFiles.Count > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: Loading {logFiles.Count} log files");
+                    var streamer = new LogStreamer(logFiles);
+                    LoadHistoryAndStream(streamer, directoryPath);
+                    System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] BRANCH: File loading complete");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] ERROR: No logs found in directory!");
+                    Title = $"Empty: {Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))}";
+                }
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] ====== Completed in {sw.ElapsedMilliseconds}ms ======");
+    }
+
+    private void LoadHistoryAndStream(LogStreamer streamer, string directoryPath)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] LoadHistoryAndStream: calling streamer.LoadHistory() ({sw.ElapsedMilliseconds}ms)");
+        var history = streamer.LoadHistory();
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] LoadHistoryAndStream: LoadHistory returned {history.Count} lines ({sw.ElapsedMilliseconds}ms)");
+        LoadFromLines(directoryPath, history);
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] LoadHistoryAndStream: LoadFromLines completed ({sw.ElapsedMilliseconds}ms)");
+        Title = Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        StartStreaming(streamer);
+        System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] LoadHistoryAndStream: completed ({sw.ElapsedMilliseconds}ms)");
+    }
+
+    private void StartStreaming(LogStreamer streamer)
+    {
+        _streamer?.Dispose();
+        _streamer = streamer;
+
+        streamer.LinesReceived += OnStreamerLinesReceived;
+        streamer.StartTailing();
+        IsStreaming = true;
+    }
+
+    private void OnStreamerLinesReceived(IReadOnlyList<string> rawLines)
+    {
+        AvDispatcher.UIThread.Post(() =>
+        {
+            if (_memorySource is null) return;
+
+            var baseIndex = _memorySource.Count;
+            var parsed = rawLines.Select((raw, i) => LogLineParser.Parse(raw, baseIndex + i));
+            _memorySource.AppendLines(parsed);
+            TotalLineCount = _memorySource.Count;
+
+            if (IsFollowMode)
+                RequestScrollToEndThrottled();
+        });
+    }
+
+    [RelayCommand]
+    private void ToggleFollow()
+    {
+        IsFollowMode = !IsFollowMode;
+        if (IsFollowMode)
+            RequestScrollToEndThrottled();
+    }
+
+    private void DisposeProvider()
+    {
+        _streamer?.Dispose();
+        _streamer = null;
+        _watcher?.Dispose();
+        _watcher = null;
+        _provider?.Dispose();
+        _provider = null;
+        _virtualSource = null;
+        _memorySource = null;
+        _scrollThrottleTimer?.Dispose();
+        _scrollThrottleTimer = null;
+        _scrollPending = false;
+        IsStreaming = false;
+    }
+
+    /// <summary>Helper to find and track source ID by physical path.</summary>
+    private void TrackSourceByPath(string path)
+    {
+        if (_sourceManager == null) return;
+
+        var source = _sourceManager.Sources.FirstOrDefault(s =>
+            s.PhysicalPath.Equals(path, StringComparison.OrdinalIgnoreCase) && !s.IsChild);
+
+        if (source != null)
+            _loadedSourceIds.Add(source.SourceId);
+    }
+
+    /// <summary>Clear contents if the removed source is loaded in this pane.</summary>
+    public void ClearIfSourceRemoved(SourceItemViewModel removedSource)
+    {
+        bool shouldClear = false;
+
+        // Check by source ID
+        if (_loadedSourceIds.Contains(removedSource.SourceId))
+            shouldClear = true;
+
+        // Check by physical path (handles cases where source wasn't in SourceManager yet)
+        if (!shouldClear && !string.IsNullOrEmpty(removedSource.PhysicalPath))
+        {
+            var removedPath = Path.GetFullPath(removedSource.PhysicalPath);
+            if (_loadedPaths.Contains(removedPath))
+                shouldClear = true;
+        }
+
+        if (shouldClear)
+        {
+            DisposeProvider();
+            _loadedSourceIds.Clear();
+            _loadedPaths.Clear();
+            _delegatingSource.SetInner(PlaceholderLine);
+            Title = "No file loaded";
+            TotalLineCount = 1;
+
+            // Clear filter subscriptions
+            Filter.OnSourceChanged(null);
+        }
+    }
+}
+
+public class SourceKindToIconConverter : IValueConverter
+{
+    public static readonly SourceKindToIconConverter Instance = new();
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is SourceKind kind)
+        {
+            return kind switch
+            {
+                SourceKind.Folder => "\uE8B7",
+                SourceKind.File => "\uE7C3",
+                SourceKind.Merge => "\uE8D5",
+                _ => "\uE7C3"
+            };
+        }
+        return "\uE7C3";
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}

@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+        xmlns:models="using:NovaLog.Core.Models"
+        x:Class="NovaLog.Avalonia.Views.HighlightRulesDialog"
+        x:DataType="vm:HighlightRulesViewModel"
+        Title="Highlight Rules"
+        Width="520" Height="450"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        TextElement.Foreground="{DynamicResource TextDefaultBrush}">
+
+  <Border Padding="12">
+    <DockPanel>
+      <!-- Action Buttons -->
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+        <Button Content="Close" Click="OnCloseClick" Width="80" />
+      </StackPanel>
+
+      <Grid RowDefinitions="*,Auto">
+        <!-- Rules List -->
+        <Border Grid.Row="0" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="1" CornerRadius="4">
+          <ListBox ItemsSource="{Binding Rules}"
+                   SelectedItem="{Binding SelectedRule}"
+                   Background="{DynamicResource PanelBgBrush}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="models:HighlightRule">
+                <Grid ColumnDefinitions="*,80,80,80">
+                  <TextBlock Text="{Binding Pattern}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding RuleType}" FontSize="10" Opacity="0.7" VerticalAlignment="Center" />
+                  <Border Grid.Column="2" Background="{Binding ForegroundHex}" Height="12" Width="40" CornerRadius="2" ToolTip.Tip="Foreground" />
+                  <Border Grid.Column="3" Background="{Binding BackgroundHex}" Height="12" Width="40" CornerRadius="2" ToolTip.Tip="Background" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+
+        <!-- Rule Editor -->
+        <StackPanel Grid.Row="1" Spacing="8" Margin="0,12,0,0">
+          <Grid ColumnDefinitions="*,120">
+            <TextBox Text="{Binding Pattern}" Watermark="Regex pattern..." FontFamily="Cascadia Mono, Consolas" />
+            <ComboBox Grid.Column="1" SelectedIndex="{Binding RuleTypeIndex}" HorizontalAlignment="Stretch" Margin="8,0,0,0">
+              <ComboBoxItem>Match</ComboBoxItem>
+              <ComboBoxItem>Line</ComboBoxItem>
+            </ComboBox>
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="Text Color:" VerticalAlignment="Center" FontSize="11" />
+              <TextBox Text="{Binding ForegroundHex}" Width="100" FontSize="11" />
+            </StackPanel>
+            
+            <CheckBox IsChecked="{Binding IsBackgroundEnabled}" Content="Bg Color:" FontSize="11" />
+            <TextBox Text="{Binding BackgroundHex}" Width="100" IsEnabled="{Binding IsBackgroundEnabled}" FontSize="11" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Add / Update" Command="{Binding AddOrUpdateCommand}" Classes="accent" />
+            <Button Content="Remove" Command="{Binding RemoveCommand}" Foreground="{DynamicResource TextErrorBrush}" />
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </DockPanel>
+  </Border>
+</Window>

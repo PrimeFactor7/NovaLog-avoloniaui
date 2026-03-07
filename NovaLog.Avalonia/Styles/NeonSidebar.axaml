@@ -1,0 +1,105 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Neon sidebar container -->
+  <Style Selector="Border.neon-sidebar">
+    <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <!-- Neon header -->
+  <Style Selector="Border.neon-header">
+    <Setter Property="Background" Value="{DynamicResource ToolBarBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="8,6" />
+  </Style>
+
+  <Style Selector="TextBlock.neon-title">
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- Neon action buttons -->
+  <Style Selector="Button.neon-action">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Padding" Value="8,3" />
+  </Style>
+
+  <Style Selector="Button.neon-action:pointerover">
+    <Setter Property="Background" Value="{DynamicResource TabHoverBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+  </Style>
+
+  <Style Selector="Button.neon-action:pressed">
+    <Setter Property="Background" Value="{DynamicResource TabActiveBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton.neon-action">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Padding" Value="8,3" />
+  </Style>
+
+  <Style Selector="ToggleButton.neon-action:pointerover">
+    <Setter Property="Background" Value="{DynamicResource TabHoverBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton.neon-action:checked">
+    <Setter Property="Background" Value="{DynamicResource TabActiveBgBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <!-- Source list item styles -->
+  <Style Selector="ListBoxItem.neon-source">
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Margin" Value="4,1" />
+  </Style>
+
+  <Style Selector="ListBoxItem.neon-source:pointerover">
+    <Setter Property="Background" Value="{DynamicResource TabHoverBgBrush}" />
+  </Style>
+
+  <Style Selector="ListBoxItem.neon-source:selected">
+    <Setter Property="Background" Value="{DynamicResource TabActiveBgBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <!-- Neon separator -->
+  <Style Selector="Border.neon-separator">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Margin" Value="0,2" />
+    <Setter Property="Background" Value="{DynamicResource SeparatorBrush}" />
+  </Style>
+
+  <!-- Neon status text -->
+  <Style Selector="TextBlock.neon-status">
+    <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+
+  <!-- Source color pip -->
+  <Style Selector="Ellipse.neon-pip">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+  </Style>
+
+</Styles>

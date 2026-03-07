@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="NovaLog.Avalonia.Views.InputDialog"
+        Title="Input"
+        Width="350" Height="160"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}">
+
+  <StackPanel Margin="16" Spacing="12">
+    <TextBlock x:Name="PromptText"
+               Foreground="{DynamicResource TextDefaultBrush}"
+               TextWrapping="Wrap" />
+    <TextBox x:Name="InputBox"
+             Watermark="Enter value..." />
+    <StackPanel Orientation="Horizontal" Spacing="8"
+                HorizontalAlignment="Right">
+      <Button Content="OK" Width="80" x:Name="BtnOk"
+              Classes="neon-action" />
+      <Button Content="Cancel" Width="80" x:Name="BtnCancel"
+              Classes="neon-action" />
+    </StackPanel>
+  </StackPanel>
+</Window>

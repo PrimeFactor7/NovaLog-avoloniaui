@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="DragDropTest.MainWindow"
+        Title="Drag-Drop Test">
+
+    <Grid ColumnDefinitions="*,*">
+        <!-- Left side: Drag Source -->
+        <Border Grid.Column="0" Background="#202020" Padding="20">
+            <StackPanel Spacing="10">
+                <TextBlock Text="DRAG SOURCE" FontSize="20" FontWeight="Bold"
+                           HorizontalAlignment="Center" Foreground="White" Margin="0,0,0,20"/>
+
+                <Border x:Name="DragRect"
+                        Background="#00FF41"
+                        Width="200" Height="100"
+                        CornerRadius="8"
+                        PointerPressed="OnDragRectPointerPressed"
+                        PointerMoved="OnDragRectPointerMoved"
+                        PointerReleased="OnDragRectPointerReleased">
+                    <TextBlock Text="DRAG ME"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontWeight="Bold"
+                               FontSize="16"/>
+                </Border>
+
+                <TextBlock Text="Click and drag the green box to the right →"
+                           Foreground="White"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Right side: Drop Target -->
+        <Border Grid.Column="1" Background="#303030" Padding="20"
+                DragDrop.AllowDrop="True">
+            <StackPanel Spacing="10">
+                <TextBlock Text="DROP TARGET" FontSize="20" FontWeight="Bold"
+                           HorizontalAlignment="Center" Foreground="White" Margin="0,0,0,20"/>
+
+                <Border x:Name="DropRect"
+                        Background="#404040"
+                        BorderBrush="#666666"
+                        BorderThickness="3"
+                        Width="200" Height="100"
+                        CornerRadius="8"
+                        DragDrop.AllowDrop="True">
+                    <TextBlock x:Name="DropText"
+                               Text="DROP HERE"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontWeight="Bold"
+                               FontSize="16"
+                               Foreground="#888888"/>
+                </Border>
+
+                <TextBlock x:Name="StatusText"
+                           Text="Status: Waiting for drop..."
+                           Foreground="White"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
