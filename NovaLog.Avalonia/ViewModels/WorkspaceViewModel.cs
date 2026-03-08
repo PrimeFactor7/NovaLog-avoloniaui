@@ -24,6 +24,8 @@ public partial class WorkspaceViewModel : ObservableObject
     private ThemeService? _theme;
     private bool _defaultMainFollow = true;
     private bool _defaultFilterFollow;
+    private bool _defaultGridMode = true;
+    private bool _defaultGridMultiline = true;
 
     /// <summary>True when more than one tab exists (shows tab bar).</summary>
     public bool HasMultipleTabs => Tabs.Count > 1;
@@ -97,6 +99,22 @@ public partial class WorkspaceViewModel : ObservableObject
             pane.LogView.IsFollowMode = mainFollow;
             pane.LogView.Filter.IsFollowMode = filterFollow;
         }
+    }
+
+    public void SetGridModeDefault(bool value, bool applyToExisting)
+    {
+        _defaultGridMode = value;
+        if (!applyToExisting) return;
+        foreach (var pane in GetAllPanes())
+            pane.LogView.IsGridMode = value;
+    }
+
+    public void SetGridMultilineDefault(bool value, bool applyToExisting)
+    {
+        _defaultGridMultiline = value;
+        if (!applyToExisting) return;
+        foreach (var pane in GetAllPanes())
+            pane.LogView.GridMultiline = value;
     }
 
     // ── Persistence ──────────────────────────────────────────────────
@@ -510,6 +528,8 @@ public partial class WorkspaceViewModel : ObservableObject
     {
         pane.LogView.IsFollowMode = _defaultMainFollow;
         pane.LogView.Filter.IsFollowMode = _defaultFilterFollow;
+        pane.LogView.IsGridMode = _defaultGridMode;
+        pane.LogView.GridMultiline = _defaultGridMultiline;
     }
 
     private void SyncActiveTabLayout()

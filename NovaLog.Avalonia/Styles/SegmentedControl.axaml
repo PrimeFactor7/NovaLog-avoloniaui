@@ -1,0 +1,72 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Segmented ListBox: PrimeNG-style SelectButton -->
+  <Style Selector="ListBox.segmented">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border CornerRadius="5"
+                BorderBrush="{DynamicResource SeparatorBrush}"
+                BorderThickness="1"
+                ClipToBounds="True"
+                HorizontalAlignment="Left">
+          <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Horizontal" />
+      </ItemsPanelTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Segment items: flat buttons joined together -->
+  <Style Selector="ListBox.segmented ListBoxItem">
+    <Setter Property="Background" Value="{DynamicResource ToolBarBgBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+    <Setter Property="Padding" Value="12,5" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter Name="PART_ContentPresenter"
+                          Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          Content="{TemplateBinding Content}"
+                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                          Padding="{TemplateBinding Padding}"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center" />
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="ListBox.segmented ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource TabHoverBgBrush}" />
+  </Style>
+
+  <Style Selector="ListBox.segmented ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="TextElement.Foreground" Value="#000000" />
+  </Style>
+
+  <Style Selector="ListBox.segmented ListBoxItem:selected">
+    <Setter Property="Foreground" Value="#000000" />
+  </Style>
+
+  <!-- Remove right border on last item for clean join -->
+  <Style Selector="ListBox.segmented ListBoxItem:nth-last-child(1)">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+</Styles>

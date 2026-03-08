@@ -77,6 +77,9 @@ public sealed class AppSettings
     [JsonPropertyName("fontSize")]
     public float FontSize { get; set; } = 10f;
 
+    [JsonPropertyName("lineHeight")]
+    public int LineHeight { get; set; } = 18;
+
     [JsonPropertyName("windowWidth")]
     public int WindowWidth { get; set; } = 1280;
 
@@ -117,8 +120,14 @@ public sealed class AppSettings
     public Dictionary<string, List<long>> Bookmarks { get; set; } = new();
 
     // Grid View
+    [JsonPropertyName("defaultGridMode")]
+    public bool DefaultGridMode { get; set; } = true;
+
     [JsonPropertyName("gridLinesVisible")]
     public bool GridLinesVisible { get; set; } = true;
+
+    [JsonPropertyName("gridMultiline")]
+    public bool GridMultiline { get; set; } = true;
 
     [JsonPropertyName("sectionGridExpanded")]
     public bool SectionGridExpanded { get; set; } = false;

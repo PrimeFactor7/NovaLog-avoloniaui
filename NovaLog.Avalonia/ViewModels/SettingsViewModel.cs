@@ -29,6 +29,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _isVisible;
     [ObservableProperty] private string _theme = AppConstants.ThemeDark;
     [ObservableProperty] private float _fontSize = 10f;
+    [ObservableProperty] private int _lineHeight = 18;
     
     // Column Colors
     [ObservableProperty] private bool _timestampColorEnabled;
@@ -58,7 +59,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _filterPanelVisible;
 
     // Grid View
+    [ObservableProperty] private bool _defaultGridMode = true;
     [ObservableProperty] private bool _gridLinesVisible = true;
+    [ObservableProperty] private bool _gridMultiline = true;
 
     // Sections (Expanders)
     [ObservableProperty] private bool _sectionGridExpanded;
@@ -86,7 +89,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         Theme = settings.Theme;
         FontSize = settings.FontSize;
-        
+        LineHeight = settings.LineHeight;
+
         TimestampColorEnabled = settings.TimestampColorEnabled;
         if (Color.TryParse(settings.TimestampColor, out var tc)) TimestampColor = tc;
         MessageColorEnabled = settings.MessageColorEnabled;
@@ -119,7 +123,9 @@ public partial class SettingsViewModel : ObservableObject
         MinimapVisible = settings.MinimapVisible;
         FilterPanelVisible = settings.FilterPanelVisible;
 
+        DefaultGridMode = settings.DefaultGridMode;
         GridLinesVisible = settings.GridLinesVisible;
+        GridMultiline = settings.GridMultiline;
         SectionGridExpanded = settings.SectionGridExpanded;
         SectionColumnColorsExpanded = settings.SectionColumnColorsExpanded;
         SectionLogLevelsExpanded = settings.SectionLogLevelsExpanded;
@@ -135,7 +141,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         settings.Theme = Theme;
         settings.FontSize = FontSize;
-        
+        settings.LineHeight = LineHeight;
+
         settings.TimestampColorEnabled = TimestampColorEnabled;
         settings.TimestampColor = TimestampColor.ToString();
         settings.MessageColorEnabled = MessageColorEnabled;
@@ -167,7 +174,9 @@ public partial class SettingsViewModel : ObservableObject
         settings.MinimapVisible = MinimapVisible;
         settings.FilterPanelVisible = FilterPanelVisible;
 
+        settings.DefaultGridMode = DefaultGridMode;
         settings.GridLinesVisible = GridLinesVisible;
+        settings.GridMultiline = GridMultiline;
         settings.SectionGridExpanded = SectionGridExpanded;
         settings.SectionColumnColorsExpanded = SectionColumnColorsExpanded;
         settings.SectionLogLevelsExpanded = SectionLogLevelsExpanded;

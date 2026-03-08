@@ -54,6 +54,7 @@ public partial class LogViewViewModel : ObservableObject
     }
 
     [ObservableProperty] private bool _isGridMode = true;
+    [ObservableProperty] private bool _gridMultiline = true;
     [ObservableProperty] private bool _isIndexing;
     [ObservableProperty] private double _indexingProgress;
     [ObservableProperty] private bool _isStreaming;
@@ -84,6 +85,12 @@ public partial class LogViewViewModel : ObservableObject
             GridDataSource = null;
     }
 
+    partial void OnGridMultilineChanged(bool value)
+    {
+        if (IsGridMode)
+            RebuildGridSource();
+    }
+
     [ObservableProperty] private global::Avalonia.Controls.ITreeDataGridSource? _gridDataSource;
 
     private List<GridRowViewModel>? _gridRootRows;
@@ -95,16 +102,18 @@ public partial class LogViewViewModel : ObservableObject
         if (_memorySource is not null)
         {
             _gridRootRows = GridSourceBuilder.BuildHierarchical(
-                _memorySource, Title);
+                _memorySource, Title, multiline: GridMultiline);
             GridDataSource = CreateHierarchicalGridSource(_gridRootRows);
         }
         else if (_virtualSource is not null)
         {
             // Virtual sources use flat grid (too many lines for tree nodes)
-            var rows = GridSourceBuilder.BuildFlat(_virtualSource);
+            var rows = GridSourceBuilder.BuildFlat(_virtualSource, multiline: GridMultiline);
             GridDataSource = CreateFlatGridSource(rows);
         }
     }
+
+    private static readonly global::Avalonia.Media.FontFamily MonoFont = new("Cascadia Mono, Consolas, Courier New");
 
     private global::Avalonia.Controls.ITreeDataGridSource CreateFlatGridSource(
         IReadOnlyList<GridRowViewModel> rows)
@@ -113,12 +122,21 @@ public partial class LogViewViewModel : ObservableObject
         {
             Columns =
             {
-                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
-                    "Timestamp", x => x.TimestampText, width: new global::Avalonia.Controls.GridLength(180)),
-                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
-                    "Level", x => x.LevelText, width: new global::Avalonia.Controls.GridLength(70)),
-                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
-                    "Message", x => x.Message, width: new global::Avalonia.Controls.GridLength(1, global::Avalonia.Controls.GridUnitType.Star)),
+                new global::Avalonia.Controls.Models.TreeDataGrid.TemplateColumn<GridRowViewModel>(
+                    "Timestamp", new global::Avalonia.Controls.Templates.FuncDataTemplate<GridRowViewModel>((row, _) =>
+                        new global::Avalonia.Controls.TextBlock
+                        {
+                            Text = row?.TimestampText ?? "",
+                            Foreground = LogLineRow.ResolveBrush("TimestampBrush") ?? LogLineRow.FallbackTimestamp,
+                            FontFamily = MonoFont, FontSize = LogLineRow.LogFontSize,
+                            Height = LogLineRow.RowHeight * (row?.LineCount ?? 1),
+                            VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
+                            Padding = new global::Avalonia.Thickness(0, (LogLineRow.RowHeight - LogLineRow.LogFontSize) / 2.0, 0, 0),
+                            Margin = new global::Avalonia.Thickness(2, 0),
+                        }, supportsRecycling: false),
+                    width: new global::Avalonia.Controls.GridLength(180)),
+                CreateLevelColumn(),
+                CreateMessageColumn(),
             }
         };
     }
@@ -131,20 +149,41 @@ public partial class LogViewViewModel : ObservableObject
             Columns =
             {
                 new global::Avalonia.Controls.Models.TreeDataGrid.HierarchicalExpanderColumn<GridRowViewModel>(
-                    new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
-                        "File / Timestamp",
-                        x => x.IsFileHeader
-                            ? (string.IsNullOrEmpty(x.FileSizeText)
-                                ? $"{x.FileName}  ({x.ChildCount} lines)"
-                                : $"{x.FileName}  ({x.FileSizeText}, {x.ChildCount} lines)")
-                            : x.TimestampText,
+                    new global::Avalonia.Controls.Models.TreeDataGrid.TemplateColumn<GridRowViewModel>(
+                        "File / Timestamp", new global::Avalonia.Controls.Templates.FuncDataTemplate<GridRowViewModel>((row, _) =>
+                        {
+                            if (row is null) return new global::Avalonia.Controls.TextBlock();
+                            if (row.IsFileHeader)
+                            {
+                                var label = string.IsNullOrEmpty(row.FileSizeText)
+                                    ? $"{row.FileName}  ({row.ChildCount} lines)"
+                                    : $"{row.FileName}  ({row.FileSizeText}, {row.ChildCount} lines)";
+                                return new global::Avalonia.Controls.TextBlock
+                                {
+                                    Text = label,
+                                    Foreground = LogLineRow.ResolveBrush("AccentBrush") ?? global::Avalonia.Media.Brushes.Cyan,
+                                    FontFamily = MonoFont, FontSize = LogLineRow.LogFontSize,
+                                    FontWeight = global::Avalonia.Media.FontWeight.Bold,
+                                    Height = LogLineRow.RowHeight,
+                                    VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center,
+                                    Margin = new global::Avalonia.Thickness(2, 0),
+                                };
+                            }
+                            return new global::Avalonia.Controls.TextBlock
+                            {
+                                Text = row.TimestampText,
+                                Foreground = LogLineRow.ResolveBrush("TimestampBrush") ?? LogLineRow.FallbackTimestamp,
+                                FontFamily = MonoFont, FontSize = LogLineRow.LogFontSize,
+                                Height = LogLineRow.RowHeight * row.LineCount,
+                                VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
+                                Padding = new global::Avalonia.Thickness(0, (LogLineRow.RowHeight - LogLineRow.LogFontSize) / 2.0, 0, 0),
+                                Margin = new global::Avalonia.Thickness(2, 0),
+                            };
+                        }, supportsRecycling: false),
                         width: new global::Avalonia.Controls.GridLength(260)),
                     x => x.Children),
-                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
-                    "Level", x => x.LevelText, width: new global::Avalonia.Controls.GridLength(70)),
-                new global::Avalonia.Controls.Models.TreeDataGrid.TextColumn<GridRowViewModel, string>(
-                    "Message", x => x.IsFileHeader ? "" : x.Message,
-                    width: new global::Avalonia.Controls.GridLength(1, global::Avalonia.Controls.GridUnitType.Star)),
+                CreateLevelColumn(),
+                CreateMessageColumn(),
             }
         };
 
@@ -154,6 +193,31 @@ public partial class LogViewViewModel : ObservableObject
             source.Expand(new global::Avalonia.Controls.IndexPath(rootRows.Count - 1));
 
         return source;
+    }
+
+    private static global::Avalonia.Controls.Models.TreeDataGrid.TemplateColumn<GridRowViewModel> CreateLevelColumn()
+    {
+        return new global::Avalonia.Controls.Models.TreeDataGrid.TemplateColumn<GridRowViewModel>(
+            "Level", new global::Avalonia.Controls.Templates.FuncDataTemplate<GridRowViewModel>((row, _) =>
+                new global::Avalonia.Controls.TextBlock
+                {
+                    Text = row?.LevelText ?? "",
+                    Foreground = LogLineRow.ResolveLevelBrush(row?.Level ?? LogLevel.Unknown),
+                    FontFamily = MonoFont, FontSize = LogLineRow.LogFontSize,
+                    Height = LogLineRow.RowHeight * (row?.LineCount ?? 1),
+                    VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
+                    Padding = new global::Avalonia.Thickness(0, (LogLineRow.RowHeight - LogLineRow.LogFontSize) / 2.0, 0, 0),
+                    Margin = new global::Avalonia.Thickness(2, 0),
+                }, supportsRecycling: false),
+            width: new global::Avalonia.Controls.GridLength(70));
+    }
+
+    private static global::Avalonia.Controls.Models.TreeDataGrid.TemplateColumn<GridRowViewModel> CreateMessageColumn()
+    {
+        return new global::Avalonia.Controls.Models.TreeDataGrid.TemplateColumn<GridRowViewModel>(
+            "Message", new global::Avalonia.Controls.Templates.FuncDataTemplate<GridRowViewModel>((_, _) =>
+                new GridMessageCell(), supportsRecycling: false),
+            width: new global::Avalonia.Controls.GridLength(1, global::Avalonia.Controls.GridUnitType.Star));
     }
 
     private readonly DelegatingItemsSource _delegatingSource = new();

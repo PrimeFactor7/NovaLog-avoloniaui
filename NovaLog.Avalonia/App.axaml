@@ -16,5 +16,6 @@
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml"/>
         <StyleInclude Source="avares://NovaLog.Avalonia/Styles/NeonSidebar.axaml" />
+        <StyleInclude Source="avares://NovaLog.Avalonia/Styles/SegmentedControl.axaml" />
     </Application.Styles>
 </Application>

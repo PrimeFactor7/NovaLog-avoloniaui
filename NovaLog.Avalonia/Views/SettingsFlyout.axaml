@@ -182,6 +182,17 @@
                       Value="{Binding FontSize}"
                       TickFrequency="1"
                       IsSnapToTickEnabled="True" />
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right"
+                           Text="{Binding LineHeight, StringFormat={}{0}px}"
+                           FontSize="11"
+                           Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock Text="Line Height" FontSize="11" Foreground="{DynamicResource DimTextBrush}" />
+              </DockPanel>
+              <Slider Minimum="14" Maximum="32"
+                      Value="{Binding LineHeight}"
+                      TickFrequency="1"
+                      IsSnapToTickEnabled="True" />
             </StackPanel>
           </Expander>
 
@@ -210,6 +221,20 @@
               </StackPanel>
             </Expander.Header>
             <StackPanel Spacing="6" Margin="8,4">
+              <TextBlock Text="Default View" FontSize="11" Foreground="{DynamicResource DimTextBrush}" Margin="0,0,0,2" />
+              <ListBox Classes="segmented"
+                       SelectionMode="Single"
+                       SelectedIndex="{Binding DefaultGridMode, Converter={x:Static vm:BoolToIndexConverter.Instance}}">
+                <ListBoxItem Content="Text View" />
+                <ListBoxItem Content="Grid View" />
+              </ListBox>
+              <TextBlock Text="Multiline Logs" FontSize="11" Foreground="{DynamicResource DimTextBrush}" Margin="0,4,0,2" />
+              <ListBox Classes="segmented"
+                       SelectionMode="Single"
+                       SelectedIndex="{Binding GridMultiline, Converter={x:Static vm:BoolToIndexConverter.Instance}}">
+                <ListBoxItem Content="One Per Row" />
+                <ListBoxItem Content="Span Lines" />
+              </ListBox>
               <CheckBox IsChecked="{Binding GridLinesVisible}" Content="Grid lines" />
             </StackPanel>
           </Expander>

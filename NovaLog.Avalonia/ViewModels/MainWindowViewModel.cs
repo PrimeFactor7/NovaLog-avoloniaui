@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NovaLog.Avalonia.Controls;
 using NovaLog.Core.Models;
 using NovaLog.Core.Services;
 using NovaLog.Core.Theme;
@@ -37,6 +38,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         Workspace.Initialize(SourceManager, ThemeService);
         Workspace.SetFollowDefaults(Settings.MainFollowEnabled, Settings.FilterFollowEnabled, applyToExisting: true);
+        Workspace.SetGridModeDefault(Settings.DefaultGridMode, applyToExisting: true);
+        Workspace.SetGridMultilineDefault(Settings.GridMultiline, applyToExisting: true);
+        LogLineRow.RowHeight = Settings.LineHeight;
         Workspace.PropertyChanged += OnWorkspacePropertyChanged;
         AttachActiveLogView(Workspace.ActiveLogView);
 
@@ -326,6 +330,17 @@ public partial class MainWindowViewModel : ObservableObject
                 break;
             case nameof(SettingsViewModel.FilterFollowEnabled):
                 Workspace.SetFilterFollowDefault(Settings.FilterFollowEnabled, applyToExisting: true);
+                break;
+            case nameof(SettingsViewModel.DefaultGridMode):
+                Workspace.SetGridModeDefault(Settings.DefaultGridMode, applyToExisting: true);
+                break;
+            case nameof(SettingsViewModel.GridMultiline):
+                Workspace.SetGridMultilineDefault(Settings.GridMultiline, applyToExisting: true);
+                break;
+            case nameof(SettingsViewModel.LineHeight):
+                LogLineRow.RowHeight = Settings.LineHeight;
+                foreach (var pane in Workspace.GetAllPanes())
+                    pane.LogView.NotifyRowVisualsChanged();
                 break;
         }
     }

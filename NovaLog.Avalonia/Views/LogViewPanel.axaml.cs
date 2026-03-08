@@ -20,6 +20,7 @@ public partial class LogViewPanel : UserControl
     private ItemsRepeater? _repeater;
     private ScrollViewer? _scroller;
     private LogMinimap? _minimap;
+    private global::Avalonia.Controls.TreeDataGrid? _logGrid;
     private LogViewViewModel? _attachedViewModel;
     private FilterPanelViewModel? _attachedFilterViewModel;
     private bool _minimapRefreshPending;
@@ -90,6 +91,9 @@ public partial class LogViewPanel : UserControl
         _repeater = this.FindControl<ItemsRepeater>("LogRepeater");
         _scroller = this.FindControl<ScrollViewer>("LogScroller");
         _minimap = this.FindControl<LogMinimap>("Minimap");
+        _logGrid = this.FindControl<global::Avalonia.Controls.TreeDataGrid>("LogGrid");
+        if (_logGrid is not null)
+            _logGrid.SizeChanged += (_, _) => FitMessageColumn();
         FilterPanelView.SizeChanged += OnFilterPanelSizeChanged;
 
         if (_repeater is not null)
@@ -312,6 +316,7 @@ public partial class LogViewPanel : UserControl
             _attachedViewModel.NavIndex.IndicesChanged -= OnNavIndexChanged;
             _attachedViewModel.SelectedLineChanged -= OnSelectedLineChanged;
             _attachedViewModel.RowVisualsChanged -= OnRowVisualsChanged;
+            _attachedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
 
         if (_attachedFilterViewModel is not null)
@@ -330,6 +335,7 @@ public partial class LogViewPanel : UserControl
             _attachedViewModel.NavIndex.IndicesChanged += OnNavIndexChanged;
             _attachedViewModel.SelectedLineChanged += OnSelectedLineChanged;
             _attachedViewModel.RowVisualsChanged += OnRowVisualsChanged;
+            _attachedViewModel.PropertyChanged += OnViewModelPropertyChanged;
             _attachedFilterViewModel?.PropertyChanged += OnFilterViewModelPropertyChanged;
 
             if (_minimap is not null)
@@ -432,6 +438,51 @@ public partial class LogViewPanel : UserControl
     }
 
     private void OnRowVisualsChanged() => OnSelectedLineChanged();
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(LogViewViewModel.IsGridMode) or nameof(LogViewViewModel.GridDataSource))
+        {
+            // After grid becomes visible or source changes, fit the Message column
+            Dispatcher.UIThread.Post(FitMessageColumn, DispatcherPriority.Render);
+        }
+    }
+
+    /// <summary>
+    /// Manually sizes the last (Message) column to fill remaining width.
+    /// Star sizing on TemplateColumn is broken in TreeDataGrid v11.0.10.
+    /// </summary>
+    private void FitMessageColumn()
+    {
+        if (_logGrid is null || DataContext is not LogViewViewModel { IsGridMode: true } vm)
+            return;
+        var source = vm.GridDataSource;
+        if (source is null) return;
+
+        double gridWidth = _logGrid.Bounds.Width;
+        if (gridWidth <= 0) return;
+
+        var columns = source.Columns;
+        if (columns.Count < 2) return;
+
+        // Sum widths of all columns except the last one
+        double fixedWidth = 0;
+        for (int i = 0; i < columns.Count - 1; i++)
+        {
+            double w = columns[i].ActualWidth;
+            if (double.IsNaN(w))
+                w = columns[i].Width.IsAbsolute ? columns[i].Width.Value : 200;
+            fixedWidth += w;
+        }
+
+        // Account for scrollbar (~18px) and small margin
+        double margin = 20;
+        double remaining = gridWidth - fixedWidth - margin;
+        if (remaining < 100) remaining = 100;
+
+        int lastIdx = columns.Count - 1;
+        columns.SetColumnWidth(lastIdx, new global::Avalonia.Controls.GridLength(remaining));
+    }
 
     private void OnFilterViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

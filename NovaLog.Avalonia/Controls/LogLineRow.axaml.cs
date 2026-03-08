@@ -15,9 +15,9 @@ namespace NovaLog.Avalonia.Controls;
 
 public partial class LogLineRow : Control
 {
-    private static readonly Typeface MonoTypeface = new("Cascadia Mono, Consolas, Courier New");
-    private const double LogFontSize = 12;
-    internal const double RowHeight = 18;
+    internal static readonly Typeface MonoTypeface = new("Cascadia Mono, Consolas, Courier New");
+    internal const double LogFontSize = 12;
+    internal static double RowHeight { get; set; } = 18;
     private const double CharWidth = 7.2;
     private const double TimestampChars = 23;
     private const double LevelCharsMax = 8;
@@ -28,33 +28,33 @@ public partial class LogLineRow : Control
     private const double BookmarkMarkerWidth = 3;
     private static readonly IBrush SelectedLineBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x4F, 0xC3, 0xF7));
     private static readonly IPen SelectedLinePen = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x4F, 0xC3, 0xF7)), 1);
-    private static readonly ConcurrentDictionary<string, IBrush> ParsedBrushes = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Regex StackMethodPattern = new(@"(?<atkw>at)\s+(?<method>[\w.+<>\[\]`,]+)\((?<args>[^)]*)\)", RegexOptions.Compiled);
-    private static readonly Regex StackFilePattern = new(@"(?:(?<inkw>in)\s+)?(?<path>\w:[\\\/][^\s:]+|[\\\/][^\s:]+):(?:line\s+)?(?<line>\d+)", RegexOptions.Compiled);
-    private static readonly Regex StackExceptionPattern = new(@"(?<extype>[\w.]+Exception)\b", RegexOptions.Compiled);
-    private static readonly Regex HexPattern = new(@"\b0x[0-9a-fA-F]+\b", RegexOptions.Compiled);
-    private static readonly Regex NumberPattern = new(@"\b\d+\.?\d*(?:[eE][-+]?\d+)?\b", RegexOptions.Compiled);
-    private static readonly Regex GuidPattern = new(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex IpPattern = new(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled);
-    private static readonly Regex UrlPattern = new(@"\b(?:https?|ftp)://[^\s]+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex SqlKeywordPattern = new(
+    internal static readonly ConcurrentDictionary<string, IBrush> ParsedBrushes = new(StringComparer.OrdinalIgnoreCase);
+    internal static readonly Regex StackMethodPattern = new(@"(?<atkw>at)\s+(?<method>[\w.+<>\[\]`,]+)\((?<args>[^)]*)\)", RegexOptions.Compiled);
+    internal static readonly Regex StackFilePattern = new(@"(?:(?<inkw>in)\s+)?(?<path>\w:[\\\/][^\s:]+|[\\\/][^\s:]+):(?:line\s+)?(?<line>\d+)", RegexOptions.Compiled);
+    internal static readonly Regex StackExceptionPattern = new(@"(?<extype>[\w.]+Exception)\b", RegexOptions.Compiled);
+    internal static readonly Regex HexPattern = new(@"\b0x[0-9a-fA-F]+\b", RegexOptions.Compiled);
+    internal static readonly Regex NumberPattern = new(@"\b\d+\.?\d*(?:[eE][-+]?\d+)?\b", RegexOptions.Compiled);
+    internal static readonly Regex GuidPattern = new(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    internal static readonly Regex IpPattern = new(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled);
+    internal static readonly Regex UrlPattern = new(@"\b(?:https?|ftp)://[^\s]+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    internal static readonly Regex SqlKeywordPattern = new(
         @"\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|AND|OR|NOT|IN|INTO|VALUES|SET|CREATE|DROP|ALTER|TABLE|INDEX|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|BETWEEN|LIKE|IS|NULL|EXISTS|UNION|CASE|WHEN|THEN|ELSE|END|EXEC|EXECUTE|TOP|ASC|DESC)\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex SqlStringPattern = new(@"'(?:[^'\\]|\\.)*'", RegexOptions.Compiled);
-    private static readonly Regex SqlOperatorPattern = new(@"[=<>!]+|[(),;*]", RegexOptions.Compiled);
-    private static readonly Regex SqlNumberPattern = new(@"\b\d+\.?\d*\b", RegexOptions.Compiled);
-    private static readonly IBrush FallbackText = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x41));
-    private static readonly IBrush FallbackDim = new SolidColorBrush(Color.FromRgb(0x78, 0x78, 0x96));
-    private static readonly IBrush FallbackTimestamp = new SolidColorBrush(Color.FromRgb(0x5A, 0x5A, 0x82));
-    private static readonly IBrush FallbackStackArgs = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
-    private static readonly IBrush FallbackStackPath = new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90));
-    private static readonly IBrush FallbackGuidBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
-    private static readonly IBrush FallbackUrlBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
-    private static readonly IBrush FallbackIpBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
-    private static readonly IBrush FallbackHexBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xA5, 0x00));
-    private static readonly IBrush FallbackJsonBraceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
-    private static readonly IBrush FallbackJsonBracketBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
-    private static readonly IBrush FallbackSqlKeywordBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
+    internal static readonly Regex SqlStringPattern = new(@"'(?:[^'\\]|\\.)*'", RegexOptions.Compiled);
+    internal static readonly Regex SqlOperatorPattern = new(@"[=<>!]+|[(),;*]", RegexOptions.Compiled);
+    internal static readonly Regex SqlNumberPattern = new(@"\b\d+\.?\d*\b", RegexOptions.Compiled);
+    internal static readonly IBrush FallbackText = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x41));
+    internal static readonly IBrush FallbackDim = new SolidColorBrush(Color.FromRgb(0x78, 0x78, 0x96));
+    internal static readonly IBrush FallbackTimestamp = new SolidColorBrush(Color.FromRgb(0x5A, 0x5A, 0x82));
+    internal static readonly IBrush FallbackStackArgs = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+    internal static readonly IBrush FallbackStackPath = new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90));
+    internal static readonly IBrush FallbackGuidBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
+    internal static readonly IBrush FallbackUrlBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
+    internal static readonly IBrush FallbackIpBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
+    internal static readonly IBrush FallbackHexBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xA5, 0x00));
+    internal static readonly IBrush FallbackJsonBraceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00));
+    internal static readonly IBrush FallbackJsonBracketBrush = new SolidColorBrush(Color.FromRgb(0xDA, 0x70, 0xD6));
+    internal static readonly IBrush FallbackSqlKeywordBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
     private static readonly IBrush FallbackBookmarkBrush = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xFF));
     private static readonly IBrush SearchHighlightBrush = new SolidColorBrush(Color.FromArgb(0x60, 0xFF, 0xE0, 0x00));
 
@@ -241,7 +241,7 @@ public partial class LogLineRow : Control
         {
             IBrush levelBrush = theme != null
                 ? ParseBrush(theme.GetLevelColorHex(_vm.Level))
-                : GetLevelBrush(_vm.Level);
+                : ResolveLevelBrush(_vm.Level);
 
             var ft = CreateFormattedText(_vm.LevelText, levelBrush);
             context.DrawText(ft, new Point(x, y));
@@ -576,46 +576,49 @@ public partial class LogLineRow : Control
     }
 
     private IBrush GetJsonBrush(JsonHighlightKind kind, string segment)
+        => ResolveJsonBrush(kind, segment);
+
+    internal static IBrush ResolveJsonBrush(JsonHighlightKind kind, string segment)
     {
         if (kind == JsonHighlightKind.Punctuation && segment.Length == 1)
         {
             return segment[0] switch
             {
-                '{' or '}' => GetBrush("JsonBraceBrush") ?? FallbackJsonBraceBrush,
-                '[' or ']' => GetBrush("JsonBracketBrush") ?? FallbackJsonBracketBrush,
-                ':' or ',' => GetBrush("JsonPunctuationBrush") ?? Brushes.Gray,
-                _ => GetBrush("JsonPunctuationBrush") ?? Brushes.Gray
+                '{' or '}' => ResolveBrush("JsonBraceBrush") ?? FallbackJsonBraceBrush,
+                '[' or ']' => ResolveBrush("JsonBracketBrush") ?? FallbackJsonBracketBrush,
+                ':' or ',' => ResolveBrush("JsonPunctuationBrush") ?? Brushes.Gray,
+                _ => ResolveBrush("JsonPunctuationBrush") ?? Brushes.Gray
             };
         }
 
         return kind switch
         {
-            JsonHighlightKind.Key         => GetBrush("JsonKeyBrush") ?? Brushes.Cyan,
-            JsonHighlightKind.String      => GetBrush("JsonStringBrush") ?? Brushes.Green,
-            JsonHighlightKind.Number      => GetBrush("JsonNumberBrush") ?? Brushes.Orange,
-            JsonHighlightKind.Bool        => GetBrush("JsonBoolBrush") ?? Brushes.Red,
-            JsonHighlightKind.Punctuation => GetBrush("JsonPunctuationBrush") ?? Brushes.Gray,
-            JsonHighlightKind.Prefix      => GetBrush("DimTextBrush") ?? Brushes.Gray,
-            _                             => GetBrush("TextDefaultBrush") ?? Brushes.White
+            JsonHighlightKind.Key         => ResolveBrush("JsonKeyBrush") ?? Brushes.Cyan,
+            JsonHighlightKind.String      => ResolveBrush("JsonStringBrush") ?? Brushes.Green,
+            JsonHighlightKind.Number      => ResolveBrush("JsonNumberBrush") ?? Brushes.Orange,
+            JsonHighlightKind.Bool        => ResolveBrush("JsonBoolBrush") ?? Brushes.Red,
+            JsonHighlightKind.Punctuation => ResolveBrush("JsonPunctuationBrush") ?? Brushes.Gray,
+            JsonHighlightKind.Prefix      => ResolveBrush("DimTextBrush") ?? Brushes.Gray,
+            _                             => ResolveBrush("TextDefaultBrush") ?? Brushes.White
         };
     }
 
-    private IBrush GetLevelBrush(LogLevel level) => level switch
+    internal static IBrush ResolveLevelBrush(LogLevel level) => level switch
     {
-        LogLevel.Trace   => GetBrush("TextTraceBrush") ?? Brushes.Gray,
-        LogLevel.Verbose => GetBrush("TextVerboseBrush") ?? Brushes.Gray,
-        LogLevel.Debug   => GetBrush("TextDebugBrush") ?? Brushes.Gray,
-        LogLevel.Info    => GetBrush("TextInfoBrush") ?? Brushes.Cyan,
-        LogLevel.Warn    => GetBrush("TextWarnBrush") ?? Brushes.Orange,
-        LogLevel.Error   => GetBrush("TextErrorBrush") ?? Brushes.Red,
-        LogLevel.Fatal   => GetBrush("TextFatalBrush") ?? Brushes.Magenta,
-        _                => GetBrush("TextDefaultBrush") ?? Brushes.Green
+        LogLevel.Trace   => ResolveBrush("TextTraceBrush") ?? Brushes.Gray,
+        LogLevel.Verbose => ResolveBrush("TextVerboseBrush") ?? Brushes.Gray,
+        LogLevel.Debug   => ResolveBrush("TextDebugBrush") ?? Brushes.Gray,
+        LogLevel.Info    => ResolveBrush("TextInfoBrush") ?? Brushes.Cyan,
+        LogLevel.Warn    => ResolveBrush("TextWarnBrush") ?? Brushes.Orange,
+        LogLevel.Error   => ResolveBrush("TextErrorBrush") ?? Brushes.Red,
+        LogLevel.Fatal   => ResolveBrush("TextFatalBrush") ?? Brushes.Magenta,
+        _                => ResolveBrush("TextDefaultBrush") ?? Brushes.Green
     };
 
-    private IBrush? GetBrush(string key)
+    private IBrush? GetBrush(string key) => ResolveBrush(key);
+
+    internal static IBrush? ResolveBrush(string key)
     {
-        if (this.TryFindResource(key, out var resource) && resource is IBrush brush)
-            return brush;
         if (AvaloniaApplication.Current?.TryGetResource(key, null, out var appRes) == true && appRes is IBrush appBrush)
             return appBrush;
         return key switch
@@ -628,10 +631,10 @@ public partial class LogLineRow : Control
         };
     }
 
-    private static IBrush ParseBrush(string hex)
+    internal static IBrush ParseBrush(string hex)
         => ParsedBrushes.GetOrAdd(hex, static value => Brush.Parse(value));
 
-    private static FormattedText CreateFormattedText(string text, IBrush foreground)
+    internal static FormattedText CreateFormattedText(string text, IBrush foreground)
     {
         return new FormattedText(text, System.Globalization.CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight, MonoTypeface, LogFontSize, foreground);

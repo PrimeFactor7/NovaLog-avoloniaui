@@ -60,3 +60,15 @@ public sealed class MinimapToVerticalScrollBarVisibilityConverter : IValueConver
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+/// <summary>Two-way converter: bool (true=index 1, false=index 0) ↔ int SelectedIndex.</summary>
+public sealed class BoolToIndexConverter : IValueConverter
+{
+    public static readonly BoolToIndexConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? 1 : 0;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is 1;
+}
