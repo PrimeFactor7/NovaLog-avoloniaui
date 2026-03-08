@@ -40,6 +40,7 @@ public partial class MainWindowViewModel : ObservableObject
         Workspace.SetFollowDefaults(Settings.MainFollowEnabled, Settings.FilterFollowEnabled, applyToExisting: true);
         Workspace.SetGridModeDefault(Settings.DefaultGridMode, applyToExisting: true);
         Workspace.SetGridMultilineDefault(Settings.GridMultiline, applyToExisting: true);
+        Workspace.SetFormattingOptions(BuildFormattingOptions(), applyToExisting: true);
         LogLineRow.RowHeight = Settings.LineHeight;
         Workspace.PropertyChanged += OnWorkspacePropertyChanged;
         AttachActiveLogView(Workspace.ActiveLogView);
@@ -315,6 +316,15 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand] private void SimShowcaseMedium() => StartSimulator(200, showcase: true);
     [RelayCommand] private void SimShowcaseFast() => StartSimulator(50, showcase: true);
 
+    private FormattingOptions? BuildFormattingOptions()
+    {
+        if (!Settings.JsonFormatEnabled && !Settings.SqlFormatEnabled)
+            return null;
+        return new FormattingOptions(
+            Settings.JsonFormatEnabled, Settings.SqlFormatEnabled,
+            Settings.FormatIndentSize, Settings.MaxRowLines);
+    }
+
     private void OnSettingsChanged()
     {
         ApplySettingsToTheme();
@@ -336,6 +346,12 @@ public partial class MainWindowViewModel : ObservableObject
                 break;
             case nameof(SettingsViewModel.GridMultiline):
                 Workspace.SetGridMultilineDefault(Settings.GridMultiline, applyToExisting: true);
+                break;
+            case nameof(SettingsViewModel.JsonFormatEnabled):
+            case nameof(SettingsViewModel.SqlFormatEnabled):
+            case nameof(SettingsViewModel.FormatIndentSize):
+            case nameof(SettingsViewModel.MaxRowLines):
+                Workspace.SetFormattingOptions(BuildFormattingOptions(), applyToExisting: true);
                 break;
             case nameof(SettingsViewModel.LineHeight):
                 LogLineRow.RowHeight = Settings.LineHeight;

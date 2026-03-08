@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using NovaLog.Core.Models;
+using NovaLog.Core.Services;
 
 namespace NovaLog.Avalonia.ViewModels;
 
@@ -23,8 +24,11 @@ public sealed class GridRowViewModel
     // Merged sub-lines for multiline span mode (null = single line)
     public List<LogLineViewModel>? SubLines { get; init; }
 
+    // Auto-formatted lines (JSON pretty-print, SQL formatting) — takes priority over SubLines
+    public List<FormattedSubLine>? FormattedLines { get; set; }
+
     /// <summary>Number of visual lines this row spans (1 for normal, N for multiline).</summary>
-    public int LineCount => SubLines?.Count ?? 1;
+    public int LineCount => FormattedLines?.Count ?? SubLines?.Count ?? 1;
 
     // Convenience accessors for column bindings
     public string TimestampText => Line?.TimestampText ?? "";

@@ -131,6 +131,22 @@ public sealed class AppSettings
 
     [JsonPropertyName("sectionGridExpanded")]
     public bool SectionGridExpanded { get; set; } = false;
+
+    // Formatting (auto-format in Span Lines mode)
+    [JsonPropertyName("jsonFormatEnabled")]
+    public bool JsonFormatEnabled { get; set; }
+
+    [JsonPropertyName("sqlFormatEnabled")]
+    public bool SqlFormatEnabled { get; set; }
+
+    [JsonPropertyName("formatIndentSize")]
+    public int FormatIndentSize { get; set; } = 2;
+
+    [JsonPropertyName("maxRowLines")]
+    public int MaxRowLines { get; set; } = 50;
+
+    [JsonPropertyName("sectionFormattingExpanded")]
+    public bool SectionFormattingExpanded { get; set; }
 }
 
 public sealed class LevelColorEntry

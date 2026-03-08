@@ -72,3 +72,15 @@ public sealed class BoolToIndexConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is 1;
 }
+
+/// <summary>Two-way converter: indent size (2→0, 4→1) ↔ SelectedIndex for segmented control.</summary>
+public sealed class IndentSizeToIndexConverter : IValueConverter
+{
+    public static readonly IndentSizeToIndexConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is 4 ? 1 : 0;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is 1 ? 4 : 2;
+}

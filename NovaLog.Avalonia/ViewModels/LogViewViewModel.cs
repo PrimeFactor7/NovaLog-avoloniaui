@@ -55,6 +55,7 @@ public partial class LogViewViewModel : ObservableObject
 
     [ObservableProperty] private bool _isGridMode = true;
     [ObservableProperty] private bool _gridMultiline = true;
+    private FormattingOptions? _formattingOptions;
     [ObservableProperty] private bool _isIndexing;
     [ObservableProperty] private double _indexingProgress;
     [ObservableProperty] private bool _isStreaming;
@@ -91,6 +92,13 @@ public partial class LogViewViewModel : ObservableObject
             RebuildGridSource();
     }
 
+    public void SetFormattingOptions(FormattingOptions? options)
+    {
+        _formattingOptions = options;
+        if (IsGridMode)
+            RebuildGridSource();
+    }
+
     [ObservableProperty] private global::Avalonia.Controls.ITreeDataGridSource? _gridDataSource;
 
     private List<GridRowViewModel>? _gridRootRows;
@@ -99,16 +107,18 @@ public partial class LogViewViewModel : ObservableObject
     {
         if (!IsGridMode) return;
 
+        var fmt = GridMultiline ? _formattingOptions : null;
+
         if (_memorySource is not null)
         {
             _gridRootRows = GridSourceBuilder.BuildHierarchical(
-                _memorySource, Title, multiline: GridMultiline);
+                _memorySource, Title, multiline: GridMultiline, formatting: fmt);
             GridDataSource = CreateHierarchicalGridSource(_gridRootRows);
         }
         else if (_virtualSource is not null)
         {
             // Virtual sources use flat grid (too many lines for tree nodes)
-            var rows = GridSourceBuilder.BuildFlat(_virtualSource, multiline: GridMultiline);
+            var rows = GridSourceBuilder.BuildFlat(_virtualSource, multiline: GridMultiline, formatting: fmt);
             GridDataSource = CreateFlatGridSource(rows);
         }
     }

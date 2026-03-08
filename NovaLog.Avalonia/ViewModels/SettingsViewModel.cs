@@ -63,7 +63,14 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _gridLinesVisible = true;
     [ObservableProperty] private bool _gridMultiline = true;
 
+    // Formatting (auto-format in Span Lines mode)
+    [ObservableProperty] private bool _jsonFormatEnabled;
+    [ObservableProperty] private bool _sqlFormatEnabled;
+    [ObservableProperty] private int _formatIndentSize = 2;
+    [ObservableProperty] private int _maxRowLines = 50;
+
     // Sections (Expanders)
+    [ObservableProperty] private bool _sectionFormattingExpanded;
     [ObservableProperty] private bool _sectionGridExpanded;
     [ObservableProperty] private bool _sectionColumnColorsExpanded;
     [ObservableProperty] private bool _sectionLogLevelsExpanded;
@@ -126,6 +133,11 @@ public partial class SettingsViewModel : ObservableObject
         DefaultGridMode = settings.DefaultGridMode;
         GridLinesVisible = settings.GridLinesVisible;
         GridMultiline = settings.GridMultiline;
+        JsonFormatEnabled = settings.JsonFormatEnabled;
+        SqlFormatEnabled = settings.SqlFormatEnabled;
+        FormatIndentSize = settings.FormatIndentSize;
+        MaxRowLines = settings.MaxRowLines;
+        SectionFormattingExpanded = settings.SectionFormattingExpanded;
         SectionGridExpanded = settings.SectionGridExpanded;
         SectionColumnColorsExpanded = settings.SectionColumnColorsExpanded;
         SectionLogLevelsExpanded = settings.SectionLogLevelsExpanded;
@@ -177,6 +189,11 @@ public partial class SettingsViewModel : ObservableObject
         settings.DefaultGridMode = DefaultGridMode;
         settings.GridLinesVisible = GridLinesVisible;
         settings.GridMultiline = GridMultiline;
+        settings.JsonFormatEnabled = JsonFormatEnabled;
+        settings.SqlFormatEnabled = SqlFormatEnabled;
+        settings.FormatIndentSize = FormatIndentSize;
+        settings.MaxRowLines = MaxRowLines;
+        settings.SectionFormattingExpanded = SectionFormattingExpanded;
         settings.SectionGridExpanded = SectionGridExpanded;
         settings.SectionColumnColorsExpanded = SectionColumnColorsExpanded;
         settings.SectionLogLevelsExpanded = SectionLogLevelsExpanded;

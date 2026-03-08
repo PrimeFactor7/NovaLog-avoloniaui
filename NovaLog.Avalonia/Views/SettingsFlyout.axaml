@@ -212,6 +212,40 @@
             </StackPanel>
           </Expander>
 
+          <!-- Formatting (auto-format in Span Lines mode) -->
+          <Expander IsExpanded="{Binding SectionFormattingExpanded}">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#x2261;" Classes="expander-icon" />
+                <TextBlock Text="Formatting" Classes="expander-header" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="6" Margin="8,4">
+              <TextBlock Text="Auto-format in Span Lines mode" FontSize="10" Foreground="{DynamicResource DimTextBrush}" Margin="0,0,0,2" />
+              <CheckBox IsChecked="{Binding JsonFormatEnabled}" Content="Pretty-print JSON" />
+              <CheckBox IsChecked="{Binding SqlFormatEnabled}" Content="Format SQL" />
+              <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,4" />
+              <TextBlock Text="Indent Size" FontSize="11" Foreground="{DynamicResource DimTextBrush}" Margin="0,0,0,2" />
+              <ListBox Classes="segmented"
+                       SelectionMode="Single"
+                       SelectedIndex="{Binding FormatIndentSize, Converter={x:Static vm:IndentSizeToIndexConverter.Instance}}">
+                <ListBoxItem Content="2 spaces" />
+                <ListBoxItem Content="4 spaces" />
+              </ListBox>
+              <DockPanel Margin="0,4,0,0">
+                <TextBlock DockPanel.Dock="Right"
+                           Text="{Binding MaxRowLines}"
+                           FontSize="11"
+                           Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock Text="Max Row Lines" FontSize="11" Foreground="{DynamicResource DimTextBrush}" />
+              </DockPanel>
+              <Slider Minimum="10" Maximum="200"
+                      Value="{Binding MaxRowLines}"
+                      TickFrequency="10"
+                      IsSnapToTickEnabled="True" />
+            </StackPanel>
+          </Expander>
+
           <!-- Grid View -->
           <Expander IsExpanded="{Binding SectionGridExpanded}">
             <Expander.Header>

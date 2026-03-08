@@ -1,6 +1,13 @@
 using System.Collections.ObjectModel;
+using NovaLog.Core.Models;
+using NovaLog.Core.Services;
 
 namespace NovaLog.Avalonia.ViewModels;
+
+/// <summary>Options for auto-formatting JSON/SQL in span-lines mode.</summary>
+public sealed record FormattingOptions(
+    bool JsonFormatEnabled, bool SqlFormatEnabled,
+    int IndentSize = 2, int MaxRowLines = 50);
 
 /// <summary>
 /// Transforms flat LogLineViewModel lists into GridRowViewModel structures
@@ -10,7 +17,8 @@ public static class GridSourceBuilder
 {
     /// <summary>Build a flat list (no hierarchy). Skips file separator lines.</summary>
     public static List<GridRowViewModel> BuildFlat(
-        IReadOnlyList<LogLineViewModel> lines, bool multiline = false)
+        IReadOnlyList<LogLineViewModel> lines, bool multiline = false,
+        FormattingOptions? formatting = null)
     {
         var result = new List<GridRowViewModel>(lines.Count);
         foreach (var line in lines)
@@ -18,7 +26,9 @@ public static class GridSourceBuilder
             if (line.IsFileSeparator) continue;
             result.Add(new GridRowViewModel { Line = line });
         }
-        return multiline ? MergeContinuations(result) : result;
+        var merged = multiline ? MergeContinuations(result) : result;
+        if (formatting is not null) ApplyFormatting(merged, formatting);
+        return merged;
     }
 
     /// <summary>
@@ -28,7 +38,7 @@ public static class GridSourceBuilder
     /// </summary>
     public static List<GridRowViewModel> BuildHierarchical(
         IReadOnlyList<LogLineViewModel> lines, string? defaultFileName = null,
-        bool multiline = false)
+        bool multiline = false, FormattingOptions? formatting = null)
     {
         var result = new List<GridRowViewModel>();
         GridRowViewModel? currentHeader = null;
@@ -39,7 +49,7 @@ public static class GridSourceBuilder
             if (line.IsFileSeparator)
             {
                 // Flush previous group
-                FlushGroup(result, ref currentHeader, multiline);
+                FlushGroup(result, ref currentHeader, multiline, formatting);
 
                 // Start new group
                 currentChildren = new ObservableCollection<GridRowViewModel>();
@@ -70,12 +80,13 @@ public static class GridSourceBuilder
         }
 
         // Flush last group
-        FlushGroup(result, ref currentHeader, multiline);
+        FlushGroup(result, ref currentHeader, multiline, formatting);
         return result;
     }
 
     private static void FlushGroup(List<GridRowViewModel> result,
-        ref GridRowViewModel? header, bool multiline = false)
+        ref GridRowViewModel? header, bool multiline = false,
+        FormattingOptions? formatting = null)
     {
         if (header is null) return;
 
@@ -86,6 +97,9 @@ public static class GridSourceBuilder
             foreach (var row in merged)
                 children.Add(row);
         }
+
+        if (formatting is not null && header.Children is { Count: > 0 } kids)
+            ApplyFormatting(kids, formatting);
 
         header.ChildCount = header.Children?.Count ?? 0;
         result.Add(header);
@@ -140,6 +154,40 @@ public static class GridSourceBuilder
         else
         {
             result.Add(primary);
+        }
+    }
+
+    /// <summary>
+    /// Apply auto-formatting (JSON pretty-print, SQL clause splitting) to rows.
+    /// Sets FormattedLines on applicable rows.
+    /// </summary>
+    private static void ApplyFormatting(IReadOnlyList<GridRowViewModel> rows, FormattingOptions fmt)
+    {
+        foreach (var row in rows)
+        {
+            if (row.IsFileHeader || row.Line is null) continue;
+
+            // Determine source text and flavor
+            string message;
+            SyntaxFlavor flavor;
+            if (row.SubLines is { Count: > 0 } subs)
+            {
+                message = string.Join("\n", subs.Select(s => s.Message));
+                flavor = subs[0].Flavor;
+            }
+            else
+            {
+                message = row.Line.Message;
+                flavor = row.Line.Flavor;
+            }
+
+            var formatted = MessageFormatter.Format(
+                message, flavor,
+                fmt.JsonFormatEnabled, fmt.SqlFormatEnabled,
+                fmt.IndentSize, fmt.MaxRowLines);
+
+            if (formatted is not null)
+                row.FormattedLines = formatted;
         }
     }
 }

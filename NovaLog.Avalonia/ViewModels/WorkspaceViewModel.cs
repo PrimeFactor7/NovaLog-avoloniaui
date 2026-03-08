@@ -26,6 +26,7 @@ public partial class WorkspaceViewModel : ObservableObject
     private bool _defaultFilterFollow;
     private bool _defaultGridMode = true;
     private bool _defaultGridMultiline = true;
+    private FormattingOptions? _defaultFormattingOptions;
 
     /// <summary>True when more than one tab exists (shows tab bar).</summary>
     public bool HasMultipleTabs => Tabs.Count > 1;
@@ -115,6 +116,14 @@ public partial class WorkspaceViewModel : ObservableObject
         if (!applyToExisting) return;
         foreach (var pane in GetAllPanes())
             pane.LogView.GridMultiline = value;
+    }
+
+    public void SetFormattingOptions(FormattingOptions? options, bool applyToExisting)
+    {
+        _defaultFormattingOptions = options;
+        if (!applyToExisting) return;
+        foreach (var pane in GetAllPanes())
+            pane.LogView.SetFormattingOptions(options);
     }
 
     // ── Persistence ──────────────────────────────────────────────────
@@ -530,6 +539,7 @@ public partial class WorkspaceViewModel : ObservableObject
         pane.LogView.Filter.IsFollowMode = _defaultFilterFollow;
         pane.LogView.IsGridMode = _defaultGridMode;
         pane.LogView.GridMultiline = _defaultGridMultiline;
+        pane.LogView.SetFormattingOptions(_defaultFormattingOptions);
     }
 
     private void SyncActiveTabLayout()

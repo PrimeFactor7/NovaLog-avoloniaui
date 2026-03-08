@@ -18,7 +18,7 @@ public partial class LogLineRow : Control
     internal static readonly Typeface MonoTypeface = new("Cascadia Mono, Consolas, Courier New");
     internal const double LogFontSize = 12;
     internal static double RowHeight { get; set; } = 18;
-    private const double CharWidth = 7.2;
+    internal const double CharWidth = 7.2;
     private const double TimestampChars = 23;
     private const double LevelCharsMax = 8;
     private const double GapChars = 2;
@@ -389,14 +389,14 @@ public partial class LogLineRow : Control
                 var gap = message.Substring(pos, index - pos);
                 var ft = CreateFormattedText(gap, fallbackBrush);
                 context.DrawText(ft, new Point(x, y));
-                x += ft.Width;
+                x += gap.Length * CharWidth;
             }
 
             // Draw token
             var token = message.Substring(index, length);
             var tokenFt = CreateFormattedText(token, brush);
             context.DrawText(tokenFt, new Point(x, y));
-            x += tokenFt.Width;
+            x += token.Length * CharWidth;
             pos = index + length;
         }
 
@@ -469,14 +469,14 @@ public partial class LogLineRow : Control
                 var gap = message.Substring(pos, index - pos);
                 var ft = CreateFormattedText(gap, defaultBrush);
                 context.DrawText(ft, new Point(x, y));
-                x += ft.Width;
+                x += gap.Length * CharWidth;
             }
 
             // Draw token
             var token = message.Substring(index, length);
             var tokenFt = CreateFormattedText(token, brush);
             context.DrawText(tokenFt, new Point(x, y));
-            x += tokenFt.Width;
+            x += token.Length * CharWidth;
             pos = index + length;
         }
 
@@ -501,7 +501,7 @@ public partial class LogLineRow : Control
             var brush = GetJsonBrush(kind, segment);
             var ft = CreateFormattedText(segment, brush);
             context.DrawText(ft, new Point(x, y));
-            x += ft.Width;
+            x += segment.Length * CharWidth;
         }
     }
 
@@ -548,14 +548,14 @@ public partial class LogLineRow : Control
                 var gap = message.Substring(pos, index - pos);
                 var ft = CreateFormattedText(gap, fallbackBrush);
                 context.DrawText(ft, new Point(x, y));
-                x += ft.Width;
+                x += gap.Length * CharWidth;
             }
 
             // Draw token
             var token = message.Substring(index, length);
             var tokenFt = CreateFormattedText(token, brush);
             context.DrawText(tokenFt, new Point(x, y));
-            x += tokenFt.Width;
+            x += token.Length * CharWidth;
             pos = index + length;
         }
 

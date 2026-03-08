@@ -46,6 +46,18 @@ public sealed class GridMessageCell : Control
             return;
         }
 
+        // Auto-formatted lines (JSON pretty-print, SQL formatting)
+        if (row.FormattedLines is { Count: > 0 } fmtLines)
+        {
+            for (int i = 0; i < fmtLines.Count; i++)
+            {
+                double y = TextY + i * R.RowHeight;
+                var fl = fmtLines[i];
+                RenderLine(context, fl.Text, fl.Flavor, fl.IsContinuation, y);
+            }
+            return;
+        }
+
         // Multiline span mode: render each sub-line at its own Y offset
         if (row.SubLines is { Count: > 0 } subLines)
         {
@@ -100,7 +112,7 @@ public sealed class GridMessageCell : Control
             var brush = R.ResolveJsonBrush(kind, segment);
             var ft = R.CreateFormattedText(segment, brush);
             context.DrawText(ft, new Point(x, y));
-            x += ft.Width;
+            x += segment.Length * R.CharWidth;
         }
     }
 
@@ -210,12 +222,12 @@ public sealed class GridMessageCell : Control
                 var gap = message.Substring(pos, index - pos);
                 var ft = R.CreateFormattedText(gap, fallbackBrush);
                 context.DrawText(ft, new Point(x, y));
-                x += ft.Width;
+                x += gap.Length * R.CharWidth;
             }
             var token = message.Substring(index, length);
             var tokenFt = R.CreateFormattedText(token, brush);
             context.DrawText(tokenFt, new Point(x, y));
-            x += tokenFt.Width;
+            x += token.Length * R.CharWidth;
             pos = index + length;
         }
 
