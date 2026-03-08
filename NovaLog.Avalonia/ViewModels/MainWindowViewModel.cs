@@ -8,7 +8,7 @@ using System.ComponentModel;
 
 namespace NovaLog.Avalonia.ViewModels;
 
-public partial class MainWindowViewModel : ObservableObject
+public partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     [ObservableProperty] private WorkspaceViewModel _workspace;
     [ObservableProperty] private SourceManagerViewModel _sourceManager;
@@ -77,9 +77,16 @@ public partial class MainWindowViewModel : ObservableObject
 
         SourceManager.AliasInputRequested += async (oldAlias) =>
         {
-            var dialog = new Views.InputDialog("Set Alias", "Enter display name:", oldAlias);
-            if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null)
-                return await dialog.ShowDialog<string?>(desktop.MainWindow);
+            try
+            {
+                var dialog = new Views.InputDialog("Set Alias", "Enter display name:", oldAlias);
+                if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null)
+                    return await dialog.ShowDialog<string?>(desktop.MainWindow);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AliasInputRequested failed: {ex.Message}");
+            }
             return null;
         };
 
@@ -400,5 +407,24 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusLines));
         OnPropertyChanged(nameof(StatusStreaming));
         OnPropertyChanged(nameof(StatusFollow));
+    }
+
+    public void Dispose()
+    {
+        Workspace.PropertyChanged -= OnWorkspacePropertyChanged;
+        Settings.SettingsChanged -= OnSettingsChanged;
+        Settings.PropertyChanged -= OnSettingsPropertyChanged;
+
+        if (_observedActiveLogView is not null)
+            _observedActiveLogView.PropertyChanged -= OnActiveLogViewPropertyChanged;
+
+        foreach (var sim in _simulators)
+        {
+            sim.Stop();
+            sim.Dispose();
+        }
+        _simulators.Clear();
+
+        Workspace.Dispose();
     }
 }

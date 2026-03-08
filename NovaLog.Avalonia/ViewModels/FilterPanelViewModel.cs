@@ -30,7 +30,8 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _searchCts;
     private LogViewViewModel? _boundLogView;
     private CompiledMatcher? _currentMatcher;
-    private int _lastProcessedIndex;
+    private volatile int _lastProcessedIndex;
+    private volatile int _searchGeneration;
 
     /// <summary>Fired when search hits change. Carries sorted list of matching line indices.</summary>
     public event Action<List<long>>? SearchHitsChanged;
@@ -159,16 +160,18 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
         }
 
         _currentMatcher = matcher;
+        _searchGeneration++;
+        var generation = _searchGeneration;
         if (_boundLogView is not null)
         {
             _boundLogView.ActiveSearchMatcher = matcher;
             AvDispatcher.UIThread.Post(() => _boundLogView.NotifyRowVisualsChanged());
         }
         _lastProcessedIndex = 0;
-        Task.Run(() => ExecuteSearch(matcher, ct), ct);
+        Task.Run(() => ExecuteSearch(matcher, generation, ct), ct);
     }
 
-    private void ExecuteSearch(CompiledMatcher matcher, CancellationToken ct)
+    private void ExecuteSearch(CompiledMatcher matcher, int generation, CancellationToken ct)
     {
         var source = _boundLogView;
         if (source is null) return;
@@ -214,6 +217,9 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
 
         AvDispatcher.UIThread.Post(() =>
         {
+            // Discard stale results if a newer search has started
+            if (_searchGeneration != generation) return;
+
             var resultSource = new InMemoryLogItemsSource();
             resultSource.AddRange(matchedLines);
             ResultItems = resultSource;

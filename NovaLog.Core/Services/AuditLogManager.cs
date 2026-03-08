@@ -179,7 +179,8 @@ public sealed partial class AuditLogManager
             var audit = JsonSerializer.Deserialize<AuditLog>(stream);
             if (audit == null) return null;
 
-            var dir = Path.GetDirectoryName(filePath)!;
+            var dir = Path.GetDirectoryName(filePath);
+            if (string.IsNullOrEmpty(dir)) return null;
             foreach (var entry in audit.Files)
             {
                 // Resolve to local directory — the Name field may be an absolute path

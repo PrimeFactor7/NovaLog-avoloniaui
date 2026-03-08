@@ -63,7 +63,7 @@ public sealed class BigFileLineIndex : IDisposable
     {
         lock (_lock)
         {
-            if (lineIndex < 0 || lineIndex >= _offsets.Count) return -1;
+            if (lineIndex < 0 || lineIndex >= _offsets.Count || lineIndex > int.MaxValue) return -1;
             return _offsets[(int)lineIndex];
         }
     }

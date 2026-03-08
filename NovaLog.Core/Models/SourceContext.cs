@@ -43,7 +43,7 @@ public sealed class SourceContext : IDisposable
                 a();
             _disposeActions.Clear();
         }
-        LevelScanCts?.Cancel();
+        try { LevelScanCts?.Cancel(); } catch (ObjectDisposedException) { }
         LevelScanCts?.Dispose();
         Streamer?.Dispose();
         BigFileProvider?.Dispose();

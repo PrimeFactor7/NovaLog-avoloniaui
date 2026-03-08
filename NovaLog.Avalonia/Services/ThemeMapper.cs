@@ -90,18 +90,25 @@ public sealed class ThemeMapper
     {
         if (string.IsNullOrEmpty(hex)) return Colors.White;
         hex = hex.TrimStart('#');
-        return hex.Length switch
+        try
         {
-            6 => Color.FromRgb(
-                Convert.ToByte(hex[..2], 16),
-                Convert.ToByte(hex[2..4], 16),
-                Convert.ToByte(hex[4..6], 16)),
-            8 => Color.FromArgb(
-                Convert.ToByte(hex[..2], 16),
-                Convert.ToByte(hex[2..4], 16),
-                Convert.ToByte(hex[4..6], 16),
-                Convert.ToByte(hex[6..8], 16)),
-            _ => Colors.White
-        };
+            return hex.Length switch
+            {
+                6 => Color.FromRgb(
+                    Convert.ToByte(hex[..2], 16),
+                    Convert.ToByte(hex[2..4], 16),
+                    Convert.ToByte(hex[4..6], 16)),
+                8 => Color.FromArgb(
+                    Convert.ToByte(hex[..2], 16),
+                    Convert.ToByte(hex[2..4], 16),
+                    Convert.ToByte(hex[4..6], 16),
+                    Convert.ToByte(hex[6..8], 16)),
+                _ => Colors.White
+            };
+        }
+        catch (FormatException)
+        {
+            return Colors.White;
+        }
     }
 }

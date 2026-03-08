@@ -38,6 +38,12 @@ public partial class FilterPanel : UserControl
         if (_attachedViewModel is not null)
             _attachedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
+        // Unsubscribe from old scroll handler before resetting
+        if (_resultsScroller is not null && _resultsScrollerHooked)
+        {
+            _resultsScroller.ScrollChanged -= OnResultsScrollChanged;
+        }
+
         _attachedViewModel = DataContext as FilterPanelViewModel;
         if (_attachedViewModel is not null)
         {

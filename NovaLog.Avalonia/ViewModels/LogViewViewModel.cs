@@ -28,7 +28,13 @@ public partial class LogViewViewModel : ObservableObject
 
     public event Action? SelectedLineChanged;
     public event Action? RowVisualsChanged;
-    internal void NotifyRowVisualsChanged() => RowVisualsChanged?.Invoke();
+    internal void NotifyRowVisualsChanged()
+    {
+        if (AvDispatcher.UIThread.CheckAccess())
+            RowVisualsChanged?.Invoke();
+        else
+            AvDispatcher.UIThread.Post(() => RowVisualsChanged?.Invoke());
+    }
 
     partial void OnSelectedLineIndexChanged(int? value)
     {
@@ -234,6 +240,9 @@ public partial class LogViewViewModel : ObservableObject
     private InMemoryLogItemsSource? _memorySource;
     private VirtualLogItemsSource? _virtualSource;
     private IVirtualLogProvider? _provider;
+    private Action<long>? _providerLinesAppended;
+    private Action? _providerIndexingCompleted;
+    private Action<long>? _providerIndexingProgressChanged;
 
     // Expose for FilterPanelViewModel to access the actual source
     internal InMemoryLogItemsSource? MemorySource => _memorySource;
@@ -471,7 +480,8 @@ public partial class LogViewViewModel : ObservableObject
                     else { lo = mid + 1; continue; }
                 }
 
-                long midTicks = ts!.Value.Ticks;
+                if (ts is null) { lo = mid + 1; continue; }
+                long midTicks = ts.Value.Ticks;
                 if (midTicks < targetTicks) { best = mid; lo = mid + 1; }
                 else if (midTicks > targetTicks) { hi = mid - 1; }
                 else { best = mid; break; }
@@ -544,9 +554,8 @@ public partial class LogViewViewModel : ObservableObject
                 WriteIndented = true
             });
         }
-        catch
+        catch (System.Text.Json.JsonException)
         {
-            // If parsing fails, return null
             return null;
         }
     }
@@ -644,17 +653,19 @@ public partial class LogViewViewModel : ObservableObject
         _provider = provider;
         _virtualSource = new VirtualLogItemsSource(provider);
 
-        provider.LinesAppended += _ =>
+        _providerLinesAppended = _ =>
         {
             TotalLineCount = _virtualSource.Count;
             if (IsFollowMode)
                 RequestScrollToEndThrottled();
         };
+        provider.LinesAppended += _providerLinesAppended;
 
-        provider.IndexingCompleted += () =>
+        _providerIndexingCompleted = () =>
         {
             TotalLineCount = _virtualSource.Count;
         };
+        provider.IndexingCompleted += _providerIndexingCompleted;
 
         _delegatingSource.SetInner(_virtualSource);
         TotalLineCount = _virtualSource.Count;
@@ -694,16 +705,18 @@ public partial class LogViewViewModel : ObservableObject
                 // Large file: use memory-mapped provider with indexing
                 System.Diagnostics.Debug.WriteLine($"[LOAD] Using BigFileLogProvider ({sw.ElapsedMilliseconds}ms)");
                 var provider = new BigFileLogProvider(filePath);
-                provider.IndexingProgressChanged += _ =>
+                _providerIndexingProgressChanged = _ =>
                 {
                     IndexingProgress = provider.IndexingProgress;
                     IsIndexing = true;
                 };
-                provider.IndexingCompleted += () =>
+                provider.IndexingProgressChanged += _providerIndexingProgressChanged;
+                _providerIndexingCompleted = () =>
                 {
                     IsIndexing = false;
                     IndexingProgress = 1.0;
                 };
+                provider.IndexingCompleted += _providerIndexingCompleted;
 
                 System.Diagnostics.Debug.WriteLine($"[LOAD] Calling provider.Open() ({sw.ElapsedMilliseconds}ms)");
                 provider.Open(); // Start indexing FIRST
@@ -983,6 +996,21 @@ public partial class LogViewViewModel : ObservableObject
         _streamer = null;
         _watcher?.Dispose();
         _watcher = null;
+
+        // Unsubscribe provider events before disposing
+        if (_provider is not null)
+        {
+            if (_providerLinesAppended is not null)
+                _provider.LinesAppended -= _providerLinesAppended;
+            if (_providerIndexingCompleted is not null)
+                _provider.IndexingCompleted -= _providerIndexingCompleted;
+            if (_providerIndexingProgressChanged is not null)
+                _provider.IndexingProgressChanged -= _providerIndexingProgressChanged;
+        }
+        _providerLinesAppended = null;
+        _providerIndexingCompleted = null;
+        _providerIndexingProgressChanged = null;
+
         _provider?.Dispose();
         _provider = null;
         _virtualSource?.Dispose();

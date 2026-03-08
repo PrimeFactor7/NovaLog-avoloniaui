@@ -35,6 +35,8 @@ public class SplitPanelHost : ContentControl
         NodeProperty.Changed.AddClassHandler<SplitPanelHost>((host, _) => host.RebuildContent());
     }
 
+    private LogViewPanel? _subscribedPanel;
+
     private void UnsubscribePrevious()
     {
         if (_subscribedNode is not null && _nodeHandler is not null)
@@ -43,7 +45,21 @@ public class SplitPanelHost : ContentControl
             _nodeHandler = null;
             _subscribedNode = null;
         }
+        if (_subscribedPanel is not null)
+        {
+            _subscribedPanel.NewFileDropped -= _onNewFileDropped;
+            _subscribedPanel.SplitRequested -= _onSplitRequested;
+            _subscribedPanel.SourceIdDropped -= _onSourceIdDropped;
+            _subscribedPanel.SourceIdSplitRequested -= _onSourceIdSplitRequested;
+            _subscribedPanel = null;
+        }
     }
+
+    // Event handler delegates for cleanup
+    private Action<string>? _onNewFileDropped;
+    private Action<string, bool>? _onSplitRequested;
+    private Action<string>? _onSourceIdDropped;
+    private Action<string, bool>? _onSourceIdSplitRequested;
 
     private void RebuildContent()
     {
@@ -60,17 +76,17 @@ public class SplitPanelHost : ContentControl
         {
             var panel = new LogViewPanel { DataContext = pane.LogView };
 
-            // Wire drag-drop events
-            panel.NewFileDropped += path =>
+            // Wire drag-drop events (store delegates for cleanup)
+            _onNewFileDropped = path =>
             {
                 pane.LogView.LoadFile(path);
-                // Also add to global source manager
                 var window = this.FindAncestorOfType<MainWindow>();
                 if (window?.DataContext is MainWindowViewModel mvm)
                     mvm.SourceManager.AddSource(path, NovaLog.Core.Models.SourceKind.File);
             };
+            panel.NewFileDropped += _onNewFileDropped;
 
-            panel.SplitRequested += (path, horizontal) =>
+            _onSplitRequested = (path, horizontal) =>
             {
                 var window = this.FindAncestorOfType<MainWindow>();
                 if (window?.DataContext is MainWindowViewModel mvm)
@@ -80,8 +96,9 @@ public class SplitPanelHost : ContentControl
                     mvm.SourceManager.AddSource(path, NovaLog.Core.Models.SourceKind.File);
                 }
             };
+            panel.SplitRequested += _onSplitRequested;
 
-            panel.SourceIdDropped += id =>
+            _onSourceIdDropped = id =>
             {
                 var window = this.FindAncestorOfType<MainWindow>();
                 if (window?.DataContext is MainWindowViewModel mvm)
@@ -91,8 +108,9 @@ public class SplitPanelHost : ContentControl
                         LoadSourceIntoPane(mvm, pane.LogView, src);
                 }
             };
+            panel.SourceIdDropped += _onSourceIdDropped;
 
-            panel.SourceIdSplitRequested += (id, horizontal) =>
+            _onSourceIdSplitRequested = (id, horizontal) =>
             {
                 var window = this.FindAncestorOfType<MainWindow>();
                 if (window?.DataContext is MainWindowViewModel mvm)
@@ -106,6 +124,8 @@ public class SplitPanelHost : ContentControl
                     }
                 }
             };
+            panel.SourceIdSplitRequested += _onSourceIdSplitRequested;
+            _subscribedPanel = panel;
 
             pane.LogView.CloseRequested += () =>
             {

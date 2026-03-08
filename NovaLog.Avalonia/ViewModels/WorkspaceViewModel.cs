@@ -10,7 +10,7 @@ namespace NovaLog.Avalonia.ViewModels;
 /// Manages the workspace: a binary tree of split panes with focus tracking,
 /// and a tab bar for multiple independent workspace layouts.
 /// </summary>
-public partial class WorkspaceViewModel : ObservableObject
+public partial class WorkspaceViewModel : ObservableObject, IDisposable
 {
     [ObservableProperty] private SplitNodeViewModel _rootNode;
     [ObservableProperty] private PaneNodeViewModel? _focusedPane;
@@ -589,6 +589,11 @@ public partial class WorkspaceViewModel : ObservableObject
         RootNode = fresh;
         FocusPane(fresh);
         OnPropertyChanged(nameof(HasMultipleTabs));
+    }
+
+    public void Dispose()
+    {
+        Clock.Dispose();
     }
 }
 

@@ -150,10 +150,9 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
     /// </summary>
     public void AppendLines(int sourceIndex, IReadOnlyList<string> rawLines)
     {
-        if (_disposed || _isIndexing || rawLines.Count == 0) return;
-
         lock (_appendLock)
         {
+            if (_disposed || _isIndexing || rawLines.Count == 0) return;
             var lines = _sourceLines[sourceIndex];
             var raws = _sourceRawLines[sourceIndex];
             var src = _sources[sourceIndex];
@@ -226,7 +225,7 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
             _index = new MergedLineRef[totalLines];
 
-            var heap = new PriorityQueue<(byte SrcIdx, int LineIdx), (long Ticks, int Priority, int LineIdx)>();
+            var heap = new PriorityQueue<(byte SrcIdx, int LineIdx), (long Ticks, int Priority, int LineIdx)>(_sources.Count);
             var lastTicks = new long[_sources.Count];
 
             for (int s = 0; s < _sources.Count; s++)

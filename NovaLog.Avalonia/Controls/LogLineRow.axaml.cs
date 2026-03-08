@@ -57,6 +57,8 @@ public partial class LogLineRow : Control
     internal static readonly IBrush FallbackSqlKeywordBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
     private static readonly IBrush FallbackBookmarkBrush = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xFF));
     private static readonly IBrush SearchHighlightBrush = new SolidColorBrush(Color.FromArgb(0x60, 0xFF, 0xE0, 0x00));
+    private static readonly IBrush FallbackHeaderBg = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x1C));
+    private static readonly IPen SeparatorPen = new Pen(Brushes.Gray, 1);
 
     private LogLineViewModel? _vm;
     public static readonly StyledProperty<LogViewViewModel?> OwnerLogViewProperty =
@@ -124,6 +126,7 @@ public partial class LogLineRow : Control
     public void ResetVisualState()
     {
         _vm = null;
+        OwnerLogView = null;
     }
 
     private (IEnumerable<HighlightRule>? Rules, ThemeService? Theme, int? SelectedLineIndex, NavigationIndex? NavIndex) GetContext()
@@ -176,12 +179,11 @@ public partial class LogLineRow : Control
         if (_vm.IsFileSeparator)
         {
             // Draw header bar background
-            var headerBg = GetBrush("ToolBarBgBrush") ?? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x1C));
+            var headerBg = GetBrush("ToolBarBgBrush") ?? FallbackHeaderBg;
             context.FillRectangle(headerBg, bounds);
 
             // Bottom separator line
-            var sepBrush = GetBrush("SeparatorBrush") ?? Brushes.Gray;
-            context.DrawLine(new Pen(sepBrush, 1), new Point(0, bounds.Height - 0.5), new Point(bounds.Width, bounds.Height - 0.5));
+            context.DrawLine(SeparatorPen, new Point(0, bounds.Height - 0.5), new Point(bounds.Width, bounds.Height - 0.5));
 
             if (!string.IsNullOrEmpty(_vm.Message))
             {

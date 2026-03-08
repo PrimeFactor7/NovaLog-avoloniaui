@@ -64,13 +64,12 @@ public sealed class LogStreamer : IDisposable
 
                 using var fs = new FileStream(
                     path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                Stream source = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+                using Stream source = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
                     ? new GZipStream(fs, CompressionMode.Decompress)
                     : fs;
                 using var sr = new StreamReader(source);
                 while (sr.ReadLine() is { } line)
                     if (line.Length > 0) lines.Add(line);
-                if (source != fs) source.Dispose();
             }
             catch (IOException ex) { System.Diagnostics.Debug.WriteLine($"[LogStreamer] Skip file: {path}: {ex.Message}"); }
         }

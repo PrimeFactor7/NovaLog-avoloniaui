@@ -101,7 +101,7 @@ public sealed class BigFileLogProvider : IVirtualLogProvider
         if (byteLen <= 0) return string.Empty;
 
         // Cap read length for safety
-        byteLen = Math.Min(byteLen, MaxDisplayLineLength * 4); // UTF-8 worst case
+        byteLen = Math.Min(byteLen, 40_000); // UTF-8 worst case (10K chars × 4 bytes)
 
         byte[] buffer = new byte[byteLen];
 

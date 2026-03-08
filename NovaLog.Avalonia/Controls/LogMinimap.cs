@@ -38,6 +38,9 @@ public class LogMinimap : Control
     private static readonly IBrush WarnBrush = new SolidColorBrush(Color.Parse("#FFB000"));
     private static readonly IBrush SearchBrush = new SolidColorBrush(Color.Parse("#00D4FF"));
     private static readonly IBrush BookmarkBrush = new SolidColorBrush(Color.Parse("#00FF41"));
+    private static readonly IPen ErrorPen = new Pen(ErrorBrush, 2);
+    private static readonly IPen SearchPen = new Pen(SearchBrush, 1);
+    private static readonly IPen BookmarkPen = new Pen(BookmarkBrush, 3);
     private static readonly IBrush ViewportBrush = new SolidColorBrush(Color.Parse("#20FFFFFF"));
     private static readonly IBrush BgBrush = new SolidColorBrush(Color.Parse("#1A1A2E"));
 
@@ -64,21 +67,19 @@ public class LogMinimap : Control
         context.FillRectangle(ViewportBrush, new Rect(0, vpTop, w, vpHeight));
 
         // Draw ticks for errors
-        DrawTicks(context, NavIndex.GetAll(NavigationCategory.Error), ErrorBrush, w, h, 2);
+        DrawTicks(context, NavIndex.GetAll(NavigationCategory.Error), ErrorPen, w, h);
 
         // Draw ticks for search hits
-        DrawTicks(context, NavIndex.GetAll(NavigationCategory.SearchHit), SearchBrush, w * 0.6, h, 1);
+        DrawTicks(context, NavIndex.GetAll(NavigationCategory.SearchHit), SearchPen, w * 0.6, h);
 
         // Draw ticks for bookmarks
-        DrawTicks(context, NavIndex.GetAll(NavigationCategory.Bookmark), BookmarkBrush, w, h, 3);
+        DrawTicks(context, NavIndex.GetAll(NavigationCategory.Bookmark), BookmarkPen, w, h);
     }
 
-    private void DrawTicks(DrawingContext context, IReadOnlyList<long> indices, IBrush brush,
-        double tickWidth, double height, double tickHeight)
+    private void DrawTicks(DrawingContext context, IReadOnlyList<long> indices, IPen pen,
+        double tickWidth, double height)
     {
         if (indices.Count == 0 || TotalLines <= 0) return;
-
-        var pen = new Pen(brush, tickHeight);
         int bucketCount = Math.Max(1, (int)Math.Ceiling(height));
         var occupiedRows = new HashSet<int>();
 

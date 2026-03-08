@@ -40,7 +40,7 @@ public sealed class HexToColorConverter : IValueConverter
         if (value is string hex && !string.IsNullOrWhiteSpace(hex))
         {
             try { return new SolidColorBrush(Color.Parse(hex)); }
-            catch { /* fall through */ }
+            catch (FormatException) { /* invalid hex color, fall through */ }
         }
         return Brushes.Transparent;
     }

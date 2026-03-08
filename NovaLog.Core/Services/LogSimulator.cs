@@ -140,7 +140,8 @@ public sealed class LogSimulator : IDisposable
         try
         {
             var block = ShowcaseMode ? EmitShowcaseLine(now) : EmitStandardLine(now);
-            File.AppendAllText(_currentFile!, block);
+            if (_currentFile is null) return;
+            File.AppendAllText(_currentFile, block);
             _lineCount++;
         }
         catch (IOException) { /* file contention, skip */ }

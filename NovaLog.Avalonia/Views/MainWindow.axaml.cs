@@ -142,6 +142,7 @@ public partial class MainWindow : Window
                 (int)Height,
                 WindowState == WindowState.Maximized);
             vm.SaveSettings();
+            vm.Dispose();
         }
     }
 

@@ -85,7 +85,15 @@ public static class JsonHighlightTokenizer
         while (i < s.Length)
         {
             char c = s[i];
-            if (c == '\\') { i += 2; if (i > s.Length) i = s.Length; continue; }
+            if (c == '\\')
+            {
+                if (i + 1 < s.Length && s[i + 1] == 'u')
+                    i += 6; // \uXXXX
+                else
+                    i += 2;
+                if (i > s.Length) i = s.Length;
+                continue;
+            }
             if (c == quote)
             {
                 i++;

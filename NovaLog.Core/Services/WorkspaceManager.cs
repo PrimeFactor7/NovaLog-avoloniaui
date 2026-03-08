@@ -104,7 +104,7 @@ public sealed class WorkspaceManager
             if (dir != null) Directory.CreateDirectory(dir);
             File.WriteAllText(WorkspacePath, json);
         }
-        catch { /* skip for now */ }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"WorkspaceManager.Save failed: {ex.Message}"); }
     }
 
     public void Load()
@@ -121,6 +121,6 @@ public sealed class WorkspaceManager
                 WorkspaceTabs = data.WorkspaceTabs ?? [];
             }
         }
-        catch { /* skip for now */ }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"WorkspaceManager.Load failed: {ex.Message}"); }
     }
 }

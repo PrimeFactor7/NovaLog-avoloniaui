@@ -31,17 +31,17 @@ public static class SyntaxResolver
 
     private static bool IsStackTrace(ReadOnlySpan<char> span)
     {
-        if (span.Contains("at ".AsSpan(), StringComparison.Ordinal))
+        int atIdx = span.IndexOf("at ".AsSpan(), StringComparison.Ordinal);
+        if (atIdx >= 0)
         {
-            int atIdx = span.IndexOf("at ".AsSpan(), StringComparison.Ordinal);
             var after = span[(atIdx + 3)..];
             if (after.Contains('.') && after.Contains('('))
                 return true;
         }
 
-        if (span.Contains("Exception".AsSpan(), StringComparison.Ordinal))
+        int idx = span.IndexOf("Exception".AsSpan(), StringComparison.Ordinal);
+        if (idx >= 0)
         {
-            int idx = span.IndexOf("Exception".AsSpan(), StringComparison.Ordinal);
             int endIdx = idx + "Exception".Length;
 
             bool followedByColon = endIdx < span.Length && span[endIdx] == ':';
