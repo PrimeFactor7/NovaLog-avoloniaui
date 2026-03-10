@@ -95,7 +95,10 @@ public partial class LogViewPanel : UserControl
         _minimap = this.FindControl<LogMinimap>("Minimap");
         _logGrid = this.FindControl<global::Avalonia.Controls.TreeDataGrid>("LogGrid");
         if (_logGrid is not null)
+        {
             _logGrid.SizeChanged += (_, _) => FitMessageColumn();
+            _logGrid.TemplateApplied += (_, _) => EnsureGridScroller();
+        }
         FilterPanelView.SizeChanged += OnFilterPanelSizeChanged;
 
         if (_repeater is not null)
@@ -368,7 +371,10 @@ public partial class LogViewPanel : UserControl
                 if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
                     return;
 
-                if (_gridScroller.Extent.Height <= 0)
+                if (_minimap is not null)
+                    UpdateMinimapViewport(_minimap);
+
+                if (_gridScroller!.Extent.Height <= 0)
                     return;
 
                 double maxScroll = _gridScroller.Extent.Height - _gridScroller.Viewport.Height;
@@ -377,19 +383,53 @@ public partial class LogViewPanel : UserControl
                 if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1 && maxScroll - currentScroll > 36.0)
                     vm.IsFollowMode = false;
             };
+            _gridScroller.SizeChanged += (_, _) =>
+            {
+                if (_minimap is not null)
+                    UpdateMinimapViewport(_minimap);
+            };
         }
         return _gridScroller;
     }
 
+    /// <summary>Returns the ScrollViewer that is currently showing content (list or grid).</summary>
+    private ScrollViewer? GetActiveScroller()
+    {
+        if (DataContext is LogViewViewModel { IsGridMode: true })
+            return EnsureGridScroller();
+        return _scroller;
+    }
+
     private void OnScrollToEndRequested()
     {
-        Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(() => ScrollToEndAfterLayout(retryCount: 0), DispatcherPriority.Loaded);
+    }
+
+    private const int MaxScrollRetries = 5;
+
+    private void ScrollToEndAfterLayout(int retryCount = 0)
+    {
+        ScrollViewer? sv = GetActiveScroller();
+        if (sv is null)
         {
-            if (DataContext is LogViewViewModel { IsGridMode: true })
-                EnsureGridScroller()?.ScrollToEnd();
-            else
-                _scroller?.ScrollToEnd();
-        });
+            // Scroller may not be available yet (e.g. grid template not applied)
+            if (retryCount < MaxScrollRetries)
+                Dispatcher.UIThread.Post(() => ScrollToEndAfterLayout(retryCount + 1), DispatcherPriority.Loaded);
+            return;
+        }
+        double extentH = sv.Extent.Height;
+        double viewportH = sv.Viewport.Height;
+        if (extentH <= 0 && retryCount < MaxScrollRetries)
+        {
+            // Scrollbar/extent often not ready until after first layout or user interaction; retry.
+            Dispatcher.UIThread.Post(() => ScrollToEndAfterLayout(retryCount + 1), DispatcherPriority.Loaded);
+            return;
+        }
+        if (extentH <= viewportH) return;
+        double targetY = Math.Max(0, extentH - viewportH);
+        sv.Offset = new global::Avalonia.Vector(sv.Offset.X, targetY);
+        if (_minimap is not null)
+            UpdateMinimapViewport(_minimap);
     }
 
     private void OnScrollToLineRequested(int lineIndex)
@@ -477,6 +517,13 @@ public partial class LogViewPanel : UserControl
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(LogViewViewModel.GridDataSource))
+        {
+            // Grid source rebuild invalidates the cached scroller
+            _gridScroller = null;
+            _gridScrollerHooked = false;
+        }
+
         if (e.PropertyName is nameof(LogViewViewModel.IsGridMode) or nameof(LogViewViewModel.GridDataSource))
         {
             // After grid becomes visible or source changes, fit the Message column
@@ -548,11 +595,12 @@ public partial class LogViewPanel : UserControl
 
     private void UpdateMinimapViewport(LogMinimap minimap)
     {
-        if (_scroller is null)
+        ScrollViewer? sv = GetActiveScroller();
+        if (sv is null)
             return;
 
-        double extentHeight = _scroller.Extent.Height;
-        double viewportHeight = _scroller.Viewport.Height;
+        double extentHeight = sv.Extent.Height;
+        double viewportHeight = sv.Viewport.Height;
 
         if (extentHeight <= 0 || viewportHeight <= 0)
         {
@@ -562,7 +610,7 @@ public partial class LogViewPanel : UserControl
         }
 
         double maxOffset = Math.Max(0.0, extentHeight - viewportHeight);
-        double clampedOffset = Math.Clamp(_scroller.Offset.Y, 0.0, maxOffset);
+        double clampedOffset = Math.Clamp(sv.Offset.Y, 0.0, maxOffset);
         double heightRatio = viewportHeight / extentHeight;
         bool pinToBottom = _attachedViewModel?.IsFollowMode == true && maxOffset > 0;
         double topRatio = pinToBottom

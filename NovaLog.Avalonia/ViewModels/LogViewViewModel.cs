@@ -49,14 +49,20 @@ public partial class LogViewViewModel : ObservableObject
 
     private void RequestScrollToEndThrottled()
     {
-        if (_scrollPending) return; // Already have a scroll queued
-
+        if (_scrollPending) return;
         _scrollPending = true;
-        AvDispatcher.UIThread.Post(() =>
+
+        void Fire()
         {
             _scrollPending = false;
             ScrollToEndRequested?.Invoke();
-        }, global::Avalonia.Threading.DispatcherPriority.Render);
+        }
+
+        // When running in headless/test mode (no dispatcher), fire synchronously.
+        if (AvDispatcher.UIThread.CheckAccess())
+            Fire();
+        else
+            AvDispatcher.UIThread.Post(Fire, global::Avalonia.Threading.DispatcherPriority.Render);
     }
 
     [ObservableProperty] private bool _isGridMode = true;
@@ -640,6 +646,9 @@ public partial class LogViewViewModel : ObservableObject
         // Notify filter that source changed
         Filter.OnSourceChanged(_memorySource);
         RebuildGridSource();
+
+        if (IsFollowMode)
+            RequestScrollToEndThrottled();
     }
 
     /// <summary>Load from a virtual provider (BigFile mode).</summary>

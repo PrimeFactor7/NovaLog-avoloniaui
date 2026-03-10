@@ -38,7 +38,18 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -Er
     $global:PSNativeCommandUseErrorActionPreference = $false
 }
 
-$cmdArgs = @('run', '--project', $project) + $DotnetArgs
+# Build first so latest code is always run
+Write-Log "Building..."
+& dotnet build $project -c Debug --nologo -v q 2>&1 | ForEach-Object {
+    $line = $_.ToString() -replace "`0", ""
+    if ($line.Trim().Length -gt 0) { Write-Host $line; Add-Content -Path $logFile -Value $line }
+}
+if ($LASTEXITCODE -ne 0) {
+    Write-Log "Build failed." 'ERROR'
+    exit $LASTEXITCODE
+}
+
+$cmdArgs = @('run', '--project', $project, '--no-build') + $DotnetArgs
 Write-Log ("Command: dotnet {0}" -f ($cmdArgs -join ' '))
 
 $previousErrorActionPreference = $ErrorActionPreference

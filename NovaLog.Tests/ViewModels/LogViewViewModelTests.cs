@@ -201,6 +201,20 @@ public class LogViewViewModelTests : IDisposable
         Assert.True(vm.IsFollowMode);
     }
 
+    /// <summary>Single-file path: LoadFromLines with follow mode must request scroll to end so the view jumps to bottom.</summary>
+    [Fact]
+    public void LoadFromLines_WithFollowMode_RaisesScrollToEndRequested()
+    {
+        var vm = new LogViewViewModel();
+        Assert.True(vm.IsFollowMode);
+        var scrollRequestCount = 0;
+        vm.ScrollToEndRequested += () => scrollRequestCount++;
+
+        vm.LoadFromLines("single.log", new[] { "line1", "line2", "line3" });
+
+        Assert.True(scrollRequestCount >= 1, $"ScrollToEndRequested should be raised at least once, was {scrollRequestCount}");
+    }
+
     // ── Default state ────────────────────────────────────────────
 
     [Fact]

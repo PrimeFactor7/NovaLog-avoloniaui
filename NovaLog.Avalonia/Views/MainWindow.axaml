@@ -37,15 +37,15 @@
            </ToggleButton>
 
            <!-- Follow -->
-           <ToggleButton Classes="neon-action"
-                         IsChecked="{Binding Workspace.ActiveLogView.IsFollowMode}"
-                         ToolTip.Tip="Auto-scroll to newest lines (F)"
-                         AutomationProperties.AutomationId="btnFollow">
+           <Button Classes="neon-action"
+                  Command="{Binding ToggleFollowCommand}"
+                  ToolTip.Tip="Toggle follow mode (F)"
+                  AutomationProperties.AutomationId="btnFollow">
              <StackPanel Orientation="Horizontal" Spacing="4">
                <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="17" Foreground="{DynamicResource AccentBrush}" />
                <TextBlock Text="Follow" />
              </StackPanel>
-           </ToggleButton>
+           </Button>
 
            <!-- Grid View -->
            <ToggleButton Classes="neon-action"
