@@ -21,6 +21,8 @@ public partial class LogViewPanel : UserControl
     private ScrollViewer? _scroller;
     private LogMinimap? _minimap;
     private global::Avalonia.Controls.TreeDataGrid? _logGrid;
+    private ScrollViewer? _gridScroller;
+    private bool _gridScrollerHooked;
     private LogViewViewModel? _attachedViewModel;
     private FilterPanelViewModel? _attachedFilterViewModel;
     private bool _minimapRefreshPending;
@@ -354,22 +356,56 @@ public partial class LogViewPanel : UserControl
         }
     }
 
+    private ScrollViewer? EnsureGridScroller()
+    {
+        if (_gridScroller is not null) return _gridScroller;
+        _gridScroller = _logGrid?.FindDescendantOfType<ScrollViewer>();
+        if (_gridScroller is not null && !_gridScrollerHooked)
+        {
+            _gridScrollerHooked = true;
+            _gridScroller.ScrollChanged += (s, e) =>
+            {
+                if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
+                    return;
+
+                if (_gridScroller.Extent.Height <= 0)
+                    return;
+
+                double maxScroll = _gridScroller.Extent.Height - _gridScroller.Viewport.Height;
+                double currentScroll = _gridScroller.Offset.Y;
+
+                if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1 && maxScroll - currentScroll > 36.0)
+                    vm.IsFollowMode = false;
+            };
+        }
+        return _gridScroller;
+    }
+
     private void OnScrollToEndRequested()
     {
-        Dispatcher.UIThread.Post(() => _scroller?.ScrollToEnd());
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is LogViewViewModel { IsGridMode: true })
+                EnsureGridScroller()?.ScrollToEnd();
+            else
+                _scroller?.ScrollToEnd();
+        });
     }
 
     private void OnScrollToLineRequested(int lineIndex)
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (_scroller is null) return;
-            // Center the target line in the viewport
-            double halfViewport = _scroller.Viewport.Height / 2;
+            ScrollViewer? sv;
+            if (DataContext is LogViewViewModel { IsGridMode: true })
+                sv = EnsureGridScroller();
+            else
+                sv = _scroller;
+
+            if (sv is null) return;
+            double halfViewport = sv.Viewport.Height / 2;
             double targetY = Math.Max(0, lineIndex * LogLineRow.RowHeight - halfViewport);
-            _scroller.Offset = new global::Avalonia.Vector(
-                _scroller.Offset.X,
-                targetY);
+            sv.Offset = new global::Avalonia.Vector(sv.Offset.X, targetY);
         });
     }
 
