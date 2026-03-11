@@ -1,6 +1,7 @@
 #pragma warning disable CS0618
 using global::Avalonia;
 using global::Avalonia.Controls;
+using global::Avalonia.Controls.Primitives;
 using global::Avalonia.Input;
 using global::Avalonia.Threading;
 using global::Avalonia.VisualTree;
@@ -93,6 +94,14 @@ public partial class LogViewPanel : UserControl
         _repeater = this.FindControl<ItemsRepeater>("LogRepeater");
         _scroller = this.FindControl<ScrollViewer>("LogScroller");
         _minimap = this.FindControl<LogMinimap>("Minimap");
+        if (_minimap is not null)
+        {
+            _minimap.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == Visual.IsVisibleProperty)
+                    SyncGridScrollerVisibility();
+            };
+        }
         _logGrid = this.FindControl<global::Avalonia.Controls.TreeDataGrid>("LogGrid");
         if (_logGrid is not null)
         {
@@ -363,6 +372,7 @@ public partial class LogViewPanel : UserControl
     {
         if (_gridScroller is not null) return _gridScroller;
         _gridScroller = _logGrid?.FindDescendantOfType<ScrollViewer>();
+        SyncGridScrollerVisibility();
         if (_gridScroller is not null && !_gridScrollerHooked)
         {
             _gridScrollerHooked = true;
@@ -591,6 +601,14 @@ public partial class LogViewPanel : UserControl
         RootGrid.RowDefinitions[3].Height = new GridLength(isVisible ? Math.Max(FilterPanelView.MinHeight, _filterPanelHeight) : 0, GridUnitType.Pixel);
         FilterSplitter.IsVisible = isVisible;
         FilterPanelView.IsVisible = isVisible;
+    }
+
+    private void SyncGridScrollerVisibility()
+    {
+        if (_gridScroller is null) return;
+        _gridScroller.VerticalScrollBarVisibility = _minimap?.IsVisible == true
+            ? ScrollBarVisibility.Hidden
+            : ScrollBarVisibility.Auto;
     }
 
     private void UpdateMinimapViewport(LogMinimap minimap)
