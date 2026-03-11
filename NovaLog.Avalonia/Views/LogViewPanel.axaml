@@ -105,8 +105,13 @@
                     CanUserSortColumns="False"
                     ShowColumnHeaders="True"
                     Classes.gridlines="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.GridLinesVisible}"
+                    Classes.minimap="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible}"
                     Background="{DynamicResource BackgroundBrush}">
         <TreeDataGrid.Styles>
+          <!-- Hide native scrollbar when minimap is visible (minimap replaces it) -->
+          <Style Selector="TreeDataGrid.minimap ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Hidden" />
+          </Style>
           <!-- Horizontal gridlines on rows -->
           <Style Selector="TreeDataGrid.gridlines TreeDataGridRow">
             <Setter Property="BorderBrush" Value="{DynamicResource SplitterBgBrush}" />
