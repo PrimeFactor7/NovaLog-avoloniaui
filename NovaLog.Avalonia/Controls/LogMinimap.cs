@@ -51,7 +51,7 @@ public class LogMinimap : Control
 
     public override void Render(DrawingContext context)
     {
-        var bounds = Bounds;
+        var bounds = new Rect(Bounds.Size);
         context.FillRectangle(BgBrush, bounds);
 
         if (TotalLines <= 0 || NavIndex is null) return;
