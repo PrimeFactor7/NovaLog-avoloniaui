@@ -16,22 +16,24 @@
     <!-- Header -->
     <Border Grid.Row="0" Height="24"
             Background="{DynamicResource ToolBarBgBrush}"
-            Padding="8,2"
+            Padding="4,2"
             x:Name="HeaderBorder"
             DoubleTapped="OnHeaderDoubleTapped">
       <Panel>
         <DockPanel>
+          <!-- Right: Close -->
           <Button DockPanel.Dock="Right" Classes="neon-action" Content="&#x2715;"
                   Command="{Binding ClosePaneCommand}"
                   Width="20" Height="20" Padding="0" Margin="0,-2,-4,-2"
                   Background="Transparent" BorderThickness="0"
                   Foreground="{DynamicResource DimTextBrush}"
                   ToolTip.Tip="Close pane (source stays in list)" />
+          <!-- Right: Link status -->
           <TextBlock DockPanel.Dock="Right"
                      Text="&#xEB4B;"
                      FontFamily="{StaticResource CodiconFont}"
                      FontSize="14"
-                     Margin="0,0,8,0"
+                     Margin="0,0,4,0"
                      Foreground="{DynamicResource AccentBrush}"
                      VerticalAlignment="Center"
                      IsVisible="{Binding IsLinked}"
@@ -40,15 +42,49 @@
                      Text="&#xEB4C;"
                      FontFamily="{StaticResource CodiconFont}"
                      FontSize="14"
-                     Margin="0,0,8,0"
+                     Margin="0,0,4,0"
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
                      IsVisible="{Binding !IsLinked}"
                      ToolTip.Tip="Unlinked from time sync (Ctrl+L to link)" />
+          <!-- Right: Metadata -->
+          <TextBlock DockPanel.Dock="Right"
+                     Text="{Binding HeaderMeta}"
+                     Foreground="{DynamicResource DimTextBrush}"
+                     VerticalAlignment="Center"
+                     FontSize="10"
+                     Margin="0,0,6,0" />
+          <!-- Left: Follow toggle -->
+          <ToggleButton DockPanel.Dock="Left" Classes="neon-action"
+                        IsChecked="{Binding IsFollowMode}"
+                        Width="20" Height="20" Padding="0"
+                        Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="Toggle follow mode">
+            <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </ToggleButton>
+          <!-- Left: Grid view toggle -->
+          <ToggleButton DockPanel.Dock="Left" Classes="neon-action"
+                        IsChecked="{Binding IsGridMode}"
+                        Width="20" Height="20" Padding="0"
+                        Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="Toggle grid view (G)">
+            <TextBlock Text="&#xEB91;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </ToggleButton>
+          <!-- Left: Filter toggle -->
+          <ToggleButton DockPanel.Dock="Left" Classes="neon-action"
+                        IsChecked="{Binding Filter.IsVisible}"
+                        Width="20" Height="20" Padding="0"
+                        Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="Toggle filter panel (Ctrl+F)">
+            <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </ToggleButton>
+          <!-- Center: Title -->
           <TextBlock Text="{Binding Title}"
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
-                     FontSize="11" />
+                     FontSize="11"
+                     Margin="4,0,0,0"
+                     TextTrimming="CharacterEllipsis" />
         </DockPanel>
         <ProgressBar Height="2" Minimum="0" Maximum="1"
                      Value="{Binding IndexingProgress}"
@@ -56,7 +92,7 @@
                      VerticalAlignment="Bottom"
                      Foreground="{DynamicResource AccentBrush}"
                      Background="Transparent"
-                     Margin="-8,0,-8,-2" />
+                     Margin="-4,0,-4,-2" />
       </Panel>
     </Border>
 
@@ -107,7 +143,25 @@
                     Classes.gridlines="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.GridLinesVisible}"
                     Classes.minimap="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible}"
                     Background="{DynamicResource BackgroundBrush}">
+        <TreeDataGrid.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Copy Line" x:Name="GridMenuCopyLine" />
+            <MenuItem Header="Copy Formatted JSON" x:Name="GridMenuCopyFormattedJson" />
+            <Separator />
+            <MenuItem Header="Toggle Bookmark" x:Name="GridMenuToggleBookmark" InputGesture="Ctrl+B" />
+            <MenuItem Header="Go to Timestamp..." x:Name="GridMenuGoToTimestamp" InputGesture="Ctrl+G" />
+            <MenuItem Header="Time Travel (Sync Others)" x:Name="GridMenuTimeTravel" />
+            <MenuItem Header="Pin Timestamp" x:Name="GridMenuPinTimestamp" InputGesture="Ctrl+Shift+P" />
+          </ContextMenu>
+        </TreeDataGrid.ContextMenu>
         <TreeDataGrid.Styles>
+          <!-- Row selection highlight -->
+          <Style Selector="TreeDataGridRow:selected">
+            <Setter Property="Background" Value="#244FC3F7" />
+          </Style>
+          <Style Selector="TreeDataGridRow:pointerover">
+            <Setter Property="Background" Value="#14FFFFFF" />
+          </Style>
           <!-- Hide native scrollbar when minimap is visible (minimap replaces it) -->
           <Style Selector="TreeDataGrid.minimap ScrollViewer">
             <Setter Property="VerticalScrollBarVisibility" Value="Hidden" />

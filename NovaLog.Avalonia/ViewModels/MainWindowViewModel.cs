@@ -38,6 +38,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Workspace.Initialize(SourceManager, ThemeService);
         Workspace.SetFollowDefaults(Settings.MainFollowEnabled, Settings.FilterFollowEnabled, applyToExisting: true);
+        Workspace.IsMasterFollowOn = Settings.MainFollowEnabled;
         Workspace.SetGridModeDefault(Settings.DefaultGridMode, applyToExisting: true);
         Workspace.SetGridMultilineDefault(Settings.GridMultiline, applyToExisting: true);
         Workspace.SetFormattingOptions(BuildFormattingOptions(), applyToExisting: true);
@@ -292,10 +293,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public string StatusFile => Workspace.ActiveLogView?.Title ?? "No file loaded";
     public string StatusLines => $"{Workspace.ActiveLogView?.TotalLineCount ?? 0} lines";
     public string StatusStreaming => Workspace.ActiveLogView?.IsStreaming == true ? "Streaming" : "";
-    public string StatusFollow => Workspace.ActiveLogView?.IsFollowMode == true ? "Follow: On" : "Follow: Off";
-
-    [RelayCommand]
-    private void ToggleFollow() => Workspace.ActiveLogView?.ToggleFollowCommand.Execute(null);
+    public string StatusFollow => Workspace.IsMasterFollowOn ? "Follow: All"
+        : Workspace.ActiveLogView?.IsFollowMode == true ? "Follow: On" : "Follow: Off";
 
     // Simulators
     private readonly List<LogSimulator> _simulators = new();
@@ -344,6 +343,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             case nameof(SettingsViewModel.MainFollowEnabled):
                 Workspace.SetMainFollowDefault(Settings.MainFollowEnabled, applyToExisting: true);
+                Workspace.IsMasterFollowOn = Settings.MainFollowEnabled;
                 RaiseStatusProperties();
                 break;
             case nameof(SettingsViewModel.FilterFollowEnabled):

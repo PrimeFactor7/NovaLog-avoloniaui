@@ -90,6 +90,50 @@ public partial class LogViewPanel : UserControl
                 ShowHighlightRulesDialog(vm);
         };
 
+        // Grid context menu handlers (mirror text mode context menu)
+        GridMenuCopyLine.Click += async (_, _) =>
+        {
+            if (DataContext is LogViewViewModel vm)
+            {
+                var text = vm.GetCurrentLineText();
+                if (text is not null)
+                {
+                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                    if (clipboard is not null)
+                        await clipboard.SetTextAsync(text);
+                }
+            }
+        };
+        GridMenuCopyFormattedJson.Click += async (_, _) =>
+        {
+            if (DataContext is LogViewViewModel vm)
+            {
+                var json = vm.GetFormattedJson();
+                if (json is not null)
+                {
+                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                    if (clipboard is not null)
+                        await clipboard.SetTextAsync(json);
+                }
+            }
+        };
+        GridMenuToggleBookmark.Click += (_, _) =>
+        {
+            if (DataContext is LogViewViewModel vm) vm.ToggleBookmark();
+        };
+        GridMenuGoToTimestamp.Click += (_, _) =>
+        {
+            if (DataContext is LogViewViewModel vm) ShowGoToTimestampDialog(vm);
+        };
+        GridMenuTimeTravel.Click += (_, _) =>
+        {
+            if (DataContext is LogViewViewModel vm) vm.TimeTravelCommand.Execute(null);
+        };
+        GridMenuPinTimestamp.Click += (_, _) =>
+        {
+            if (DataContext is LogViewViewModel vm) vm.PinCurrentTimestamp();
+        };
+
         _repeater = this.FindControl<ItemsRepeater>("LogRepeater");
         _scroller = this.FindControl<ScrollViewer>("LogScroller");
         _minimap = this.FindControl<LogMinimap>("Minimap");
@@ -98,6 +142,8 @@ public partial class LogViewPanel : UserControl
         {
             _logGrid.SizeChanged += (_, _) => FitMessageColumn();
             _logGrid.TemplateApplied += (_, _) => EnsureGridScroller();
+            _logGrid.AddHandler(InputElement.PointerPressedEvent, OnGridPointerPressed,
+                RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         }
         FilterPanelView.SizeChanged += OnFilterPanelSizeChanged;
 
@@ -469,6 +515,9 @@ public partial class LogViewPanel : UserControl
             double targetY = Math.Max(0, ratio * scroll.Extent.Height - scroll.Viewport.Height / 2);
             targetY = Math.Min(targetY, Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height));
             scroll.Offset = scroll.Offset.WithY(targetY);
+            // Post selection after layout so virtualized rows are realized
+            Dispatcher.UIThread.Post(() => SelectGridRowByLineIndex(lineIndex),
+                DispatcherPriority.Render);
         }
         else
         {
@@ -479,6 +528,60 @@ public partial class LogViewPanel : UserControl
         }
 
         if (_minimap is not null) UpdateMinimapViewport(_minimap);
+    }
+
+    /// <summary>Programmatically select the grid row matching a line index.</summary>
+    private void SelectGridRowByLineIndex(int lineIndex)
+    {
+        // Use the control's own source reference to ensure we're operating on
+        // the same source the TreeDataGrid is displaying.
+        var source = _logGrid?.Source;
+        if (source is null) return;
+
+        if (source is global::Avalonia.Controls.FlatTreeDataGridSource<GridRowViewModel> flat)
+        {
+            var sel = flat.RowSelection;
+            if (sel is null) return;
+            int i = 0;
+            foreach (var item in flat.Items)
+            {
+                if (item.Line?.GlobalIndex == lineIndex)
+                {
+                    sel.SelectedIndex = new global::Avalonia.Controls.IndexPath(i);
+                    return;
+                }
+                i++;
+            }
+        }
+        else if (source is global::Avalonia.Controls.HierarchicalTreeDataGridSource<GridRowViewModel> hier)
+        {
+            var sel = hier.RowSelection;
+            if (sel is null) return;
+            int g = 0;
+            foreach (var group in hier.Items)
+            {
+                if (group.Children is { } children)
+                {
+                    int c = 0;
+                    foreach (var child in children)
+                    {
+                        if (child.Line?.GlobalIndex == lineIndex)
+                        {
+                            hier.Expand(new global::Avalonia.Controls.IndexPath(g));
+                            sel.SelectedIndex = new global::Avalonia.Controls.IndexPath(g, c);
+                            return;
+                        }
+                        c++;
+                    }
+                }
+                if (group.Line?.GlobalIndex == lineIndex)
+                {
+                    sel.SelectedIndex = new global::Avalonia.Controls.IndexPath(g);
+                    return;
+                }
+                g++;
+            }
+        }
     }
 
     private void OnMinimapWheelScroll(PointerWheelEventArgs e)
@@ -520,6 +623,22 @@ public partial class LogViewPanel : UserControl
             _minimapRefreshPending = false;
             _minimap?.InvalidateVisual();
         }, DispatcherPriority.Background);
+    }
+
+    private void OnGridPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_attachedViewModel is null) return;
+
+        var currentPoint = e.GetCurrentPoint(this);
+        if (!currentPoint.Properties.IsLeftButtonPressed && !currentPoint.Properties.IsRightButtonPressed)
+            return;
+
+        // Walk up from clicked element to find the TreeDataGridRow and its data context
+        var row = FindVisualAncestorOrSelf<global::Avalonia.Controls.Primitives.TreeDataGridRow>(e.Source);
+        if (row?.DataContext is GridRowViewModel gridRow && gridRow.Line is { } line)
+        {
+            _attachedViewModel.SelectLine((int)line.GlobalIndex, disableFollow: false);
+        }
     }
 
     private void OnLogPointerPressed(object? sender, PointerPressedEventArgs e)

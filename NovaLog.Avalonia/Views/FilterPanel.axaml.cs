@@ -26,7 +26,7 @@ public partial class FilterPanel : UserControl
             input.KeyDown += OnSearchInputKeyDown;
         }
 
-        var results = this.FindControl<ItemsControl>("FilterResultsControl");
+        var results = this.FindControl<ListBox>("FilterResultsControl");
         results?.AddHandler(InputElement.PointerPressedEvent, OnFilterResultPointerPressed,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
     }
@@ -147,7 +147,7 @@ public partial class FilterPanel : UserControl
             if (current is StyledElement styled && styled.DataContext is LogLineViewModel line)
             {
                 _attachedViewModel.ActivateResult(line);
-                e.Handled = true;
+                // Don't set e.Handled — let ListBox process its own selection
                 return;
             }
 

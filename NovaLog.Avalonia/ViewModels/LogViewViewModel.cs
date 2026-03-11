@@ -24,6 +24,10 @@ public partial class LogViewViewModel : ObservableObject
     [ObservableProperty] private int _totalLineCount;
     [ObservableProperty] private int? _selectedLineIndex;
 
+    public string HeaderMeta => TotalLineCount > 0 ? $"{TotalLineCount:N0} lines" : "";
+
+    partial void OnTotalLineCountChanged(int value) => OnPropertyChanged(nameof(HeaderMeta));
+
     private bool _scrollPending;
 
     public event Action? SelectedLineChanged;
@@ -574,6 +578,7 @@ public partial class LogViewViewModel : ObservableObject
         if (!TryNormalizeLineIndex(line, out var normalized))
             return;
 
+        IsFollowMode = false;
         SelectLine(normalized);
         RequestScrollToLine(normalized);
     }

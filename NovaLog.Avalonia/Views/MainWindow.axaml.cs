@@ -267,10 +267,10 @@ public partial class MainWindow : Window
         }
         else if (e.Key == Key.F && !ctrl && !shift && !alt)
         {
-            // F — toggle follow mode (only when no text input is focused)
-            if (FocusManager?.GetFocusedElement() is not TextBox && vm.Workspace.ActiveLogView != null)
+            // F — toggle master follow (all panes, only when no text input is focused)
+            if (FocusManager?.GetFocusedElement() is not TextBox)
             {
-                vm.Workspace.ActiveLogView.IsFollowMode = !vm.Workspace.ActiveLogView.IsFollowMode;
+                vm.Workspace.IsMasterFollowOn = !vm.Workspace.IsMasterFollowOn;
                 e.Handled = true;
             }
             else

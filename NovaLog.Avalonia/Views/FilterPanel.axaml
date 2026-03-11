@@ -101,30 +101,35 @@
       </Border>
 
       <!-- Filter results -->
-      <ItemsControl x:Name="FilterResultsControl"
-                    ItemsSource="{Binding ResultItems}"
-                    Background="{DynamicResource BackgroundBrush}">
-        <ItemsControl.Template>
-          <ControlTemplate>
-            <ScrollViewer x:Name="ResultsScrollViewer"
-                          HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Auto"
-                          Background="{TemplateBinding Background}">
-              <ItemsPresenter />
-            </ScrollViewer>
-          </ControlTemplate>
-        </ItemsControl.Template>
-        <ItemsControl.ItemsPanel>
+      <ListBox x:Name="FilterResultsControl"
+               ItemsSource="{Binding ResultItems}"
+               Background="{DynamicResource BackgroundBrush}"
+               SelectionMode="Single"
+               ScrollViewer.HorizontalScrollBarVisibility="Auto">
+        <ListBox.Styles>
+          <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+          </Style>
+          <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="#244FC3F7" />
+          </Style>
+          <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#14FFFFFF" />
+          </Style>
+        </ListBox.Styles>
+        <ListBox.ItemsPanel>
           <ItemsPanelTemplate>
             <VirtualizingStackPanel Orientation="Vertical" />
           </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:LogLineViewModel">
             <controls:LogLineRow />
           </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+        </ListBox.ItemTemplate>
+      </ListBox>
 
     </DockPanel>
   </Border>

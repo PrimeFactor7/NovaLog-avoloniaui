@@ -15,6 +15,7 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     [ObservableProperty] private SplitNodeViewModel _rootNode;
     [ObservableProperty] private PaneNodeViewModel? _focusedPane;
     [ObservableProperty] private int _activeTabIndex;
+    [ObservableProperty] private bool _isMasterFollowOn = true;
 
     public ObservableCollection<WorkspaceTabItem> Tabs { get; } = [];
     public GlobalClockService Clock { get; } = new();
@@ -102,6 +103,12 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
             pane.LogView.IsFollowMode = mainFollow;
             pane.LogView.Filter.IsFollowMode = filterFollow;
         }
+    }
+
+    partial void OnIsMasterFollowOnChanged(bool value)
+    {
+        foreach (var pane in GetAllPanes())
+            pane.LogView.IsFollowMode = value;
     }
 
     public void SetGridModeDefault(bool value, bool applyToExisting)
