@@ -50,6 +50,12 @@ public sealed class AppSettings
     [JsonPropertyName("filterPanelVisible")]
     public bool FilterPanelVisible { get; set; } = false;
 
+    [JsonPropertyName("searchResultCap")]
+    public int SearchResultCap { get; set; } = 500;
+
+    [JsonPropertyName("searchNewestFirst")]
+    public bool SearchNewestFirst { get; set; } = true;
+
     [JsonPropertyName("sectionColumnColorsExpanded")]
     public bool SectionColumnColorsExpanded { get; set; } = false;
 

@@ -41,6 +41,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         Workspace.SetGridModeDefault(Settings.DefaultGridMode, applyToExisting: true);
         Workspace.SetGridMultilineDefault(Settings.GridMultiline, applyToExisting: true);
         Workspace.SetFormattingOptions(BuildFormattingOptions(), applyToExisting: true);
+        Workspace.SetSearchDefaults(Settings.SearchResultCap, Settings.SearchNewestFirst, applyToExisting: true);
         LogLineRow.RowHeight = Settings.LineHeight;
         Workspace.PropertyChanged += OnWorkspacePropertyChanged;
         AttachActiveLogView(Workspace.ActiveLogView);
@@ -364,6 +365,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 LogLineRow.RowHeight = Settings.LineHeight;
                 foreach (var pane in Workspace.GetAllPanes())
                     pane.LogView.NotifyRowVisualsChanged();
+                break;
+            case nameof(SettingsViewModel.SearchResultCap):
+            case nameof(SettingsViewModel.SearchNewestFirst):
+                Workspace.SetSearchDefaults(Settings.SearchResultCap, Settings.SearchNewestFirst, applyToExisting: true);
                 break;
         }
     }

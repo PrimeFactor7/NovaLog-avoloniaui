@@ -328,7 +328,10 @@ public partial class LogViewPanel : UserControl
             _attachedFilterViewModel.PropertyChanged -= OnFilterViewModelPropertyChanged;
 
         if (_minimap is not null)
+        {
             _minimap.ScrollRequested -= OnMinimapScrollRequested;
+            _minimap.WheelScrollRequested -= OnMinimapWheelScroll;
+        }
 
         _attachedViewModel = DataContext as LogViewViewModel;
         _attachedFilterViewModel = _attachedViewModel?.Filter;
@@ -348,6 +351,7 @@ public partial class LogViewPanel : UserControl
                 _minimap.NavIndex = _attachedViewModel.NavIndex;
                 UpdateMinimapViewport(_minimap);
                 _minimap.ScrollRequested += OnMinimapScrollRequested;
+                _minimap.WheelScrollRequested += OnMinimapWheelScroll;
             }
 
             UpdateFilterLayout(_attachedFilterViewModel?.IsVisible == true);
@@ -451,19 +455,43 @@ public partial class LogViewPanel : UserControl
     {
         Dispatcher.UIThread.Post(() =>
         {
-            // Grid mode: use RowsPresenter.BringIntoView (handles virtualized rows)
-            if (DataContext is LogViewViewModel { IsGridMode: true })
+            // Grid mode: use TreeDataGrid.Scroll to set offset by ratio
+            if (DataContext is LogViewViewModel { IsGridMode: true } gvm)
             {
-                _logGrid?.RowsPresenter?.BringIntoView(lineIndex);
+                var scroll = _logGrid?.Scroll;
+                if (scroll is null || gvm.TotalLineCount <= 0) return;
+                double ratio = (double)lineIndex / gvm.TotalLineCount;
+                double targetY = Math.Max(0, ratio * scroll.Extent.Height - scroll.Viewport.Height / 2);
+                targetY = Math.Min(targetY, Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height));
+                scroll.Offset = scroll.Offset.WithY(targetY);
+                if (_minimap is not null) UpdateMinimapViewport(_minimap);
                 return;
             }
 
             // Text mode: calculate pixel offset from line index
             if (_scroller is null) return;
             double halfViewport = _scroller.Viewport.Height / 2;
-            double targetY = Math.Max(0, lineIndex * LogLineRow.RowHeight - halfViewport);
-            _scroller.Offset = new global::Avalonia.Vector(_scroller.Offset.X, targetY);
+            double textTargetY = Math.Max(0, lineIndex * LogLineRow.RowHeight - halfViewport);
+            _scroller.Offset = new global::Avalonia.Vector(_scroller.Offset.X, textTargetY);
         });
+    }
+
+    private void OnMinimapWheelScroll(PointerWheelEventArgs e)
+    {
+        // Forward mousewheel over minimap to the active scroller
+        double delta = e.Delta.Y * 48; // ~3 lines per notch
+        if (DataContext is LogViewViewModel { IsGridMode: true } && _logGrid?.Scroll is { } scroll)
+        {
+            double newY = Math.Clamp(scroll.Offset.Y - delta, 0, Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height));
+            scroll.Offset = scroll.Offset.WithY(newY);
+        }
+        else if (_scroller is not null)
+        {
+            double newY = Math.Clamp(_scroller.Offset.Y - delta, 0, Math.Max(0, _scroller.Extent.Height - _scroller.Viewport.Height));
+            _scroller.Offset = new global::Avalonia.Vector(_scroller.Offset.X, newY);
+        }
+        if (_minimap is not null)
+            UpdateMinimapViewport(_minimap);
     }
 
     private void OnMinimapScrollRequested(int line)

@@ -117,6 +117,16 @@ public class LogMinimap : Control
         ScrollRequested?.Invoke(line);
     }
 
+    /// <summary>Fired when user scrolls the mousewheel over the minimap.</summary>
+    public event Action<PointerWheelEventArgs>? WheelScrollRequested;
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        WheelScrollRequested?.Invoke(e);
+        e.Handled = true;
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         return new Size(40, availableSize.Height);

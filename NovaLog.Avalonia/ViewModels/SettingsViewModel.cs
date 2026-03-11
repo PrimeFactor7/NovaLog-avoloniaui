@@ -57,6 +57,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _minimapShowErrors;
     [ObservableProperty] private bool _minimapVisible = true;
     [ObservableProperty] private bool _filterPanelVisible;
+    [ObservableProperty] private int _searchResultCap = 500;
+    [ObservableProperty] private bool _searchNewestFirst = true;
 
     // Grid View
     [ObservableProperty] private bool _defaultGridMode = true;
@@ -129,6 +131,8 @@ public partial class SettingsViewModel : ObservableObject
         MinimapShowErrors = settings.MinimapShowErrors;
         MinimapVisible = settings.MinimapVisible;
         FilterPanelVisible = settings.FilterPanelVisible;
+        SearchResultCap = settings.SearchResultCap;
+        SearchNewestFirst = settings.SearchNewestFirst;
 
         DefaultGridMode = settings.DefaultGridMode;
         GridLinesVisible = settings.GridLinesVisible;
@@ -185,6 +189,8 @@ public partial class SettingsViewModel : ObservableObject
         settings.MinimapShowErrors = MinimapShowErrors;
         settings.MinimapVisible = MinimapVisible;
         settings.FilterPanelVisible = FilterPanelVisible;
+        settings.SearchResultCap = SearchResultCap;
+        settings.SearchNewestFirst = SearchNewestFirst;
 
         settings.DefaultGridMode = DefaultGridMode;
         settings.GridLinesVisible = GridLinesVisible;

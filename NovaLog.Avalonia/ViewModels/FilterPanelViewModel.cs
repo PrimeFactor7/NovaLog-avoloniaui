@@ -25,6 +25,8 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private IEnumerable? _resultItems;
     [ObservableProperty] private int _resultCount;
+    [ObservableProperty] private int _searchResultCap = 500;
+    [ObservableProperty] private bool _searchNewestFirst = true;
 
     private readonly System.Timers.Timer _debounceTimer;
     private CancellationTokenSource? _searchCts;
@@ -81,6 +83,13 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
         if (_currentMatcher is null || ResultItems is not InMemoryLogItemsSource resultSource)
             return;
 
+        int cap = SearchResultCap;
+        if (cap > 0 && resultSource.Count >= cap)
+        {
+            _lastProcessedIndex = memSource.Count;
+            return;
+        }
+
         var newMatches = new List<LogLine>();
         var newHits = new List<long>();
 
@@ -92,6 +101,8 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
             {
                 newHits.Add(vm.GlobalIndex);
                 newMatches.Add(LogLineParser.Parse(vm.RawText, vm.GlobalIndex));
+                if (cap > 0 && resultSource.Count + newMatches.Count >= cap)
+                    break;
             }
         }
 
@@ -103,7 +114,8 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
             {
                 resultSource.AppendLines(newMatches);
                 ResultCount += newMatches.Count;
-                StatusText = $"{ResultCount:N0} matches";
+                bool capped = cap > 0 && resultSource.Count >= cap;
+                StatusText = capped ? $"{ResultCount:N0}+ matches (capped)" : $"{ResultCount:N0} matches";
 
                 // Notify about all hits (not just new ones) for navigation
                 var allHits = new List<long>();
@@ -178,30 +190,65 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
 
         var hits = new List<long>();
         var matchedLines = new List<LogLine>();
+        int cap = SearchResultCap;
+        bool newestFirst = SearchNewestFirst;
+        bool capped = false;
+
+        void ProcessMatch(LogLineViewModel vm)
+        {
+            hits.Add(vm.GlobalIndex);
+            matchedLines.Add(LogLineParser.Parse(vm.RawText, vm.GlobalIndex));
+        }
 
         // Access the actual source, not the delegating wrapper
         if (source.MemorySource is { } memSource)
         {
-            for (int i = 0; i < memSource.Count && !ct.IsCancellationRequested; i++)
+            if (newestFirst)
             {
-                var vm = memSource[i];
-                if (matcher.IsMatch(vm.RawText))
+                for (int i = memSource.Count - 1; i >= 0 && !ct.IsCancellationRequested; i--)
                 {
-                    hits.Add(vm.GlobalIndex);
-                    matchedLines.Add(LogLineParser.Parse(vm.RawText, vm.GlobalIndex));
+                    if (matcher.IsMatch(memSource[i].RawText))
+                    {
+                        ProcessMatch(memSource[i]);
+                        if (cap > 0 && hits.Count >= cap) { capped = true; break; }
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < memSource.Count && !ct.IsCancellationRequested; i++)
+                {
+                    if (matcher.IsMatch(memSource[i].RawText))
+                    {
+                        ProcessMatch(memSource[i]);
+                        if (cap > 0 && hits.Count >= cap) { capped = true; break; }
+                    }
                 }
             }
         }
         else if (source.VirtualSource is { } virtSource)
         {
-            long total = virtSource.Count;
-            for (long i = 0; i < total && !ct.IsCancellationRequested; i++)
+            int total = virtSource.Count;
+            if (newestFirst)
             {
-                var vm = virtSource[(int)i];
-                if (matcher.IsMatch(vm.RawText))
+                for (int i = total - 1; i >= 0 && !ct.IsCancellationRequested; i--)
                 {
-                    hits.Add(vm.GlobalIndex);
-                    matchedLines.Add(LogLineParser.Parse(vm.RawText, vm.GlobalIndex));
+                    if (matcher.IsMatch(virtSource[i].RawText))
+                    {
+                        ProcessMatch(virtSource[i]);
+                        if (cap > 0 && hits.Count >= cap) { capped = true; break; }
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < total && !ct.IsCancellationRequested; i++)
+                {
+                    if (matcher.IsMatch(virtSource[i].RawText))
+                    {
+                        ProcessMatch(virtSource[i]);
+                        if (cap > 0 && hits.Count >= cap) { capped = true; break; }
+                    }
                 }
             }
         }
@@ -224,7 +271,7 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
             resultSource.AddRange(matchedLines);
             ResultItems = resultSource;
             ResultCount = hits.Count;
-            StatusText = $"{hits.Count:N0} matches";
+            StatusText = capped ? $"{hits.Count:N0}+ matches (capped)" : $"{hits.Count:N0} matches";
             SearchHitsChanged?.Invoke(hits);
             _lastProcessedIndex = processedCount;
         });

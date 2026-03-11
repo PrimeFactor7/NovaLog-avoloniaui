@@ -27,6 +27,8 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     private bool _defaultGridMode = true;
     private bool _defaultGridMultiline = true;
     private FormattingOptions? _defaultFormattingOptions;
+    private int _defaultSearchResultCap = 500;
+    private bool _defaultSearchNewestFirst = true;
 
     /// <summary>True when more than one tab exists (shows tab bar).</summary>
     public bool HasMultipleTabs => Tabs.Count > 1;
@@ -124,6 +126,18 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         if (!applyToExisting) return;
         foreach (var pane in GetAllPanes())
             pane.LogView.SetFormattingOptions(options);
+    }
+
+    public void SetSearchDefaults(int resultCap, bool newestFirst, bool applyToExisting)
+    {
+        _defaultSearchResultCap = resultCap;
+        _defaultSearchNewestFirst = newestFirst;
+        if (!applyToExisting) return;
+        foreach (var pane in GetAllPanes())
+        {
+            pane.LogView.Filter.SearchResultCap = resultCap;
+            pane.LogView.Filter.SearchNewestFirst = newestFirst;
+        }
     }
 
     // ── Persistence ──────────────────────────────────────────────────
@@ -537,6 +551,8 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     {
         pane.LogView.IsFollowMode = _defaultMainFollow;
         pane.LogView.Filter.IsFollowMode = _defaultFilterFollow;
+        pane.LogView.Filter.SearchResultCap = _defaultSearchResultCap;
+        pane.LogView.Filter.SearchNewestFirst = _defaultSearchNewestFirst;
         pane.LogView.IsGridMode = _defaultGridMode;
         pane.LogView.GridMultiline = _defaultGridMultiline;
         pane.LogView.SetFormattingOptions(_defaultFormattingOptions);
