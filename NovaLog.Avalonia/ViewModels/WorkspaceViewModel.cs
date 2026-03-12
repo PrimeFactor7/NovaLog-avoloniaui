@@ -107,8 +107,12 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
     partial void OnIsMasterFollowOnChanged(bool value)
     {
+        // When turning ON "Follow all", set every pane to follow. When turning OFF, only clear
+        // the master switch — leave each pane's follow state unchanged.
+        if (!value)
+            return;
         foreach (var pane in GetAllPanes())
-            pane.LogView.IsFollowMode = value;
+            pane.LogView.IsFollowMode = true;
     }
 
     public void SetGridModeDefault(bool value, bool applyToExisting)
@@ -563,6 +567,13 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         pane.LogView.IsGridMode = _defaultGridMode;
         pane.LogView.GridMultiline = _defaultGridMultiline;
         pane.LogView.SetFormattingOptions(_defaultFormattingOptions);
+
+        // When any pane's follow turns off, turn off master follow
+        pane.LogView.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(LogViewViewModel.IsFollowMode) && !pane.LogView.IsFollowMode)
+                IsMasterFollowOn = false;
+        };
     }
 
     private void SyncActiveTabLayout()

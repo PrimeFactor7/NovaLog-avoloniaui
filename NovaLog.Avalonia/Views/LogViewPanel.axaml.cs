@@ -161,6 +161,13 @@ public partial class LogViewPanel : UserControl
         if (_scroller is not null)
         {
             _scroller.AddHandler(InputElement.PointerPressedEvent, OnLogPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+
+            // Mouse wheel up → disable follow (fires before ScrollChanged, reliable direction)
+            _scroller.AddHandler(InputElement.PointerWheelChangedEvent, (_, e) =>
+            {
+                if (e.Delta.Y > 0 && DataContext is LogViewViewModel { IsFollowMode: true } vm)
+                    vm.IsFollowMode = false;
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
 
         if (_scroller is not null)
@@ -176,17 +183,12 @@ public partial class LogViewPanel : UserControl
                     if (_minimap is not null)
                         UpdateMinimapViewport(_minimap);
 
-                    if (_scroller.Extent.Height <= 0)
-                        return;
-
-                    double maxScroll = _scroller.Extent.Height - _scroller.Viewport.Height;
-                    double currentScroll = _scroller.Offset.Y;
-
-                    // Only disable follow when the user actually scrolls upward away from the bottom.
-                    // Extent changes from new lines arriving should not count as manual scrolling.
-                    if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1 && maxScroll - currentScroll > 36.0)
+                    // Scrollbar drag / keyboard scroll up → disable follow
+                    if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1)
                     {
-                        vm.IsFollowMode = false;
+                        double maxScroll = _scroller.Extent.Height - _scroller.Viewport.Height;
+                        if (maxScroll - _scroller.Offset.Y > 0.5)
+                            vm.IsFollowMode = false;
                     }
                 }
             };
@@ -416,6 +418,13 @@ public partial class LogViewPanel : UserControl
         if (_gridScroller is not null && !_gridScrollerHooked)
         {
             _gridScrollerHooked = true;
+            // Mouse wheel up → disable follow
+            _gridScroller.AddHandler(InputElement.PointerWheelChangedEvent, (_, e) =>
+            {
+                if (e.Delta.Y > 0 && DataContext is LogViewViewModel { IsFollowMode: true } vm)
+                    vm.IsFollowMode = false;
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
+
             _gridScroller.ScrollChanged += (s, e) =>
             {
                 if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
@@ -424,16 +433,13 @@ public partial class LogViewPanel : UserControl
                 if (_minimap is not null)
                     UpdateMinimapViewport(_minimap);
 
-                // Use TreeDataGrid.Scroll for reliable extent/offset values
-                var scroll = _logGrid?.Scroll;
-                if (scroll is null || scroll.Extent.Height <= 0)
-                    return;
-
-                double maxScroll = scroll.Extent.Height - scroll.Viewport.Height;
-                double currentScroll = scroll.Offset.Y;
-
-                if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1 && maxScroll - currentScroll > 36.0)
-                    vm.IsFollowMode = false;
+                // Scrollbar drag / keyboard scroll up → disable follow
+                if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1)
+                {
+                    var scroll = _logGrid?.Scroll;
+                    if (scroll is not null && scroll.Extent.Height - scroll.Offset.Y - scroll.Viewport.Height > 0.5)
+                        vm.IsFollowMode = false;
+                }
             };
             _gridScroller.SizeChanged += (_, _) =>
             {
@@ -798,12 +804,6 @@ public partial class LogViewPanel : UserControl
 
         minimap.ViewportTopRatio = topRatio;
         minimap.ViewportHeightRatio = heightRatio;
-    }
-
-    private void OnHeaderDoubleTapped(object? sender, global::Avalonia.Input.TappedEventArgs e)
-    {
-        if (DataContext is LogViewViewModel vm)
-            vm.ShowPicker();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
