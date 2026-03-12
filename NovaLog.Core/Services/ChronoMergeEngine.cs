@@ -11,7 +11,7 @@ namespace NovaLog.Core.Services;
 public sealed class ChronoMergeEngine : IMergedLogProvider
 {
     private readonly record struct SourceInfo(string Tag, string TagColorHex, int Priority);
-    private readonly record struct MergedLineRef(byte SourceIndex, int LineIndex);
+    private readonly record struct MergedLineRef(ushort SourceIndex, int LineIndex);
 
     private readonly List<SourceInfo> _sources = [];
     private readonly List<List<LogLine>> _sourceLines = [];
@@ -39,12 +39,10 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
     public LogLine? GetLine(long lineIndex)
     {
-        var count = _indexedCount;
-        if (lineIndex < 0 || lineIndex >= count) return null;
-
-        // Snapshot the array ref so a concurrent Array.Resize can't pull it away
+        // Snapshot array first, then use _indexedCount — both must agree
         var idx = Volatile.Read(ref _index);
-        if (lineIndex >= idx.Length) return null;
+        var count = _indexedCount;
+        if (lineIndex < 0 || lineIndex >= count || lineIndex >= idx.Length) return null;
 
         var entry = idx[lineIndex];
         if (entry.SourceIndex >= _sourceLines.Count) return null;
@@ -69,11 +67,9 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
     public string? GetRawLine(long lineIndex)
     {
-        var count = _indexedCount;
-        if (lineIndex < 0 || lineIndex >= count) return null;
-
         var idx = Volatile.Read(ref _index);
-        if (lineIndex >= idx.Length) return null;
+        var count = _indexedCount;
+        if (lineIndex < 0 || lineIndex >= count || lineIndex >= idx.Length) return null;
 
         var entry = idx[lineIndex];
         if (entry.SourceIndex >= _sourceRawLines.Count) return null;
@@ -86,12 +82,9 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
     public (string Tag, string TagColorHex) GetSourceInfo(long mergedLineIndex)
     {
-        var count = _indexedCount;
-        if (mergedLineIndex < 0 || mergedLineIndex >= count)
-            return ("?", "#808080");
-
         var idx = Volatile.Read(ref _index);
-        if (mergedLineIndex >= idx.Length)
+        var count = _indexedCount;
+        if (mergedLineIndex < 0 || mergedLineIndex >= count || mergedLineIndex >= idx.Length)
             return ("?", "#808080");
 
         var entry = idx[mergedLineIndex];
@@ -183,7 +176,7 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
                 long ticks = parsed.Timestamp?.Ticks ?? lastTicks;
                 lastTicks = ticks;
-                newRefs.Add((new MergedLineRef((byte)sourceIndex, lineIdx), ticks));
+                newRefs.Add((new MergedLineRef((ushort)sourceIndex, lineIdx), ticks));
             }
 
             // Sort new lines by timestamp, priority, line index
@@ -243,14 +236,14 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
             _index = new MergedLineRef[totalLines];
 
-            var heap = new PriorityQueue<(byte SrcIdx, int LineIdx), (long Ticks, int Priority, int LineIdx)>(_sources.Count);
+            var heap = new PriorityQueue<(ushort SrcIdx, int LineIdx), (long Ticks, int Priority, int LineIdx)>(_sources.Count);
             var lastTicks = new long[_sources.Count];
 
             for (int s = 0; s < _sources.Count; s++)
             {
                 if (_sourceLines[s].Count == 0) continue;
                 long ticks = ExtractTicks(s, 0, ref lastTicks[s]);
-                heap.Enqueue(((byte)s, 0), (ticks, _sources[s].Priority, 0));
+                heap.Enqueue(((ushort)s, 0), (ticks, _sources[s].Priority, 0));
             }
 
             int built = 0;

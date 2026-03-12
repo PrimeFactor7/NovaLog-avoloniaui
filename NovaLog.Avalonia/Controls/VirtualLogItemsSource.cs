@@ -70,6 +70,7 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
     private readonly IMergedLogProvider? _mergedProvider;
     private readonly Dictionary<long, (LogLineViewModel Vm, LinkedListNode<long> Node)> _cache = new();
     private readonly LinkedList<long> _lruOrder = new();
+    private readonly object _cacheLock = new();
     private const int CacheCapacity = 200;
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
@@ -89,11 +90,14 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
         get
         {
             long key = index;
-            if (_cache.TryGetValue(key, out var cached))
+            lock (_cacheLock)
             {
-                _lruOrder.Remove(cached.Node);
-                _lruOrder.AddLast(cached.Node);
-                return cached.Vm;
+                if (_cache.TryGetValue(key, out var cached))
+                {
+                    _lruOrder.Remove(cached.Node);
+                    _lruOrder.AddLast(cached.Node);
+                    return cached.Vm;
+                }
             }
 
             var line = _provider.GetLine(index);
@@ -111,7 +115,7 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
             }
 
             var vm = CreateViewModel(line.Value, index);
-            AddToCache(key, vm);
+            lock (_cacheLock) { AddToCache(key, vm); }
             return vm;
         }
     }
@@ -160,8 +164,7 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
     {
         if (AvDispatcher.UIThread.CheckAccess())
         {
-            _cache.Clear();
-            _lruOrder.Clear();
+            lock (_cacheLock) { _cache.Clear(); _lruOrder.Clear(); }
             CollectionChanged?.Invoke(this,
                 new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }

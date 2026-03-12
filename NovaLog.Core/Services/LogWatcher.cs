@@ -30,9 +30,11 @@ public sealed class LogWatcher : IDisposable
     /// </summary>
     public void UseStrategy(IRotationStrategy strategy)
     {
-        _strategy?.Stop();
         if (_strategy != null)
+        {
             _strategy.RotationDetected -= OnStrategyRotation;
+            _strategy.Stop();
+        }
 
         _strategy = strategy;
         _strategy.RotationDetected += OnStrategyRotation;

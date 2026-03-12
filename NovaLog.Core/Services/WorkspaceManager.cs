@@ -102,7 +102,9 @@ public sealed class WorkspaceManager
             var json = JsonSerializer.Serialize(data, JsonOpts);
             var dir = Path.GetDirectoryName(WorkspacePath);
             if (dir != null) Directory.CreateDirectory(dir);
-            File.WriteAllText(WorkspacePath, json);
+            var tmp = WorkspacePath + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, WorkspacePath, overwrite: true);
         }
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"WorkspaceManager.Save failed: {ex.Message}"); }
     }

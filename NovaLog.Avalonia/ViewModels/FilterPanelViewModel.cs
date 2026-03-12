@@ -329,6 +329,7 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
             _subscribedSource.CollectionChanged -= OnSourceCollectionChanged;
             _subscribedSource = null;
         }
+        _debounceTimer.Stop();
         _debounceTimer.Dispose();
         _searchCts?.Cancel();
         _searchCts?.Dispose();

@@ -39,6 +39,8 @@ public partial class SettingsViewModel : ObservableObject
 
     // Log Levels
     public ObservableCollection<LevelColorViewModel> LevelColors { get; } = new();
+    private void OnLevelColorPropertyChanged(object? s, System.ComponentModel.PropertyChangedEventArgs e)
+        => SettingsChanged?.Invoke();
     [ObservableProperty] private bool _levelEntireLineEnabled;
 
     // Follow Mode
@@ -105,6 +107,8 @@ public partial class SettingsViewModel : ObservableObject
         MessageColorEnabled = settings.MessageColorEnabled;
         if (Color.TryParse(settings.MessageColor, out var mc)) MessageColor = mc;
 
+        foreach (var old in LevelColors)
+            old.PropertyChanged -= OnLevelColorPropertyChanged;
         LevelColors.Clear();
         foreach (var (name, entry) in settings.LevelColors)
         {
@@ -112,8 +116,8 @@ public partial class SettingsViewModel : ObservableObject
             if (Color.TryParse(entry.Foreground, out var cFg)) vm.Foreground = cFg;
             if (entry.Background != null && Color.TryParse(entry.Background, out var cBg)) vm.Background = cBg;
             vm.BackgroundEnabled = entry.BackgroundEnabled;
-            
-            vm.PropertyChanged += (_, _) => SettingsChanged?.Invoke();
+
+            vm.PropertyChanged += OnLevelColorPropertyChanged;
             LevelColors.Add(vm);
         }
         LevelEntireLineEnabled = settings.LevelEntireLineEnabled;

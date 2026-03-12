@@ -9,6 +9,7 @@ namespace NovaLog.Core.Services;
 public sealed class GlobalClockService : IDisposable
 {
     private readonly SynchronizationContext? _syncContext = SynchronizationContext.Current;
+    private readonly object _lock = new();
     private Timer? _debounceTimer;
     private DateTime _pendingTime;
     private object? _pendingSender;
@@ -20,16 +21,16 @@ public sealed class GlobalClockService : IDisposable
 
     public void BroadcastTime(DateTime time, object sender)
     {
-        _pendingTime = time;
-        _pendingSender = sender;
-
-        if (_debounceTimer == null)
+        lock (_lock)
         {
-            _debounceTimer = new Timer(OnDebounceElapsed, null, Timeout.Infinite, Timeout.Infinite);
-        }
+            _pendingTime = time;
+            _pendingSender = sender;
 
-        // Reset the 100ms debounce
-        _debounceTimer.Change(100, Timeout.Infinite);
+            if (_debounceTimer == null)
+                _debounceTimer = new Timer(OnDebounceElapsed, null, Timeout.Infinite, Timeout.Infinite);
+
+            _debounceTimer.Change(100, Timeout.Infinite);
+        }
     }
 
     public void NotifyTimeChanged(DateTime time, object sender)
@@ -39,11 +40,16 @@ public sealed class GlobalClockService : IDisposable
 
     private void OnDebounceElapsed(object? state)
     {
-        var sender = _pendingSender;
+        DateTime time;
+        object? sender;
+        lock (_lock)
+        {
+            time = _pendingTime;
+            sender = _pendingSender;
+        }
+
         if (sender != null)
         {
-            var time = _pendingTime;
-            // Marshal to captured sync context (UI thread) since Timer fires on thread pool
             if (_syncContext != null)
                 _syncContext.Post(_ => TimeChanged?.Invoke(time, sender), null);
             else

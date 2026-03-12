@@ -17,7 +17,10 @@ public sealed class SourceContext : IDisposable
     public ChronoMergeEngine? MergeEngine;
     public CancellationTokenSource? LevelScanCts;
     public NavigationIndex NavIndex = new();
-    public int RefCount;
+    private int _refCount;
+    public int RefCount => Volatile.Read(ref _refCount);
+    public int IncrementRef() => Interlocked.Increment(ref _refCount);
+    public int DecrementRef() => Interlocked.Decrement(ref _refCount);
 
     public bool IsBigFile => BigFileProvider != null;
     public bool IsMerge => MergeEngine != null;

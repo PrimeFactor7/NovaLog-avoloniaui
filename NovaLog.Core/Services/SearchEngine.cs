@@ -96,6 +96,8 @@ public static class SearchEngine
             comparison: comparison);
     }
 
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
     private static CompiledMatcher CompileWildcard(string pattern, bool caseSensitive)
     {
         // Escape regex special chars, then convert wildcard tokens
@@ -103,14 +105,14 @@ public static class SearchEngine
             .Replace(@"\*", ".*")
             .Replace(@"\?", ".");
         var opts = RegexOptions.Compiled | (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
-        var regex = new Regex(regexPattern, opts);
+        var regex = new Regex(regexPattern, opts, RegexTimeout);
         return new CompiledMatcher(input => regex.IsMatch(input), regex);
     }
 
     private static CompiledMatcher CompileRegex(string pattern, bool caseSensitive)
     {
         var opts = RegexOptions.Compiled | (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
-        var regex = new Regex(pattern, opts);
+        var regex = new Regex(pattern, opts, RegexTimeout);
         return new CompiledMatcher(input => regex.IsMatch(input), regex);
     }
 }

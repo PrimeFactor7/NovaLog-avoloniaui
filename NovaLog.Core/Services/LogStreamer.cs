@@ -123,7 +123,10 @@ public sealed class LogStreamer : IDisposable
             if (line.Length > 0) batch.Add(line);
 
         if (batch.Count > 0)
-            LinesReceived?.Invoke(batch);
+        {
+            try { LinesReceived?.Invoke(batch); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LogStreamer] LinesReceived handler failed: {ex.Message}"); }
+        }
     }
 
     private void OpenFile(string path, bool seekToEnd)

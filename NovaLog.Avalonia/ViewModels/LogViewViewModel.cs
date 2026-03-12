@@ -940,51 +940,59 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         ResetLineSelection();
 
         var engine = new ChronoMergeEngine();
-        int priority = 0;
-
-        foreach (var src in sourcesList)
+        try
         {
-            // Track each source ID in the merge
-            _loadedSourceIds.Add(src.SourceId);
-            // Also track physical paths
-            if (!string.IsNullOrEmpty(src.PhysicalPath) && !src.PhysicalPath.StartsWith("merge://"))
-                _loadedPaths.Add(Path.GetFullPath(src.PhysicalPath));
+            int priority = 0;
 
-            LogStreamer streamer;
-            if (src.Kind == SourceKind.Folder)
+            foreach (var src in sourcesList)
             {
-                var auditManager = new AuditLogManager(src.PhysicalPath);
-                auditManager.Refresh();
-                var prefixMap = auditManager.GetPrefixToAuditMap();
-                if (prefixMap.Count > 0)
-                    streamer = new LogStreamer(auditManager, prefixMap.Values.First());
+                // Track each source ID in the merge
+                _loadedSourceIds.Add(src.SourceId);
+                // Also track physical paths
+                if (!string.IsNullOrEmpty(src.PhysicalPath) && !src.PhysicalPath.StartsWith("merge://"))
+                    _loadedPaths.Add(Path.GetFullPath(src.PhysicalPath));
+
+                LogStreamer streamer;
+                if (src.Kind == SourceKind.Folder)
+                {
+                    var auditManager = new AuditLogManager(src.PhysicalPath);
+                    auditManager.Refresh();
+                    var prefixMap = auditManager.GetPrefixToAuditMap();
+                    if (prefixMap.Count > 0)
+                        streamer = new LogStreamer(auditManager, prefixMap.Values.First());
+                    else
+                    {
+                        var logFiles = System.IO.Directory.GetFiles(src.PhysicalPath, "*.log").OrderBy(f => f).ToList();
+                        if (logFiles.Count == 0)
+                            logFiles = System.IO.Directory.GetFiles(src.PhysicalPath, "*.txt").OrderBy(f => f).ToList();
+                        streamer = new LogStreamer(logFiles);
+                    }
+                }
                 else
                 {
-                    var logFiles = System.IO.Directory.GetFiles(src.PhysicalPath, "*.log").OrderBy(f => f).ToList();
-                    if (logFiles.Count == 0)
-                        logFiles = System.IO.Directory.GetFiles(src.PhysicalPath, "*.txt").OrderBy(f => f).ToList();
-                    streamer = new LogStreamer(logFiles);
+                    streamer = new LogStreamer([src.PhysicalPath]);
                 }
-            }
-            else
-            {
-                streamer = new LogStreamer([src.PhysicalPath]);
+
+                int srcIdx = engine.AddSource(streamer, src.DisplayName, src.SourceColorHex, priority++);
+                var history = streamer.LoadHistory();
+                engine.PushHistory(srcIdx, history);
             }
 
-            int srcIdx = engine.AddSource(streamer, src.DisplayName, src.SourceColorHex, priority++);
-            var history = streamer.LoadHistory();
-            engine.PushHistory(srcIdx, history);
+            _providerIndexingProgressChanged = p => { IndexingProgress = engine.IndexingProgress; IsIndexing = true; };
+            engine.IndexingProgressChanged += _providerIndexingProgressChanged;
+            _providerIndexingCompleted = () => { IsIndexing = false; IndexingProgress = 1.0; TotalLineCount = (int)engine.LineCount; };
+            engine.IndexingCompleted += _providerIndexingCompleted;
+            _providerLinesAppended = _ => { TotalLineCount = (int)engine.LineCount; if (IsFollowMode) RequestScrollToEndThrottled(); };
+            engine.LinesAppended += _providerLinesAppended;
+
+            engine.Build();
+            engine.StartTailing();
         }
-
-        _providerIndexingProgressChanged = p => { IndexingProgress = engine.IndexingProgress; IsIndexing = true; };
-        engine.IndexingProgressChanged += _providerIndexingProgressChanged;
-        _providerIndexingCompleted = () => { IsIndexing = false; IndexingProgress = 1.0; TotalLineCount = (int)engine.LineCount; };
-        engine.IndexingCompleted += _providerIndexingCompleted;
-        _providerLinesAppended = _ => { TotalLineCount = (int)engine.LineCount; if (IsFollowMode) RequestScrollToEndThrottled(); };
-        engine.LinesAppended += _providerLinesAppended;
-
-        engine.Build();
-        engine.StartTailing();
+        catch
+        {
+            engine.Dispose();
+            throw;
+        }
 
         _provider = engine;
         _virtualSource = new VirtualLogItemsSource(engine);
