@@ -81,6 +81,52 @@
                         ToolTip.Tip="Toggle filter panel (Ctrl+F)">
             <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
           </ToggleButton>
+          <!-- Left: Prev file -->
+          <Button DockPanel.Dock="Left" Classes="neon-action"
+                  Command="{Binding NavigatePrevFileCommand}"
+                  IsVisible="{Binding HasMultipleFiles}"
+                  Width="20" Height="20" Padding="0"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Previous file">
+            <TextBlock Text="&#xEAA1;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </Button>
+          <!-- Left: Next file -->
+          <Button DockPanel.Dock="Left" Classes="neon-action"
+                  Command="{Binding NavigateNextFileCommand}"
+                  IsVisible="{Binding HasMultipleFiles}"
+                  Width="20" Height="20" Padding="0"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Next file">
+            <TextBlock Text="&#xEAA0;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </Button>
+          <!-- Left: Expand all files (grid mode only) -->
+          <Button DockPanel.Dock="Left" Classes="neon-action"
+                  Command="{Binding ExpandAllFilesCommand}"
+                  Width="20" Height="20" Padding="0"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Expand all files">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="IsGridMode" />
+                <Binding Path="HasMultipleFiles" />
+              </MultiBinding>
+            </Button.IsVisible>
+            <TextBlock Text="&#xEB07;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </Button>
+          <!-- Left: Collapse all files (grid mode only) -->
+          <Button DockPanel.Dock="Left" Classes="neon-action"
+                  Command="{Binding CollapseAllFilesCommand}"
+                  Width="20" Height="20" Padding="0"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Collapse all files">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="IsGridMode" />
+                <Binding Path="HasMultipleFiles" />
+              </MultiBinding>
+            </Button.IsVisible>
+            <TextBlock Text="&#xEB06;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+          </Button>
           <!-- Center: Title -->
           <TextBlock Text="{Binding Title}"
                      Foreground="{DynamicResource DimTextBrush}"

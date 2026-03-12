@@ -30,6 +30,10 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
     private DateTime? _dateStart;
     private DateTime? _dateEnd;
 
+    // ── File separator navigation ────────────────────────────────
+    private readonly List<int> _fileSeparatorIndices = [];
+    public bool HasMultipleFiles => _fileCount > 0;
+
     public string HeaderMeta => BuildHeaderMeta(compact: true);
     public string HeaderMetaFull => BuildHeaderMeta(compact: false);
 
@@ -128,6 +132,56 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
                 count++;
         }
         return count;
+    }
+
+    private void BuildFileSeparatorIndex()
+    {
+        _fileSeparatorIndices.Clear();
+        if (_memorySource is null) return;
+        for (int i = 0; i < _memorySource.Count; i++)
+        {
+            if (_memorySource[i].IsFileSeparator)
+                _fileSeparatorIndices.Add(i);
+        }
+    }
+
+    [RelayCommand]
+    private void NavigateNextFile() => NavigateFile(forward: true);
+
+    [RelayCommand]
+    private void NavigatePrevFile() => NavigateFile(forward: false);
+
+    private void NavigateFile(bool forward)
+    {
+        if (_fileSeparatorIndices.Count == 0) return;
+
+        int idx = _fileSeparatorIndices.BinarySearch(_currentLine);
+        int sepIdx;
+
+        if (forward)
+        {
+            int next = idx >= 0 ? idx + 1 : ~idx;
+            sepIdx = next < _fileSeparatorIndices.Count
+                ? _fileSeparatorIndices[next]
+                : _fileSeparatorIndices[0]; // wrap
+        }
+        else
+        {
+            // Go to current file's header if we're past it, else previous
+            int prev = idx >= 0 ? idx - 1 : ~idx - 1;
+            sepIdx = prev >= 0
+                ? _fileSeparatorIndices[prev]
+                : _fileSeparatorIndices[^1]; // wrap
+        }
+
+        // Select first content line after separator
+        int lineCount = GetLoadedLineCount();
+        int target = sepIdx + 1 < lineCount ? sepIdx + 1 : sepIdx;
+        NavigateToLine(target);
+
+        int fileIdx = _fileSeparatorIndices.BinarySearch(sepIdx);
+        if (fileIdx >= 0)
+            NavStatus = $"File {fileIdx + 1} of {_fileSeparatorIndices.Count}";
     }
 
     private bool _scrollPending;
@@ -748,6 +802,8 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         // Compute header metadata
         _sourceCount = 0;
         _fileCount = CountFileSeparators();
+        BuildFileSeparatorIndex();
+        OnPropertyChanged(nameof(HasMultipleFiles));
         ExtractDateRange();
 
         // Track the physical path
@@ -1168,6 +1224,8 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         IsStreaming = false;
         _fileCount = 0;
         _sourceCount = 0;
+        _fileSeparatorIndices.Clear();
+        OnPropertyChanged(nameof(HasMultipleFiles));
         _dateStart = null;
         _dateEnd = null;
         ResetLineSelection();
