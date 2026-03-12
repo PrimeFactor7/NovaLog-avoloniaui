@@ -8,10 +8,10 @@
              Background="{DynamicResource ToolBarBgBrush}">
   <Grid>
     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
-      <!-- Clock Icon -->
-      <TextBlock Text="&#xE823;" 
-                 FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" 
-                 FontSize="12" 
+      <!-- Time sync icon (Codicon: history) -->
+      <TextBlock Text="&#xEA74;"
+                 FontFamily="{StaticResource CodiconFont}"
+                 FontSize="14"
                  Foreground="{DynamicResource AccentBrush}"
                  VerticalAlignment="Center" />
       
@@ -30,9 +30,9 @@
               Padding="4"
               VerticalAlignment="Center"
               Cursor="Hand">
-        <TextBlock Text="&#xE711;" 
-                   FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" 
-                   FontSize="10" 
+        <TextBlock Text="&#xEA76;"
+                   FontFamily="{StaticResource CodiconFont}"
+                   FontSize="12"
                    Foreground="{DynamicResource DimTextBrush}" />
       </Button>
     </StackPanel>

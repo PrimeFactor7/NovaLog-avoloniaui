@@ -417,6 +417,31 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
     private LogWatcher? _watcher;
     private GlobalClockService? _clock;
     private SourceManagerViewModel? _sourceManager;
+    private bool _isBroadcastSource;
+
+    /// <summary>Set by WorkspaceViewModel — only the focused pane broadcasts viewport changes.</summary>
+    internal void SetAsBroadcastSource(bool value) => _isBroadcastSource = value;
+
+    /// <summary>
+    /// Called by the view on user scroll. Broadcasts the center timestamp to all linked panes
+    /// via the clock service (only if this is the focused, broadcast-enabled pane).
+    /// </summary>
+    public void NotifyViewportScrolled()
+    {
+        if (!_isBroadcastSource || !IsLinked) return;
+
+        var lineCount = GetLoadedLineCount();
+        if (lineCount <= 0 || _currentLine < 0 || _currentLine >= lineCount) return;
+
+        DateTime? ts = null;
+        if (_memorySource is not null)
+            ts = _memorySource[_currentLine].Timestamp;
+        else if (_provider is not null)
+            ts = _provider.GetLine(_currentLine)?.Timestamp;
+
+        if (ts.HasValue)
+            _clock?.NotifyTimeChanged(ts.Value, this);
+    }
 
     /// <summary>Tracks which source IDs are currently loaded in this pane (for clearing when source is removed).</summary>
     private readonly HashSet<string> _loadedSourceIds = new();

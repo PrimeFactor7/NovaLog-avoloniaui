@@ -196,6 +196,9 @@ public partial class LogViewPanel : UserControl
                         if (maxScroll - _scroller.Offset.Y > 0.5)
                             vm.IsFollowMode = false;
                     }
+
+                    // Time sync: broadcast center timestamp to linked panes
+                    vm.NotifyViewportScrolled();
                 }
             };
 
@@ -429,6 +432,14 @@ public partial class LogViewPanel : UserControl
                 if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
                     return;
 
+                // Track center line for grid mode (same as text mode)
+                if (_gridScroller.Viewport.Height > 0 && vm.TotalLineCount > 0)
+                {
+                    double ratio = _gridScroller.Offset.Y / Math.Max(1, _gridScroller.Extent.Height - _gridScroller.Viewport.Height);
+                    int centerLine = (int)(ratio * vm.TotalLineCount);
+                    vm.SetCurrentLine(Math.Clamp(centerLine, 0, vm.TotalLineCount - 1));
+                }
+
                 if (_minimap is not null)
                     UpdateMinimapViewport(_minimap);
 
@@ -439,6 +450,9 @@ public partial class LogViewPanel : UserControl
                     if (scroll is not null && scroll.Extent.Height - scroll.Offset.Y - scroll.Viewport.Height > 0.5)
                         vm.IsFollowMode = false;
                 }
+
+                // Time sync: broadcast center timestamp to linked panes
+                vm.NotifyViewportScrolled();
             };
             _gridScroller.SizeChanged += (_, _) =>
             {

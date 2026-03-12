@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using NovaLog.Core.Services;
 using NovaLog.Core.Models;
 using NovaLog.Core.Theme;
+using AvDispatcher = global::Avalonia.Threading.Dispatcher;
 
 namespace NovaLog.Avalonia.ViewModels;
 
@@ -50,14 +51,25 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
         Clock.TimeChanged += (timestamp, sender) =>
         {
-            TimeSync.Pin(timestamp);
-            foreach (var pane in GetAllPanes())
+            // Ensure we're on the UI thread (timer callback may arrive on threadpool)
+            if (!AvDispatcher.UIThread.CheckAccess())
             {
-                if (pane.LogView == sender) continue;
-                if (!pane.LogView.IsLinked) continue; // Skip unlinked panes
-                pane.LogView.SeekToTimestamp(timestamp);
+                AvDispatcher.UIThread.Post(() => HandleTimeChanged(timestamp, sender));
+                return;
             }
+            HandleTimeChanged(timestamp, sender);
         };
+    }
+
+    private void HandleTimeChanged(DateTime timestamp, object sender)
+    {
+        TimeSync.Pin(timestamp);
+        foreach (var pane in GetAllPanes())
+        {
+            if (pane.LogView == sender) continue;
+            if (!pane.LogView.IsLinked) continue;
+            pane.LogView.SeekToTimestamp(timestamp);
+        }
     }
 
     public void Initialize(SourceManagerViewModel sourceManager, ThemeService theme)
@@ -396,10 +408,14 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         if (FocusedPane == pane) return;
 
         if (FocusedPane is not null)
+        {
             FocusedPane.IsFocused = false;
+            FocusedPane.LogView.SetAsBroadcastSource(false);
+        }
 
         FocusedPane = pane;
         pane.IsFocused = true;
+        pane.LogView.SetAsBroadcastSource(true);
         OnPropertyChanged(nameof(ActiveLogView));
     }
 
