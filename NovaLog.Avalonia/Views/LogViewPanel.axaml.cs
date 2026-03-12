@@ -646,7 +646,7 @@ public partial class LogViewPanel : UserControl
         var row = FindVisualAncestorOrSelf<global::Avalonia.Controls.Primitives.TreeDataGridRow>(e.Source);
         if (row?.DataContext is GridRowViewModel gridRow && gridRow.Line is { } line)
         {
-            _attachedViewModel.SelectLine((int)line.GlobalIndex, disableFollow: false);
+            _attachedViewModel.SelectLine((int)line.GlobalIndex);
         }
     }
 
