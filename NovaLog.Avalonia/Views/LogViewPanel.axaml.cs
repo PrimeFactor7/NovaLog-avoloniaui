@@ -144,6 +144,12 @@ public partial class LogViewPanel : UserControl
             _logGrid.TemplateApplied += (_, _) => EnsureGridScroller();
             _logGrid.AddHandler(InputElement.PointerPressedEvent, OnGridPointerPressed,
                 RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            // Mouse wheel up on grid → disable follow
+            _logGrid.AddHandler(InputElement.PointerWheelChangedEvent, (_, e) =>
+            {
+                if (e.Delta.Y > 0 && DataContext is LogViewViewModel { IsFollowMode: true } vm)
+                    vm.IsFollowMode = false;
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
         FilterPanelView.SizeChanged += OnFilterPanelSizeChanged;
 
@@ -418,13 +424,6 @@ public partial class LogViewPanel : UserControl
         if (_gridScroller is not null && !_gridScrollerHooked)
         {
             _gridScrollerHooked = true;
-            // Mouse wheel up → disable follow
-            _gridScroller.AddHandler(InputElement.PointerWheelChangedEvent, (_, e) =>
-            {
-                if (e.Delta.Y > 0 && DataContext is LogViewViewModel { IsFollowMode: true } vm)
-                    vm.IsFollowMode = false;
-            }, RoutingStrategies.Tunnel, handledEventsToo: true);
-
             _gridScroller.ScrollChanged += (s, e) =>
             {
                 if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
@@ -592,6 +591,10 @@ public partial class LogViewPanel : UserControl
 
     private void OnMinimapWheelScroll(PointerWheelEventArgs e)
     {
+        // Scrolling up on minimap disables follow
+        if (e.Delta.Y > 0 && _attachedViewModel is { IsFollowMode: true })
+            _attachedViewModel.IsFollowMode = false;
+
         // Forward mousewheel over minimap to the active scroller
         double delta = e.Delta.Y * 48; // ~3 lines per notch
         if (_attachedViewModel is { IsGridMode: true } && _logGrid?.Scroll is { } scroll)
