@@ -616,6 +616,8 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        foreach (var pane in GetAllPanes())
+            pane.LogView.Dispose();
         Clock.Dispose();
     }
 }

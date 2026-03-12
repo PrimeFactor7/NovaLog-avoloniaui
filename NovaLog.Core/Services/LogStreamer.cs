@@ -87,7 +87,7 @@ public sealed class LogStreamer : IDisposable
         if (activePath != null)
             OpenFile(activePath, seekToEnd: true);
 
-        _pollTimer = new System.Threading.Timer(Poll, null, 100, 100);
+        _pollTimer = new System.Threading.Timer(Poll, null, 100, Timeout.Infinite);
     }
 
     /// <summary>
@@ -110,7 +110,8 @@ public sealed class LogStreamer : IDisposable
     private void Poll(object? state)
     {
         if (_disposed) return;
-        lock (_lock) { Drain(); }
+        try { lock (_lock) { Drain(); } }
+        finally { _pollTimer?.Change(100, Timeout.Infinite); }
     }
 
     private void Drain()

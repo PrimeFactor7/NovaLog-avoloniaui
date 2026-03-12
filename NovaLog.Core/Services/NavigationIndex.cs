@@ -25,7 +25,12 @@ public sealed class NavigationIndex
     private List<long> _bookmarks = [];
 
     /// <summary>Tracks how many lines the background level scan has processed so far.</summary>
-    public long LevelScanUpTo { get; set; }
+    private long _levelScanUpTo;
+    public long LevelScanUpTo
+    {
+        get => Volatile.Read(ref _levelScanUpTo);
+        set => Volatile.Write(ref _levelScanUpTo, value);
+    }
 
     /// <summary>Fires when any index collection changes. May fire from background threads.</summary>
     public event Action? IndicesChanged;

@@ -53,6 +53,12 @@ public class SplitPanelHost : ContentControl
             _subscribedPanel.SourceIdSplitRequested -= _onSourceIdSplitRequested;
             _subscribedPanel = null;
         }
+        if (_subscribedLogView is not null && _onCloseRequested is not null)
+        {
+            _subscribedLogView.CloseRequested -= _onCloseRequested;
+            _onCloseRequested = null;
+            _subscribedLogView = null;
+        }
     }
 
     // Event handler delegates for cleanup
@@ -60,6 +66,8 @@ public class SplitPanelHost : ContentControl
     private Action<string, bool>? _onSplitRequested;
     private Action<string>? _onSourceIdDropped;
     private Action<string, bool>? _onSourceIdSplitRequested;
+    private Action? _onCloseRequested;
+    private LogViewViewModel? _subscribedLogView;
 
     private void RebuildContent()
     {
@@ -127,12 +135,14 @@ public class SplitPanelHost : ContentControl
             panel.SourceIdSplitRequested += _onSourceIdSplitRequested;
             _subscribedPanel = panel;
 
-            pane.LogView.CloseRequested += () =>
+            _onCloseRequested = () =>
             {
                 var window = this.FindAncestorOfType<MainWindow>();
                 if (window?.DataContext is MainWindowViewModel mvm)
                     mvm.Workspace.ClosePane(pane);
             };
+            _subscribedLogView = pane.LogView;
+            pane.LogView.CloseRequested += _onCloseRequested;
 
             // Wrap in a Border that shows focus state
             var border = new Border

@@ -5,6 +5,7 @@ using System.Collections.Specialized;
 using NovaLog.Core.Models;
 using NovaLog.Core.Services;
 using NovaLog.Avalonia.ViewModels;
+using AvDispatcher = global::Avalonia.Threading.Dispatcher;
 
 namespace NovaLog.Avalonia.Controls;
 
@@ -18,6 +19,8 @@ public sealed class DelegatingItemsSource : IList, IReadOnlyList<LogLineViewMode
 
     public void SetInner(IReadOnlyList<LogLineViewModel> source)
     {
+        if (ReferenceEquals(_inner, source)) return;
+
         if (_innerNotify is not null)
             _innerNotify.CollectionChanged -= OnInnerChanged;
 
@@ -65,7 +68,7 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
 {
     private readonly IVirtualLogProvider _provider;
     private readonly IMergedLogProvider? _mergedProvider;
-    private readonly Dictionary<long, LogLineViewModel> _cache = new();
+    private readonly Dictionary<long, (LogLineViewModel Vm, LinkedListNode<long> Node)> _cache = new();
     private readonly LinkedList<long> _lruOrder = new();
     private const int CacheCapacity = 200;
 
@@ -88,9 +91,9 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
             long key = index;
             if (_cache.TryGetValue(key, out var cached))
             {
-                _lruOrder.Remove(key);
-                _lruOrder.AddLast(key);
-                return cached;
+                _lruOrder.Remove(cached.Node);
+                _lruOrder.AddLast(cached.Node);
+                return cached.Vm;
             }
 
             var line = _provider.GetLine(index);
@@ -149,16 +152,23 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
             _cache.Remove(oldest.Value);
             _lruOrder.RemoveFirst();
         }
-        _cache[key] = vm;
-        _lruOrder.AddLast(key);
+        var node = _lruOrder.AddLast(key);
+        _cache[key] = (vm, node);
     }
 
     public void NotifyReset()
     {
-        _cache.Clear();
-        _lruOrder.Clear();
-        CollectionChanged?.Invoke(this,
-            new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        if (AvDispatcher.UIThread.CheckAccess())
+        {
+            _cache.Clear();
+            _lruOrder.Clear();
+            CollectionChanged?.Invoke(this,
+                new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
+        else
+        {
+            AvDispatcher.UIThread.Post(NotifyReset);
+        }
     }
 
     private void OnLinesAppended(long _) => NotifyReset();

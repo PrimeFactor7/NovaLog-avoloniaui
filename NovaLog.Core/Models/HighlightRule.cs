@@ -22,19 +22,21 @@ public sealed class HighlightRule
     public bool Enabled { get; set; } = true;
     public HighlightRuleType RuleType { get; set; } = HighlightRuleType.MatchHighlight;
 
-    private Regex? _compiled;
+    private volatile Regex? _compiled;
 
     /// <summary>Returns the compiled regex, or null if the pattern is invalid.</summary>
     public Regex? CompiledRegex
     {
         get
         {
-            if (_compiled != null) return _compiled;
+            var cached = _compiled;
+            if (cached != null) return cached;
             if (string.IsNullOrWhiteSpace(Pattern)) return null;
             try
             {
-                _compiled = new Regex(Pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
-                return _compiled;
+                cached = new Regex(Pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                _compiled = cached;
+                return cached;
             }
             catch (RegexParseException) { return null; }
         }

@@ -8,6 +8,7 @@ namespace NovaLog.Core.Services;
 /// </summary>
 public sealed class GlobalClockService : IDisposable
 {
+    private readonly SynchronizationContext? _syncContext = SynchronizationContext.Current;
     private Timer? _debounceTimer;
     private DateTime _pendingTime;
     private object? _pendingSender;
@@ -38,8 +39,16 @@ public sealed class GlobalClockService : IDisposable
 
     private void OnDebounceElapsed(object? state)
     {
-        if (_pendingSender != null)
-            TimeChanged?.Invoke(_pendingTime, _pendingSender);
+        var sender = _pendingSender;
+        if (sender != null)
+        {
+            var time = _pendingTime;
+            // Marshal to captured sync context (UI thread) since Timer fires on thread pool
+            if (_syncContext != null)
+                _syncContext.Post(_ => TimeChanged?.Invoke(time, sender), null);
+            else
+                TimeChanged?.Invoke(time, sender);
+        }
     }
 
     public void Dispose()

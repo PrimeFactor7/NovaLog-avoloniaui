@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using NovaLog.Avalonia.Services;
 using NovaLog.Avalonia.ViewModels;
 using AvaloniaApp = Avalonia.Application;
@@ -57,9 +58,15 @@ public partial class MainWindow : Window
     private void OnTabBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         // Middle-click on tab button → close tab
-        if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed &&
-            e.Source is Button btn && btn.DataContext is WorkspaceTabItem tab &&
-            DataContext is MainWindowViewModel vm)
+        if (!e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        // Walk visual tree up from e.Source to find the parent Button
+        var source = e.Source as Control;
+        while (source is not null and not Button)
+            source = source.GetVisualParent() as Control;
+
+        if (source is Button btn && btn.DataContext is WorkspaceTabItem tab)
         {
             var idx = vm.Workspace.Tabs.IndexOf(tab);
             if (idx >= 0)

@@ -31,6 +31,7 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
     private readonly System.Timers.Timer _debounceTimer;
     private CancellationTokenSource? _searchCts;
     private LogViewViewModel? _boundLogView;
+    private InMemoryLogItemsSource? _subscribedSource;
     private CompiledMatcher? _currentMatcher;
     private volatile int _lastProcessedIndex;
     private volatile int _searchGeneration;
@@ -57,13 +58,19 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
     /// <summary>Called by LogViewViewModel when source changes to resubscribe to events.</summary>
     internal void OnSourceChanged(InMemoryLogItemsSource? newSource)
     {
-        // Unsubscribe from old source
-        if (_boundLogView?.MemorySource is { } oldSource && oldSource != newSource)
-            oldSource.CollectionChanged -= OnSourceCollectionChanged;
+        // Unsubscribe from old source using tracked reference
+        if (_subscribedSource is not null)
+        {
+            _subscribedSource.CollectionChanged -= OnSourceCollectionChanged;
+            _subscribedSource = null;
+        }
 
         // Subscribe to new source
         if (newSource is not null)
+        {
             newSource.CollectionChanged += OnSourceCollectionChanged;
+            _subscribedSource = newSource;
+        }
 
         // Reset tracking when source changes
         _lastProcessedIndex = 0;
@@ -139,6 +146,7 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
     private void RunSearch()
     {
         _searchCts?.Cancel();
+        _searchCts?.Dispose();
         _searchCts = new CancellationTokenSource();
         var ct = _searchCts.Token;
 
@@ -316,6 +324,11 @@ public partial class FilterPanelViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        if (_subscribedSource is not null)
+        {
+            _subscribedSource.CollectionChanged -= OnSourceCollectionChanged;
+            _subscribedSource = null;
+        }
         _debounceTimer.Dispose();
         _searchCts?.Cancel();
         _searchCts?.Dispose();

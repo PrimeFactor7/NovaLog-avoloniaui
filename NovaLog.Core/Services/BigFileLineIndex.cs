@@ -147,7 +147,7 @@ public sealed class BigFileLineIndex : IDisposable
                 try
                 {
                     ptr += accessor.PointerOffset;
-                    var span = new ReadOnlySpan<byte>(ptr, (int)chunkLen);
+                    var span = new ReadOnlySpan<byte>(ptr, checked((int)chunkLen));
                     ScanSpan(span, pos);
                 }
                 finally
@@ -215,7 +215,7 @@ public sealed class BigFileLineIndex : IDisposable
     /// </summary>
     public void TailCheck()
     {
-        if (_disposed) return;
+        if (_disposed || !_indexingComplete) return;
 
         long newLength;
         try

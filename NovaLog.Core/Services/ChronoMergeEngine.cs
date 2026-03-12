@@ -39,9 +39,14 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
     public LogLine? GetLine(long lineIndex)
     {
-        if (lineIndex < 0 || lineIndex >= _indexedCount) return null;
+        var count = _indexedCount;
+        if (lineIndex < 0 || lineIndex >= count) return null;
 
-        var entry = _index[lineIndex];
+        // Snapshot the array ref so a concurrent Array.Resize can't pull it away
+        var idx = Volatile.Read(ref _index);
+        if (lineIndex >= idx.Length) return null;
+
+        var entry = idx[lineIndex];
         if (entry.SourceIndex >= _sourceLines.Count) return null;
 
         var lines = _sourceLines[entry.SourceIndex];
@@ -64,9 +69,13 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
     public string? GetRawLine(long lineIndex)
     {
-        if (lineIndex < 0 || lineIndex >= _indexedCount) return null;
+        var count = _indexedCount;
+        if (lineIndex < 0 || lineIndex >= count) return null;
 
-        var entry = _index[lineIndex];
+        var idx = Volatile.Read(ref _index);
+        if (lineIndex >= idx.Length) return null;
+
+        var entry = idx[lineIndex];
         if (entry.SourceIndex >= _sourceRawLines.Count) return null;
 
         var raws = _sourceRawLines[entry.SourceIndex];
@@ -77,10 +86,15 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
 
     public (string Tag, string TagColorHex) GetSourceInfo(long mergedLineIndex)
     {
-        if (mergedLineIndex < 0 || mergedLineIndex >= _indexedCount)
+        var count = _indexedCount;
+        if (mergedLineIndex < 0 || mergedLineIndex >= count)
             return ("?", "#808080");
 
-        var entry = _index[mergedLineIndex];
+        var idx = Volatile.Read(ref _index);
+        if (mergedLineIndex >= idx.Length)
+            return ("?", "#808080");
+
+        var entry = idx[mergedLineIndex];
         if (entry.SourceIndex >= _sources.Count)
             return ("?", "#808080");
 
@@ -186,7 +200,11 @@ public sealed class ChronoMergeEngine : IMergedLogProvider
             // Grow index array if needed
             int needed = _indexedCount + newRefs.Count;
             if (needed > _index.Length)
-                Array.Resize(ref _index, Math.Max(needed, _index.Length * 2));
+            {
+                var grown = new MergedLineRef[Math.Max(needed, _index.Length * 2)];
+                Array.Copy(_index, grown, _indexedCount);
+                Volatile.Write(ref _index, grown);
+            }
 
             int pos = _indexedCount;
             foreach (var (r, _) in newRefs)

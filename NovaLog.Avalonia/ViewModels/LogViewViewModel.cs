@@ -16,7 +16,7 @@ namespace NovaLog.Avalonia.ViewModels;
 /// View model for a single log viewing pane. Always uses a list-based
 /// items source (single code path for both small and large files).
 /// </summary>
-public partial class LogViewViewModel : ObservableObject
+public partial class LogViewViewModel : ObservableObject, IDisposable
 {
     [ObservableProperty] private string _title = "No file loaded";
     [ObservableProperty] private bool _isFollowMode = true;
@@ -677,6 +677,8 @@ public partial class LogViewViewModel : ObservableObject
 
         _providerIndexingCompleted = () =>
         {
+            IsIndexing = false;
+            IndexingProgress = 1.0;
             TotalLineCount = _virtualSource.Count;
         };
         provider.IndexingCompleted += _providerIndexingCompleted;
@@ -719,24 +721,20 @@ public partial class LogViewViewModel : ObservableObject
                 // Large file: use memory-mapped provider with indexing
                 System.Diagnostics.Debug.WriteLine($"[LOAD] Using BigFileLogProvider ({sw.ElapsedMilliseconds}ms)");
                 var provider = new BigFileLogProvider(filePath);
+
+                System.Diagnostics.Debug.WriteLine($"[LOAD] Calling provider.Open() ({sw.ElapsedMilliseconds}ms)");
+                provider.Open(); // Start indexing FIRST
+                System.Diagnostics.Debug.WriteLine($"[LOAD] provider.Open() returned ({sw.ElapsedMilliseconds}ms)");
+
+                LoadFromProvider(provider); // Sets up LinesAppended + IndexingCompleted
+
+                // Add progress tracking on top (LoadFromProvider doesn't handle this)
                 _providerIndexingProgressChanged = _ =>
                 {
                     IndexingProgress = provider.IndexingProgress;
                     IsIndexing = true;
                 };
                 provider.IndexingProgressChanged += _providerIndexingProgressChanged;
-                _providerIndexingCompleted = () =>
-                {
-                    IsIndexing = false;
-                    IndexingProgress = 1.0;
-                };
-                provider.IndexingCompleted += _providerIndexingCompleted;
-
-                System.Diagnostics.Debug.WriteLine($"[LOAD] Calling provider.Open() ({sw.ElapsedMilliseconds}ms)");
-                provider.Open(); // Start indexing FIRST
-                System.Diagnostics.Debug.WriteLine($"[LOAD] provider.Open() returned ({sw.ElapsedMilliseconds}ms)");
-
-                LoadFromProvider(provider); // Then setup UI binding
                 System.Diagnostics.Debug.WriteLine($"[LOAD] LoadFromProvider completed ({sw.ElapsedMilliseconds}ms)");
             }
             else
@@ -765,6 +763,8 @@ public partial class LogViewViewModel : ObservableObject
 
     public void LoadMerge(IEnumerable<SourceItemViewModel> sources)
     {
+        var sourcesList = sources as IList<SourceItemViewModel> ?? sources.ToList();
+
         DisposeProvider();
         _loadedSourceIds.Clear();
         _loadedPaths.Clear();
@@ -773,7 +773,7 @@ public partial class LogViewViewModel : ObservableObject
         var engine = new ChronoMergeEngine();
         int priority = 0;
 
-        foreach (var src in sources)
+        foreach (var src in sourcesList)
         {
             // Track each source ID in the merge
             _loadedSourceIds.Add(src.SourceId);
@@ -807,9 +807,12 @@ public partial class LogViewViewModel : ObservableObject
             engine.PushHistory(srcIdx, history);
         }
 
-        engine.IndexingProgressChanged += p => { IndexingProgress = engine.IndexingProgress; IsIndexing = true; };
-        engine.IndexingCompleted += () => { IsIndexing = false; IndexingProgress = 1.0; TotalLineCount = (int)engine.LineCount; };
-        engine.LinesAppended += _ => { TotalLineCount = (int)engine.LineCount; if (IsFollowMode) RequestScrollToEndThrottled(); };
+        _providerIndexingProgressChanged = p => { IndexingProgress = engine.IndexingProgress; IsIndexing = true; };
+        engine.IndexingProgressChanged += _providerIndexingProgressChanged;
+        _providerIndexingCompleted = () => { IsIndexing = false; IndexingProgress = 1.0; TotalLineCount = (int)engine.LineCount; };
+        engine.IndexingCompleted += _providerIndexingCompleted;
+        _providerLinesAppended = _ => { TotalLineCount = (int)engine.LineCount; if (IsFollowMode) RequestScrollToEndThrottled(); };
+        engine.LinesAppended += _providerLinesAppended;
 
         engine.Build();
         engine.StartTailing();
@@ -818,7 +821,7 @@ public partial class LogViewViewModel : ObservableObject
         _virtualSource = new VirtualLogItemsSource(engine);
         _delegatingSource.SetInner(_virtualSource);
         TotalLineCount = (int)engine.LineCount;
-        Title = $"Merged ({sources.Count()} sources)";
+        Title = $"Merged ({sourcesList.Count} sources)";
         IsStreaming = true;
 
         // Notify filter that source changed (merged sources use virtual provider)
@@ -1006,6 +1009,8 @@ public partial class LogViewViewModel : ObservableObject
 
     private void DisposeProvider()
     {
+        if (_streamer is not null)
+            _streamer.LinesReceived -= OnStreamerLinesReceived;
         _streamer?.Dispose();
         _streamer = null;
         _watcher?.Dispose();
@@ -1045,6 +1050,12 @@ public partial class LogViewViewModel : ObservableObject
 
         if (source != null)
             _loadedSourceIds.Add(source.SourceId);
+    }
+
+    public void Dispose()
+    {
+        DisposeProvider();
+        Filter.Dispose();
     }
 
     /// <summary>Clear contents if the removed source is loaded in this pane.</summary>

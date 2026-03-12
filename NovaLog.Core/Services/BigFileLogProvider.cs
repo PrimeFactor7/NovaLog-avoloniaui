@@ -18,7 +18,8 @@ public sealed class BigFileLogProvider : IVirtualLogProvider
     private System.Threading.Timer? _tailTimer;
     private bool _disposed;
 
-    // LRU cache for recently decoded lines
+    // LRU cache for recently decoded lines — accessed from UI thread + timer thread
+    private readonly object _cacheLock = new();
     private readonly Dictionary<long, LogLine> _cache = new();
     private readonly LinkedList<long> _cacheOrder = new();
     private const int MaxCacheSize = 2048;
@@ -64,14 +65,17 @@ public sealed class BigFileLogProvider : IVirtualLogProvider
     {
         if (lineIndex < 0 || lineIndex >= _index.LineCount) return null;
 
-        if (_cache.TryGetValue(lineIndex, out var cached))
-            return cached;
+        lock (_cacheLock)
+        {
+            if (_cache.TryGetValue(lineIndex, out var cached))
+                return cached;
+        }
 
         string? raw = ReadRawLine(lineIndex);
         if (raw == null) return null;
 
         var line = LogLineParser.Parse(raw, (int)Math.Min(lineIndex, int.MaxValue));
-        AddToCache(lineIndex, line);
+        lock (_cacheLock) AddToCache(lineIndex, line);
         return line;
     }
 
