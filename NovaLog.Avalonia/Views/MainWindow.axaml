@@ -12,59 +12,60 @@
         TransparencyLevelHint="AcrylicBlur">
 
   <Grid RowDefinitions="Auto,Auto,*,24">
-    <!-- Toolbar (matches WinForms layout exactly) -->
+    <!-- Main toolbar: taller header, spaced icons, tooltips with descriptions -->
     <Border Grid.Row="0"
             Background="{DynamicResource ToolBarBgBrush}"
-            Padding="6,3">
+            Padding="8,6"
+            MinHeight="44">
       <Grid ColumnDefinitions="Auto,*,Auto">
         
         <!-- Left Side: Tools & Tabs -->
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
-           <!-- Source Manager -->
-           <ToggleButton Classes="neon-action"
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+           <!-- Source Manager (folder icon) -->
+           <ToggleButton Classes="neon-action toolbar-btn"
                          IsChecked="{Binding IsSidebarVisible}"
-                         ToolTip.Tip="Toggle source manager (Ctrl+E)"
+                         ToolTip.Tip="Source manager (Ctrl+E)&#x0a;Open folder or file list, add/remove sources"
                          AutomationProperties.AutomationId="btnSources">
-             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+             <TextBlock Text="&#xEAF0;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </ToggleButton>
 
            <!-- Search/Filter -->
-           <ToggleButton Classes="neon-action"
+           <ToggleButton Classes="neon-action toolbar-btn"
                          IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}"
-                         ToolTip.Tip="Toggle filter/search panel (Ctrl+F)"
+                         ToolTip.Tip="Filter / search (Ctrl+F)&#x0a;Show search and filter panel in active pane"
                          AutomationProperties.AutomationId="btnFilter">
-             <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+             <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </ToggleButton>
 
            <!-- Follow All -->
-           <ToggleButton Classes="neon-action"
+           <ToggleButton Classes="neon-action toolbar-btn"
                          IsChecked="{Binding Workspace.IsMasterFollowOn}"
-                         ToolTip.Tip="Follow all panes (F)"
+                         ToolTip.Tip="Follow all (F)&#x0a;All panes auto-scroll to newest lines"
                          AutomationProperties.AutomationId="btnFollow">
              <StackPanel Orientation="Horizontal" Spacing="4">
-               <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="17" Foreground="{DynamicResource AccentBrush}" />
-               <TextBlock Text="Follow" />
+               <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource AccentBrush}" />
+               <TextBlock Text="Follow" VerticalAlignment="Center" />
              </StackPanel>
            </ToggleButton>
 
-           <!-- Grid View -->
-           <ToggleButton Classes="neon-action"
+           <!-- Grid View (grid icon; checked = grid, unchecked = text) -->
+           <ToggleButton Classes="neon-action toolbar-btn"
                          IsChecked="{Binding Workspace.ActiveLogView.IsGridMode}"
-                         ToolTip.Tip="Toggle grid view (G)">
-             <TextBlock Text="&#xEB91;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+                         ToolTip.Tip="Grid view (G)&#x0a;Table with File/Timestamp, Level, Message columns. Toggle for text view.">
+             <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </ToggleButton>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
 
            <!-- Split Panes -->
-           <Button Classes="neon-action" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally (side-by-side)">
-             <TextBlock Text="&#xEB56;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally&#x0a;Open another pane side-by-side">
+             <TextBlock Text="&#xEB56;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </Button>
-           <Button Classes="neon-action" Command="{Binding SplitVerticalCommand}" ToolTip.Tip="Split vertically (stacked)">
-             <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding SplitVerticalCommand}" ToolTip.Tip="Split vertically&#x0a;Stack another pane below">
+             <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
 
            <!-- TABS (inlined in toolbar) -->
            <ItemsControl ItemsSource="{Binding Workspace.Tabs}" x:Name="TabBar" VerticalAlignment="Center">
@@ -94,57 +95,57 @@
              </ItemsControl.ItemTemplate>
            </ItemsControl>
 
-           <Button Classes="neon-action" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close all panes in this tab (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
-           <Button Classes="neon-action" Content="Close tabs" Command="{Binding CloseTabsCommand}" ToolTip.Tip="Close all tabs (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
+           <Button Classes="neon-action toolbar-btn" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close panes&#x0a;Close all panes in this tab (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
+           <Button Classes="neon-action toolbar-btn" Content="Close tabs" Command="{Binding CloseTabsCommand}" ToolTip.Tip="Close tabs&#x0a;Close all tabs (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
         </StackPanel>
 
         <!-- Right Side: Navigation, Simulator, Pin, Settings -->
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
            
            <TextBlock Text="{Binding Workspace.ActiveLogView.NavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
 
            <!-- Bookmarks -->
-           <Button Classes="neon-action" Command="{Binding ToggleBookmarkCommand}" ToolTip.Tip="Toggle Bookmark (Ctrl+B)">
-             <TextBlock Text="&#xEAA5;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource BookmarkMarkerBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding ToggleBookmarkCommand}" ToolTip.Tip="Toggle bookmark (Ctrl+B)&#x0a;Add or remove bookmark on current line">
+             <TextBlock Text="&#xEAA5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource BookmarkMarkerBrush}" />
            </Button>
-           <Button Classes="neon-action" Command="{Binding BookmarkPrevCommand}" ToolTip.Tip="Prev Bookmark (Shift+F2)">
-             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource BookmarkMarkerBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding BookmarkPrevCommand}" ToolTip.Tip="Previous bookmark (Shift+F2)&#x0a;Jump to previous bookmarked line">
+             <TextBlock Text="&#xEAB6;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource BookmarkMarkerBrush}" />
            </Button>
-           <Button Classes="neon-action" Command="{Binding BookmarkNextCommand}" ToolTip.Tip="Next Bookmark (F2)">
-             <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource BookmarkMarkerBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding BookmarkNextCommand}" ToolTip.Tip="Next bookmark (F2)&#x0a;Jump to next bookmarked line">
+             <TextBlock Text="&#xEAB5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource BookmarkMarkerBrush}" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
 
            <!-- Errors -->
-           <Button Classes="neon-action" Command="{Binding ErrorPrevCommand}" ToolTip.Tip="Previous error (Alt+PgUp)">
-             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource TextErrorBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding ErrorPrevCommand}" ToolTip.Tip="Previous error (Alt+PgUp)&#x0a;Jump to previous error or fatal line">
+             <TextBlock Text="&#xEAB6;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource TextErrorBrush}" />
            </Button>
-           <Button Classes="neon-action" Command="{Binding ErrorNextCommand}" ToolTip.Tip="Next error (Alt+PgDn)">
-             <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource TextErrorBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding ErrorNextCommand}" ToolTip.Tip="Next error (Alt+PgDn)&#x0a;Jump to next error or fatal line">
+             <TextBlock Text="&#xEAB5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource TextErrorBrush}" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
 
            <!-- Search Hits -->
-           <Button Classes="neon-action" Command="{Binding SearchPrevCommand}" ToolTip.Tip="Previous search hit (Shift+F3)">
-             <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource SearchHitMarkerBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding SearchPrevCommand}" ToolTip.Tip="Previous search hit (Shift+F3)&#x0a;Jump to previous filter/search match">
+             <TextBlock Text="&#xEAB6;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource SearchHitMarkerBrush}" />
            </Button>
-           <Button Classes="neon-action" Command="{Binding SearchNextCommand}" ToolTip.Tip="Next search hit (F3)">
-             <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="20" Foreground="{DynamicResource SearchHitMarkerBrush}" />
+           <Button Classes="neon-action toolbar-btn" Command="{Binding SearchNextCommand}" ToolTip.Tip="Next search hit (F3)&#x0a;Jump to next filter/search match">
+             <TextBlock Text="&#xEAB5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource SearchHitMarkerBrush}" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
 
            <!-- Pin -->
-           <ToggleButton Classes="neon-action" IsChecked="{Binding IsTopmost}" ToolTip.Tip="Stay on top (T)">
-             <TextBlock Text="&#xEB2B;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           <ToggleButton Classes="neon-action toolbar-btn" IsChecked="{Binding IsTopmost}" ToolTip.Tip="Stay on top (T)&#x0a;Keep window above other windows">
+             <TextBlock Text="&#xEB2B;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </ToggleButton>
 
-           <!-- Simulator dropdown -->
-           <DropDownButton Classes="neon-action" Content="Gen"
+           <!-- Simulator dropdown (Gen) -->
+           <DropDownButton Classes="neon-action toolbar-btn" Content="Gen"
                            Foreground="{DynamicResource DimTextBrush}"
-                           ToolTip.Tip="Log generator for testing">
+                           ToolTip.Tip="Log generator (Gen)&#x0a;Generate sample logs for testing — choose speed in menu">
              <DropDownButton.Flyout>
                <MenuFlyout>
                  <MenuItem Header="Slow (1/s)" Command="{Binding SimSlowCommand}" />
@@ -160,12 +161,12 @@
              </DropDownButton.Flyout>
            </DropDownButton>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
 
            <!-- Theme -->
-           <Button Classes="neon-action"
+           <Button Classes="neon-action toolbar-btn"
                    Command="{Binding ToggleThemeCommand}"
-                   ToolTip.Tip="Toggle Theme"
+                   ToolTip.Tip="Toggle theme&#x0a;Switch between light and dark theme"
                    AutomationProperties.AutomationId="btnTheme">
              <StackPanel Orientation="Horizontal" Spacing="4">
                <TextBlock Text="Theme:" VerticalAlignment="Center" />
@@ -174,8 +175,8 @@
            </Button>
 
            <!-- Settings -->
-           <ToggleButton Classes="neon-action" IsChecked="{Binding Settings.IsVisible}" ToolTip.Tip="Settings (Ctrl+,)">
-             <TextBlock Text="&#xEAF8;" FontFamily="{StaticResource CodiconFont}" FontSize="20" />
+           <ToggleButton Classes="neon-action toolbar-btn" IsChecked="{Binding Settings.IsVisible}" ToolTip.Tip="Settings (Ctrl+,)&#x0a;Open settings flyout">
+             <TextBlock Text="&#xEAF8;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </ToggleButton>
 
         </StackPanel>

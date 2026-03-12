@@ -64,6 +64,24 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
+  <!-- Pane header / toolbar icon buttons: more room, spaced -->
+  <Style Selector="Button.neon-action.pane-header-btn, ToggleButton.neon-action.pane-header-btn">
+    <Setter Property="MinWidth" Value="32" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="6,4" />
+    <Setter Property="Margin" Value="2,0" />
+  </Style>
+  <Style Selector="TextBlock.pane-header-icon">
+    <Setter Property="Margin" Value="4,0" />
+  </Style>
+
+  <!-- Main window toolbar icon buttons: taller, spaced -->
+  <Style Selector="Button.neon-action.toolbar-btn, ToggleButton.neon-action.toolbar-btn, DropDownButton.neon-action.toolbar-btn">
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Margin" Value="0" />
+  </Style>
+
   <!-- Source list item styles -->
   <Style Selector="ListBoxItem.neon-source">
     <Setter Property="Padding" Value="8,4" />

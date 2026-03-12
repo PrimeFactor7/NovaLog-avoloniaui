@@ -13,127 +13,119 @@
   </UserControl.KeyBindings>
 
   <Grid x:Name="RootGrid" RowDefinitions="Auto,*,0,0">
-    <!-- Header -->
-    <Border Grid.Row="0" Height="24"
+    <!-- Header (taller, spaced icons, tooltips with descriptions) -->
+    <Border Grid.Row="0" Height="40"
             Background="{DynamicResource ToolBarBgBrush}"
-            Padding="4,2"
-            x:Name="HeaderBorder"
-            DoubleTapped="OnHeaderDoubleTapped">
+            Padding="8,6"
+            x:Name="HeaderBorder">
       <Panel>
         <DockPanel>
           <!-- Right: Close -->
-          <Button DockPanel.Dock="Right" Classes="neon-action" Content="&#x2715;"
+          <Button DockPanel.Dock="Right" Classes="neon-action pane-header-btn" Content="&#x2715;"
                   Command="{Binding ClosePaneCommand}"
-                  Width="20" Height="20" Padding="0" Margin="0,-2,-4,-2"
                   Background="Transparent" BorderThickness="0"
                   Foreground="{DynamicResource DimTextBrush}"
-                  ToolTip.Tip="Close pane (source stays in list)" />
+                  ToolTip.Tip="Close pane&#x0a;Remove this pane from the view (source stays in list)" />
           <!-- Right: Link status -->
-          <TextBlock DockPanel.Dock="Right"
+          <TextBlock DockPanel.Dock="Right" Classes="pane-header-icon"
                      Text="&#xEB4B;"
                      FontFamily="{StaticResource CodiconFont}"
-                     FontSize="14"
-                     Margin="0,0,4,0"
+                     FontSize="16"
+                     Margin="0,0,8,0"
                      Foreground="{DynamicResource AccentBrush}"
                      VerticalAlignment="Center"
                      IsVisible="{Binding IsLinked}"
-                     ToolTip.Tip="Linked to time sync (Ctrl+L to unlink)" />
-          <TextBlock DockPanel.Dock="Right"
+                     ToolTip.Tip="Time sync: linked&#x0a;Panes share the same timestamp (Ctrl+L to unlink)" />
+          <TextBlock DockPanel.Dock="Right" Classes="pane-header-icon"
                      Text="&#xEB4C;"
                      FontFamily="{StaticResource CodiconFont}"
-                     FontSize="14"
-                     Margin="0,0,4,0"
+                     FontSize="16"
+                     Margin="0,0,8,0"
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
                      IsVisible="{Binding !IsLinked}"
-                     ToolTip.Tip="Unlinked from time sync (Ctrl+L to link)" />
+                     ToolTip.Tip="Time sync: unlinked&#x0a;Ctrl+L to link panes to shared timestamp" />
           <!-- Right: Metadata -->
           <TextBlock DockPanel.Dock="Right"
                      Text="{Binding HeaderMeta}"
                      ToolTip.Tip="{Binding HeaderMetaFull}"
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
-                     FontSize="10"
+                     FontSize="11"
                      TextTrimming="CharacterEllipsis"
                      MaxWidth="300"
-                     Margin="0,0,6,0" />
-          <!-- Left: Follow toggle -->
-          <ToggleButton DockPanel.Dock="Left" Classes="neon-action"
-                        IsChecked="{Binding IsFollowMode}"
-                        Width="20" Height="20" Padding="0"
-                        Background="Transparent" BorderThickness="0"
-                        ToolTip.Tip="Toggle follow mode">
-            <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </ToggleButton>
-          <!-- Left: Grid view toggle -->
-          <ToggleButton DockPanel.Dock="Left" Classes="neon-action"
-                        IsChecked="{Binding IsGridMode}"
-                        Width="20" Height="20" Padding="0"
-                        Background="Transparent" BorderThickness="0"
-                        ToolTip.Tip="Toggle grid view (G)">
-            <TextBlock Text="&#xEB91;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </ToggleButton>
-          <!-- Left: Filter toggle -->
-          <ToggleButton DockPanel.Dock="Left" Classes="neon-action"
-                        IsChecked="{Binding Filter.IsVisible}"
-                        Width="20" Height="20" Padding="0"
-                        Background="Transparent" BorderThickness="0"
-                        ToolTip.Tip="Toggle filter panel (Ctrl+F)">
-            <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </ToggleButton>
-          <!-- Left: Prev file -->
-          <Button DockPanel.Dock="Left" Classes="neon-action"
-                  Command="{Binding NavigatePrevFileCommand}"
-                  IsVisible="{Binding HasMultipleFiles}"
-                  Width="20" Height="20" Padding="0"
-                  Background="Transparent" BorderThickness="0"
-                  ToolTip.Tip="Previous file">
-            <TextBlock Text="&#xEAA1;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </Button>
-          <!-- Left: Next file -->
-          <Button DockPanel.Dock="Left" Classes="neon-action"
-                  Command="{Binding NavigateNextFileCommand}"
-                  IsVisible="{Binding HasMultipleFiles}"
-                  Width="20" Height="20" Padding="0"
-                  Background="Transparent" BorderThickness="0"
-                  ToolTip.Tip="Next file">
-            <TextBlock Text="&#xEAA0;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </Button>
-          <!-- Left: Expand all files (grid mode only) -->
-          <Button DockPanel.Dock="Left" Classes="neon-action"
-                  Command="{Binding ExpandAllFilesCommand}"
-                  Width="20" Height="20" Padding="0"
-                  Background="Transparent" BorderThickness="0"
-                  ToolTip.Tip="Expand all files">
-            <Button.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="IsGridMode" />
-                <Binding Path="HasMultipleFiles" />
-              </MultiBinding>
-            </Button.IsVisible>
-            <TextBlock Text="&#xEB07;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </Button>
-          <!-- Left: Collapse all files (grid mode only) -->
-          <Button DockPanel.Dock="Left" Classes="neon-action"
-                  Command="{Binding CollapseAllFilesCommand}"
-                  Width="20" Height="20" Padding="0"
-                  Background="Transparent" BorderThickness="0"
-                  ToolTip.Tip="Collapse all files">
-            <Button.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="IsGridMode" />
-                <Binding Path="HasMultipleFiles" />
-              </MultiBinding>
-            </Button.IsVisible>
-            <TextBlock Text="&#xEB06;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
-          </Button>
-          <!-- Center: Title -->
-          <TextBlock Text="{Binding Title}"
+                     Margin="0,0,12,0" />
+          <!-- Left: Title first -->
+          <TextBlock DockPanel.Dock="Left"
+                     Text="{Binding Title}"
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
-                     FontSize="11"
-                     Margin="4,0,0,0"
+                     FontSize="12"
+                     Margin="0,0,12,0"
                      TextTrimming="CharacterEllipsis" />
+          <!-- Left: Follow toggle -->
+          <ToggleButton DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                        IsChecked="{Binding IsFollowMode}"
+                        Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="Follow mode&#x0a;Auto-scroll to newest lines as log grows">
+            <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+          </ToggleButton>
+          <!-- Left: Grid view toggle (grid icon; checked = grid, unchecked = text) -->
+          <ToggleButton DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                        IsChecked="{Binding IsGridMode}"
+                        Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="Grid view (G)&#x0a;Table with File/Timestamp, Level, Message columns. Toggle for text view.">
+            <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+          </ToggleButton>
+          <!-- Left: Filter toggle -->
+          <ToggleButton DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                        IsChecked="{Binding Filter.IsVisible}"
+                        Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="Filter / search (Ctrl+F)&#x0a;Show search and filter panel">
+            <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+          </ToggleButton>
+          <!-- Left: Prev file (chevron-up: previous in list) -->
+          <Button DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                  Command="{Binding NavigatePrevFileCommand}"
+                  IsVisible="{Binding HasMultipleFiles}"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Previous file&#x0a;Switch to the previous log file in this source">
+            <TextBlock Text="&#xEAB7;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+          </Button>
+          <!-- Left: Next file (chevron-down / caret) -->
+          <Button DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                  Command="{Binding NavigateNextFileCommand}"
+                  IsVisible="{Binding HasMultipleFiles}"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Next file&#x0a;Switch to the next log file in this source">
+            <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+          </Button>
+          <!-- Left: Expand all - "+ All" (only when multiple files, e.g. folder watch) -->
+          <Button DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                  Command="{Binding ExpandAllFilesCommand}"
+                  Content="+ All"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Expand all files&#x0a;Show all file rows expanded in grid view">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="IsGridMode" />
+                <Binding Path="HasMultipleFiles" />
+              </MultiBinding>
+            </Button.IsVisible>
+          </Button>
+          <!-- Left: Collapse all - "- All" (only when multiple files, e.g. folder watch) -->
+          <Button DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
+                  Command="{Binding CollapseAllFilesCommand}"
+                  Content="- All"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="Collapse all files&#x0a;Show only file rows in grid view">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="IsGridMode" />
+                <Binding Path="HasMultipleFiles" />
+              </MultiBinding>
+            </Button.IsVisible>
+          </Button>
         </DockPanel>
         <ProgressBar Height="2" Minimum="0" Maximum="1"
                      Value="{Binding IndexingProgress}"
@@ -141,7 +133,7 @@
                      VerticalAlignment="Bottom"
                      Foreground="{DynamicResource AccentBrush}"
                      Background="Transparent"
-                     Margin="-4,0,-4,-2" />
+                     Margin="-8,0,-8,-6" />
       </Panel>
     </Border>
 
