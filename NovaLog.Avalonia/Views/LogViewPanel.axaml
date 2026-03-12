@@ -50,9 +50,12 @@
           <!-- Right: Metadata -->
           <TextBlock DockPanel.Dock="Right"
                      Text="{Binding HeaderMeta}"
+                     ToolTip.Tip="{Binding HeaderMetaFull}"
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
                      FontSize="10"
+                     TextTrimming="CharacterEllipsis"
+                     MaxWidth="300"
                      Margin="0,0,6,0" />
           <!-- Left: Follow toggle -->
           <ToggleButton DockPanel.Dock="Left" Classes="neon-action"

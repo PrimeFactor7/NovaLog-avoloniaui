@@ -24,9 +24,111 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _totalLineCount;
     [ObservableProperty] private int? _selectedLineIndex;
 
-    public string HeaderMeta => TotalLineCount > 0 ? $"{TotalLineCount:N0} lines" : "";
+    // ── Header metadata ─────────────────────────────────────────
+    private int _fileCount;
+    private int _sourceCount;
+    private DateTime? _dateStart;
+    private DateTime? _dateEnd;
 
-    partial void OnTotalLineCountChanged(int value) => OnPropertyChanged(nameof(HeaderMeta));
+    public string HeaderMeta => BuildHeaderMeta(compact: true);
+    public string HeaderMetaFull => BuildHeaderMeta(compact: false);
+
+    partial void OnTotalLineCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HeaderMeta));
+        OnPropertyChanged(nameof(HeaderMetaFull));
+    }
+
+    private void RaiseHeaderMetaChanged()
+    {
+        OnPropertyChanged(nameof(HeaderMeta));
+        OnPropertyChanged(nameof(HeaderMetaFull));
+    }
+
+    private string BuildHeaderMeta(bool compact)
+    {
+        if (TotalLineCount <= 0) return "";
+
+        var parts = new List<string>(3);
+
+        // File/source count
+        if (_sourceCount > 0)
+            parts.Add($"{_sourceCount} sources");
+        else if (_fileCount > 1)
+            parts.Add($"{_fileCount} files");
+
+        // Date range
+        if (_dateStart.HasValue && _dateEnd.HasValue)
+        {
+            if (compact)
+            {
+                // Short: "Mar 9 – Mar 11" or "Mar 9" if same day
+                if (_dateStart.Value.Date == _dateEnd.Value.Date)
+                    parts.Add(_dateStart.Value.ToString("MMM d"));
+                else
+                    parts.Add($"{_dateStart.Value:MMM d} – {_dateEnd.Value:MMM d}");
+            }
+            else
+            {
+                // Full: "2024-03-09 14:23 → 2024-03-11 09:15"
+                parts.Add($"{_dateStart.Value:yyyy-MM-dd HH:mm} → {_dateEnd.Value:yyyy-MM-dd HH:mm}");
+            }
+        }
+        else if (_dateStart.HasValue)
+        {
+            parts.Add(compact ? _dateStart.Value.ToString("MMM d") : _dateStart.Value.ToString("yyyy-MM-dd HH:mm"));
+        }
+
+        // Line count
+        parts.Add($"{TotalLineCount:N0} lines");
+
+        return string.Join(" · ", parts);
+    }
+
+    private void ExtractDateRange()
+    {
+        if (_memorySource is not null && _memorySource.Count > 0)
+        {
+            // Scan forward from start for first timestamp
+            _dateStart = null;
+            for (int i = 0; i < Math.Min(_memorySource.Count, 50); i++)
+            {
+                if (_memorySource[i].Timestamp is { } ts)
+                {
+                    _dateStart = ts;
+                    break;
+                }
+            }
+            // Scan backward from end for last timestamp
+            _dateEnd = null;
+            for (int i = _memorySource.Count - 1; i >= Math.Max(0, _memorySource.Count - 50); i--)
+            {
+                if (_memorySource[i].Timestamp is { } ts)
+                {
+                    _dateEnd = ts;
+                    break;
+                }
+            }
+        }
+        else if (_provider is not null && _provider.LineCount > 0)
+        {
+            _dateStart = _provider.GetLine(0)?.Timestamp;
+            _dateEnd = _provider.GetLine(_provider.LineCount - 1)?.Timestamp;
+        }
+        RaiseHeaderMetaChanged();
+    }
+
+    private int CountFileSeparators()
+    {
+        if (_memorySource is null) return 0;
+        int count = 0;
+        for (int i = 0; i < _memorySource.Count; i++)
+        {
+            if (_memorySource[i].IsFileSeparator)
+                count++;
+        }
+        return count;
+    }
 
     private bool _scrollPending;
 
@@ -643,6 +745,11 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         TotalLineCount = _memorySource.Count;
         Title = Path.GetFileName(filePath);
 
+        // Compute header metadata
+        _sourceCount = 0;
+        _fileCount = CountFileSeparators();
+        ExtractDateRange();
+
         // Track the physical path
         _loadedPaths.Add(Path.GetFullPath(filePath));
         // Also try to track by source ID if available
@@ -680,12 +787,18 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
             IsIndexing = false;
             IndexingProgress = 1.0;
             TotalLineCount = _virtualSource.Count;
+            ExtractDateRange();
         };
         provider.IndexingCompleted += _providerIndexingCompleted;
 
         _delegatingSource.SetInner(_virtualSource);
         TotalLineCount = _virtualSource.Count;
         Title = Path.GetFileName(provider.FilePath);
+
+        // Metadata: single file, no file separators
+        _sourceCount = 0;
+        _fileCount = 0;
+        ExtractDateRange();
 
         // Track the physical path
         _loadedPaths.Add(Path.GetFullPath(provider.FilePath));
@@ -823,6 +936,11 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         TotalLineCount = (int)engine.LineCount;
         Title = $"Merged ({sourcesList.Count} sources)";
         IsStreaming = true;
+
+        // Header metadata
+        _sourceCount = sourcesList.Count;
+        _fileCount = 0;
+        ExtractDateRange();
 
         // Notify filter that source changed (merged sources use virtual provider)
         Filter.OnSourceChanged(null);
@@ -979,6 +1097,17 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
             _memorySource.AppendLines(parsed);
             TotalLineCount = _memorySource.Count;
 
+            // Update end date from last appended line
+            for (int i = parsed.Count - 1; i >= 0; i--)
+            {
+                if (parsed[i].Timestamp is { } ts)
+                {
+                    _dateEnd = ts;
+                    RaiseHeaderMetaChanged();
+                    break;
+                }
+            }
+
             // Update grid source incrementally
             if (IsGridMode && _gridRootRows is { Count: > 0 })
             {
@@ -1037,6 +1166,10 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         _memorySource = null;
         _scrollPending = false;
         IsStreaming = false;
+        _fileCount = 0;
+        _sourceCount = 0;
+        _dateStart = null;
+        _dateEnd = null;
         ResetLineSelection();
     }
 
