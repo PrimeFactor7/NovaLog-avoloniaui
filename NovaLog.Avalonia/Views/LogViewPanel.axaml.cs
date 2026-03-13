@@ -22,7 +22,7 @@ public partial class LogViewPanel : UserControl
     private LogMinimap? _minimap;
     private global::Avalonia.Controls.TreeDataGrid? _logGrid;
     private ScrollViewer? _gridScroller;
-    private bool _gridScrollerHooked;
+    private ScrollViewer? _gridScrollerHookedInstance;
     private LogViewViewModel? _attachedViewModel;
     private FilterPanelViewModel? _attachedFilterViewModel;
     private bool _minimapRefreshPending;
@@ -424,9 +424,9 @@ public partial class LogViewPanel : UserControl
     {
         if (_gridScroller is not null) return _gridScroller;
         _gridScroller = _logGrid?.FindDescendantOfType<ScrollViewer>();
-        if (_gridScroller is not null && !_gridScrollerHooked)
+        if (_gridScroller is not null && _gridScroller != _gridScrollerHookedInstance)
         {
-            _gridScrollerHooked = true;
+            _gridScrollerHookedInstance = _gridScroller;
             _gridScroller.ScrollChanged += (s, e) =>
             {
                 if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
@@ -714,9 +714,11 @@ public partial class LogViewPanel : UserControl
     {
         if (e.PropertyName == nameof(LogViewViewModel.GridDataSource))
         {
-            // Grid source rebuild invalidates the cached scroller
+            // Grid source rebuild may invalidate the cached scroller —
+            // re-discover and re-hook after the visual tree settles.
+            // Keep _gridScrollerHookedInstance so we don't double-subscribe if same ScrollViewer reappears.
             _gridScroller = null;
-            _gridScrollerHooked = false;
+            Dispatcher.UIThread.Post(() => EnsureGridScroller(), DispatcherPriority.Loaded);
         }
 
         if (e.PropertyName is nameof(LogViewViewModel.IsGridMode) or nameof(LogViewViewModel.GridDataSource))
