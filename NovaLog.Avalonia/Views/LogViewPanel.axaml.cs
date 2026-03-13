@@ -432,10 +432,15 @@ public partial class LogViewPanel : UserControl
                 if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
                     return;
 
+                // Use sender instead of _gridScroller field — the field gets nulled on GridDataSource change
+                // but the handler stays attached to the actual ScrollViewer object.
+                var sv = s as ScrollViewer;
+                if (sv is null) return;
+
                 // Track center line for grid mode (same as text mode)
-                if (_gridScroller.Viewport.Height > 0 && vm.TotalLineCount > 0)
+                if (sv.Viewport.Height > 0 && vm.TotalLineCount > 0)
                 {
-                    double ratio = _gridScroller.Offset.Y / Math.Max(1, _gridScroller.Extent.Height - _gridScroller.Viewport.Height);
+                    double ratio = sv.Offset.Y / Math.Max(1, sv.Extent.Height - sv.Viewport.Height);
                     int centerLine = (int)(ratio * vm.TotalLineCount);
                     vm.SetCurrentLine(Math.Clamp(centerLine, 0, vm.TotalLineCount - 1));
                 }

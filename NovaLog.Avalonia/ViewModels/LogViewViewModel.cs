@@ -20,7 +20,7 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
 {
     [ObservableProperty] private string _title = "No file loaded";
     [ObservableProperty] private bool _isFollowMode = true;
-    [ObservableProperty] private bool _isLinked = true;
+    [ObservableProperty] private bool _isLinked;
     [ObservableProperty] private int _totalLineCount;
     [ObservableProperty] private int? _selectedLineIndex;
 

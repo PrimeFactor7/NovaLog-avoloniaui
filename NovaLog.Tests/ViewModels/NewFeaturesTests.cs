@@ -46,10 +46,10 @@ public class NewFeaturesTests
     // ── Sync Link ───────────────────────────────────────────────────
 
     [Fact]
-    public void IsLinked_DefaultsToTrue()
+    public void IsLinked_DefaultsToFalse()
     {
         var vm = new LogViewViewModel();
-        Assert.True(vm.IsLinked);
+        Assert.False(vm.IsLinked);
     }
 
     [Fact]
