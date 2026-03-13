@@ -12,6 +12,17 @@
     <KeyBinding Gesture="Ctrl+P" Command="{Binding ShowPickerCommand}" />
   </UserControl.KeyBindings>
 
+  <UserControl.Styles>
+    <!-- Sync toggle: unchecked = unlinked icon (dim), checked = linked icon (accent) -->
+    <Style Selector="ToggleButton.sync-toggle TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.sync-toggle:checked TextBlock">
+      <Setter Property="Text" Value="&#xEB4B;" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    </Style>
+  </UserControl.Styles>
+
   <Grid x:Name="RootGrid" RowDefinitions="Auto,*,0,0">
     <!-- Header (taller, spaced icons, tooltips with descriptions) -->
     <Border Grid.Row="0" Height="40"
@@ -26,25 +37,14 @@
                   Background="Transparent" BorderThickness="0"
                   Foreground="{DynamicResource DimTextBrush}"
                   ToolTip.Tip="Close pane&#x0a;Remove this pane from the view (source stays in list)" />
-          <!-- Right: Link status -->
-          <TextBlock DockPanel.Dock="Right" Classes="pane-header-icon"
-                     Text="&#xEB4B;"
-                     FontFamily="{StaticResource CodiconFont}"
-                     FontSize="16"
-                     Margin="0,0,8,0"
-                     Foreground="{DynamicResource AccentBrush}"
-                     VerticalAlignment="Center"
-                     IsVisible="{Binding IsLinked}"
-                     ToolTip.Tip="Time sync: linked&#x0a;Panes share the same timestamp (Ctrl+L to unlink)" />
-          <TextBlock DockPanel.Dock="Right" Classes="pane-header-icon"
-                     Text="&#xEB4C;"
-                     FontFamily="{StaticResource CodiconFont}"
-                     FontSize="16"
-                     Margin="0,0,8,0"
-                     Foreground="{DynamicResource DimTextBrush}"
-                     VerticalAlignment="Center"
-                     IsVisible="{Binding !IsLinked}"
-                     ToolTip.Tip="Time sync: unlinked&#x0a;Ctrl+L to link panes to shared timestamp" />
+          <!-- Right: Link status toggle -->
+          <ToggleButton DockPanel.Dock="Right" Classes="neon-action pane-header-btn sync-toggle"
+                        IsChecked="{Binding IsLinked}"
+                        Background="Transparent" BorderThickness="0"
+                        Margin="0,0,8,0"
+                        ToolTip.Tip="Time sync (Ctrl+L)&#x0a;Link panes to share timestamp during scroll">
+            <TextBlock x:Name="SyncIcon" Text="&#xEB4C;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+          </ToggleButton>
           <!-- Right: Metadata -->
           <TextBlock DockPanel.Dock="Right"
                      Text="{Binding HeaderMeta}"

@@ -420,6 +420,72 @@ public partial class LogViewPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// Finds the line index of the row closest to the vertical center of the grid viewport.
+    /// Uses actual materialized rows instead of pixel ratio math, so it works correctly
+    /// with variable-height rows (multiline, hierarchical headers).
+    /// Falls back to ratio-based estimation if no materialized rows are found.
+    /// </summary>
+    private int FindCenterVisibleGridRow()
+    {
+        if (_logGrid is null || DataContext is not LogViewViewModel vm)
+            return -1;
+
+        // Get all materialized TreeDataGridRow containers with actual log lines (skip headers)
+        var rows = _logGrid.GetVisualDescendants()
+            .OfType<global::Avalonia.Controls.Primitives.TreeDataGridRow>()
+            .Where(r => r.DataContext is GridRowViewModel { Line: not null })
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            // Fallback: use ratio-based estimation (works for flat grids, approximate for hierarchical)
+            var scroll = _logGrid.Scroll;
+            if (scroll is not null && scroll.Extent.Height > 0 && vm.TotalLineCount > 0)
+            {
+                double ratio = scroll.Offset.Y / Math.Max(1, scroll.Extent.Height - scroll.Viewport.Height);
+                return (int)(ratio * vm.TotalLineCount);
+            }
+            return -1;
+        }
+
+        // Find viewport center point
+        var gridScroll = _logGrid.Scroll;
+        if (gridScroll is null)
+            return -1;
+
+        double viewportCenterY = gridScroll.Offset.Y + gridScroll.Viewport.Height / 2.0;
+
+        // Find the row whose vertical center is closest to the viewport center
+        global::Avalonia.Controls.Primitives.TreeDataGridRow? centerRow = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var row in rows)
+        {
+            // Get row position relative to scroll content
+            var bounds = row.Bounds;
+            var transform = row.TransformToVisual(_logGrid);
+            if (transform is null)
+                continue;
+
+            var topLeft = transform.Transform(new global::Avalonia.Point(0, 0));
+            double rowCenterY = gridScroll.Offset.Y + topLeft.Y + bounds.Height / 2.0;
+
+            double distance = Math.Abs(rowCenterY - viewportCenterY);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                centerRow = row;
+            }
+        }
+
+        // Extract line index from the center row
+        if (centerRow?.DataContext is GridRowViewModel { Line: { } line })
+            return (int)line.GlobalIndex;
+
+        return -1;
+    }
+
     private ScrollViewer? EnsureGridScroller()
     {
         if (_gridScroller is not null) return _gridScroller;
@@ -437,13 +503,10 @@ public partial class LogViewPanel : UserControl
                 var sv = s as ScrollViewer;
                 if (sv is null) return;
 
-                // Track center line for grid mode (same as text mode)
-                if (sv.Viewport.Height > 0 && vm.TotalLineCount > 0)
-                {
-                    double ratio = sv.Offset.Y / Math.Max(1, sv.Extent.Height - sv.Viewport.Height);
-                    int centerLine = (int)(ratio * vm.TotalLineCount);
-                    vm.SetCurrentLine(Math.Clamp(centerLine, 0, vm.TotalLineCount - 1));
-                }
+                // Track center line for grid mode using precise row detection
+                var centerLineIndex = FindCenterVisibleGridRow();
+                if (centerLineIndex >= 0)
+                    vm.SetCurrentLine(centerLineIndex);
 
                 if (_minimap is not null)
                     UpdateMinimapViewport(_minimap);
