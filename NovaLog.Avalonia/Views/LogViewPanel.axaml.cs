@@ -463,9 +463,9 @@ public partial class LogViewPanel : UserControl
                     return 0;
                 }
                 double ratio = Math.Clamp(scroll.Offset.Y / maxScroll, 0.0, 1.0);
-                int result = (int)(ratio * vm.TotalLineCount);
-                _lastDetectedCenterLine = result;
-                return result;
+                int fallbackResult = (int)(ratio * vm.TotalLineCount);
+                _lastDetectedCenterLine = fallbackResult;
+                return fallbackResult;
             }
             _lastDetectedCenterLine = -1;
             return -1;
@@ -486,11 +486,11 @@ public partial class LogViewPanel : UserControl
         {
             // Get row position relative to scroll content
             var bounds = row.Bounds;
-            var transform = row.TransformToVisual(_logGrid);
-            if (transform is null)
+            var transformMatrix = row.TransformToVisual(_logGrid);
+            if (!transformMatrix.HasValue)
                 continue;
 
-            var topLeft = transform.Transform(new global::Avalonia.Point(0, 0));
+            var topLeft = transformMatrix.Value.Transform(new global::Avalonia.Point(0, 0));
             // topLeft.Y is already in grid coordinates (transform accounts for scroll position)
             double rowCenterY = topLeft.Y + bounds.Height / 2.0;
 
