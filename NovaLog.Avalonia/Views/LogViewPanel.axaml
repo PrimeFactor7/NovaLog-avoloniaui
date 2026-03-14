@@ -15,6 +15,7 @@
   <UserControl.Styles>
     <!-- Sync toggle: unchecked = unlinked icon (dim), checked = linked icon (accent) -->
     <Style Selector="ToggleButton.sync-toggle TextBlock">
+      <Setter Property="Text" Value="&#xEB4C;" />
       <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
     </Style>
     <Style Selector="ToggleButton.sync-toggle:checked TextBlock">
@@ -42,8 +43,11 @@
                         IsChecked="{Binding IsLinked}"
                         Background="Transparent" BorderThickness="0"
                         Margin="0,0,8,0"
-                        ToolTip.Tip="Time sync (Ctrl+L)&#x0a;Link panes to share timestamp during scroll">
-            <TextBlock x:Name="SyncIcon" Text="&#xEB4C;" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
+                        ToolTip.Tip="Time sync (Ctrl+L)&#x0a;Link panes to share timestamp during scroll"
+                        AutomationProperties.AutomationId="btnTimeSync"
+                        AutomationProperties.Name="Time Sync Toggle"
+                        AutomationProperties.HelpText="Link this pane to synchronize scrolling with other linked panes based on timestamp">
+            <TextBlock x:Name="SyncIcon" FontFamily="{StaticResource CodiconFont}" FontSize="16" />
           </ToggleButton>
           <!-- Right: Metadata -->
           <TextBlock DockPanel.Dock="Right"

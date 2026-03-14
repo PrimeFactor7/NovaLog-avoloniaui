@@ -28,6 +28,11 @@ public partial class LogViewPanel : UserControl
     private bool _minimapRefreshPending;
     private double _filterPanelHeight = 220;
 
+    // Performance throttling for center row detection
+    private DateTime _lastCenterDetection = DateTime.MinValue;
+    private int _lastDetectedCenterLine = -1;
+    private const int CenterDetectionThrottleMs = 50; // Max 20 detections/sec
+
     public event Action<string>? NewFileDropped;
     public event Action<string, bool>? SplitRequested;
     
@@ -425,16 +430,24 @@ public partial class LogViewPanel : UserControl
     /// Uses actual materialized rows instead of pixel ratio math, so it works correctly
     /// with variable-height rows (multiline, hierarchical headers).
     /// Falls back to ratio-based estimation if no materialized rows are found.
+    /// Throttled to max 20 calls/sec to prevent performance issues during rapid scrolling.
     /// </summary>
     private int FindCenterVisibleGridRow()
     {
         if (_logGrid is null || DataContext is not LogViewViewModel vm)
             return -1;
 
-        // Get all materialized TreeDataGridRow containers with actual log lines (skip headers)
+        // Throttle expensive visual tree walk to max 20 calls/sec (50ms between calls)
+        var now = DateTime.UtcNow;
+        if ((now - _lastCenterDetection).TotalMilliseconds < CenterDetectionThrottleMs)
+            return _lastDetectedCenterLine; // Return cached result
+
+        _lastCenterDetection = now;
+
+        // Get all materialized TreeDataGridRow containers with actual log lines (skip file headers)
         var rows = _logGrid.GetVisualDescendants()
             .OfType<global::Avalonia.Controls.Primitives.TreeDataGridRow>()
-            .Where(r => r.DataContext is GridRowViewModel { Line: not null })
+            .Where(r => r.DataContext is GridRowViewModel { Line: not null, IsFileHeader: false })
             .ToList();
 
         if (rows.Count == 0)
@@ -443,9 +456,18 @@ public partial class LogViewPanel : UserControl
             var scroll = _logGrid.Scroll;
             if (scroll is not null && scroll.Extent.Height > 0 && vm.TotalLineCount > 0)
             {
-                double ratio = scroll.Offset.Y / Math.Max(1, scroll.Extent.Height - scroll.Viewport.Height);
-                return (int)(ratio * vm.TotalLineCount);
+                double maxScroll = scroll.Extent.Height - scroll.Viewport.Height;
+                if (maxScroll <= 0)
+                {
+                    _lastDetectedCenterLine = 0; // All content visible
+                    return 0;
+                }
+                double ratio = Math.Clamp(scroll.Offset.Y / maxScroll, 0.0, 1.0);
+                int result = (int)(ratio * vm.TotalLineCount);
+                _lastDetectedCenterLine = result;
+                return result;
             }
+            _lastDetectedCenterLine = -1;
             return -1;
         }
 
@@ -469,7 +491,8 @@ public partial class LogViewPanel : UserControl
                 continue;
 
             var topLeft = transform.Transform(new global::Avalonia.Point(0, 0));
-            double rowCenterY = gridScroll.Offset.Y + topLeft.Y + bounds.Height / 2.0;
+            // topLeft.Y is already in grid coordinates (transform accounts for scroll position)
+            double rowCenterY = topLeft.Y + bounds.Height / 2.0;
 
             double distance = Math.Abs(rowCenterY - viewportCenterY);
             if (distance < minDistance)
@@ -480,10 +503,48 @@ public partial class LogViewPanel : UserControl
         }
 
         // Extract line index from the center row
+        int result = -1;
         if (centerRow?.DataContext is GridRowViewModel { Line: { } line })
-            return (int)line.GlobalIndex;
+            result = (int)line.GlobalIndex;
 
-        return -1;
+        _lastDetectedCenterLine = result;
+        return result;
+    }
+
+    private void OnGridScrollChanged(object? s, ScrollChangedEventArgs e)
+    {
+        if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
+            return;
+
+        // Use sender instead of _gridScroller field — the field gets nulled on GridDataSource change
+        // but the handler stays attached to the actual ScrollViewer object.
+        var sv = s as ScrollViewer;
+        if (sv is null) return;
+
+        // Track center line for grid mode using precise row detection
+        var centerLineIndex = FindCenterVisibleGridRow();
+        if (centerLineIndex >= 0)
+            vm.SetCurrentLine(centerLineIndex);
+
+        if (_minimap is not null)
+            UpdateMinimapViewport(_minimap);
+
+        // Scrollbar drag / keyboard scroll up → disable follow
+        if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1)
+        {
+            var scroll = _logGrid?.Scroll;
+            if (scroll is not null && scroll.Extent.Height - scroll.Offset.Y - scroll.Viewport.Height > 0.5)
+                vm.IsFollowMode = false;
+        }
+
+        // Time sync: broadcast center timestamp to linked panes
+        vm.NotifyViewportScrolled();
+    }
+
+    private void OnGridScrollSizeChanged(object? s, SizeChangedEventArgs e)
+    {
+        if (_minimap is not null)
+            UpdateMinimapViewport(_minimap);
     }
 
     private ScrollViewer? EnsureGridScroller()
@@ -492,41 +553,16 @@ public partial class LogViewPanel : UserControl
         _gridScroller = _logGrid?.FindDescendantOfType<ScrollViewer>();
         if (_gridScroller is not null && _gridScroller != _gridScrollerHookedInstance)
         {
+            // Unsubscribe old handlers to prevent memory leak
+            if (_gridScrollerHookedInstance is not null)
+            {
+                _gridScrollerHookedInstance.ScrollChanged -= OnGridScrollChanged;
+                _gridScrollerHookedInstance.SizeChanged -= OnGridScrollSizeChanged;
+            }
+
             _gridScrollerHookedInstance = _gridScroller;
-            _gridScroller.ScrollChanged += (s, e) =>
-            {
-                if (DataContext is not LogViewViewModel { IsGridMode: true } vm)
-                    return;
-
-                // Use sender instead of _gridScroller field — the field gets nulled on GridDataSource change
-                // but the handler stays attached to the actual ScrollViewer object.
-                var sv = s as ScrollViewer;
-                if (sv is null) return;
-
-                // Track center line for grid mode using precise row detection
-                var centerLineIndex = FindCenterVisibleGridRow();
-                if (centerLineIndex >= 0)
-                    vm.SetCurrentLine(centerLineIndex);
-
-                if (_minimap is not null)
-                    UpdateMinimapViewport(_minimap);
-
-                // Scrollbar drag / keyboard scroll up → disable follow
-                if (vm.IsFollowMode && e.OffsetDelta.Y < -0.1)
-                {
-                    var scroll = _logGrid?.Scroll;
-                    if (scroll is not null && scroll.Extent.Height - scroll.Offset.Y - scroll.Viewport.Height > 0.5)
-                        vm.IsFollowMode = false;
-                }
-
-                // Time sync: broadcast center timestamp to linked panes
-                vm.NotifyViewportScrolled();
-            };
-            _gridScroller.SizeChanged += (_, _) =>
-            {
-                if (_minimap is not null)
-                    UpdateMinimapViewport(_minimap);
-            };
+            _gridScroller.ScrollChanged += OnGridScrollChanged;
+            _gridScroller.SizeChanged += OnGridScrollSizeChanged;
         }
         return _gridScroller;
     }

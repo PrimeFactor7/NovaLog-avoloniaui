@@ -658,7 +658,8 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
             {
                 int mid = lo + (hi - lo) / 2;
                 var ts = _memorySource[mid].Timestamp;
-                
+
+                // Handle null timestamps by probing backward to find a valid timestamp
                 if (ts == null)
                 {
                     int probe = mid - 1;
@@ -668,10 +669,22 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
                         ts = _memorySource[probe].Timestamp;
                         mid = probe;
                     }
-                    else { lo = mid + 1; continue; }
+                    else
+                    {
+                        // All timestamps in this region are null, skip to next region
+                        lo = mid + 1;
+                        continue;
+                    }
                 }
 
-                if (ts is null) { lo = mid + 1; continue; }
+                // Final safety check: if timestamp is still null after probing, skip this region
+                // (handles edge case of concurrent modification or entire null regions)
+                if (ts is null)
+                {
+                    lo = mid + 1;
+                    continue;
+                }
+
                 long midTicks = ts.Value.Ticks;
                 if (midTicks < targetTicks) { best = mid; lo = mid + 1; }
                 else if (midTicks > targetTicks) { hi = mid - 1; }
