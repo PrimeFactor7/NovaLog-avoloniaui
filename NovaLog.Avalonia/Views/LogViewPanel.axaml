@@ -13,22 +13,24 @@
   </UserControl.KeyBindings>
 
   <UserControl.Styles>
-    <!-- Sync toggle: unchecked = unlinked icon (dim), checked = linked icon (accent) -->
+    <!-- Sync toggle: link-external (unlinked, dim) / link (synced, neon cyan accent) -->
     <Style Selector="ToggleButton.sync-toggle TextBlock">
-      <Setter Property="Text" Value="&#xEB4C;" />
+      <Setter Property="Text" Value="&#xea5c;" />
+      <Setter Property="FontFamily" Value="{StaticResource CodiconFont}" />
       <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
     </Style>
     <Style Selector="ToggleButton.sync-toggle:checked TextBlock">
-      <Setter Property="Text" Value="&#xEB4B;" />
+      <Setter Property="Text" Value="&#xea5b;" />
+      <Setter Property="FontFamily" Value="{StaticResource CodiconFont}" />
       <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
     </Style>
   </UserControl.Styles>
 
   <Grid x:Name="RootGrid" RowDefinitions="Auto,*,0,0">
-    <!-- Header (taller, spaced icons, tooltips with descriptions) -->
-    <Border Grid.Row="0" Height="40"
+    <!-- Pane header (compact) -->
+    <Border Grid.Row="0" Height="32"
             Background="{DynamicResource ToolBarBgBrush}"
-            Padding="8,6"
+            Padding="6,4"
             x:Name="HeaderBorder">
       <Panel>
         <DockPanel>

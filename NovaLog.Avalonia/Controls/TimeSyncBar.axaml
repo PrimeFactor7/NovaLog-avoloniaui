@@ -3,11 +3,11 @@
              xmlns:vm="using:NovaLog.Avalonia.ViewModels"
              x:Class="NovaLog.Avalonia.Controls.TimeSyncBar"
              x:DataType="vm:TimeSyncBarViewModel"
-             Height="24"
+             Height="22"
              IsVisible="{Binding IsVisible}"
              Background="{DynamicResource ToolBarBgBrush}">
   <Grid>
-    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0">
       <!-- Time sync icon (Codicon: history) -->
       <TextBlock Text="&#xEA74;"
                  FontFamily="{StaticResource CodiconFont}"

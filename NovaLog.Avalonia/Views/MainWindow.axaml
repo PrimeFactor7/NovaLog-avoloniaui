@@ -12,19 +12,19 @@
         TransparencyLevelHint="AcrylicBlur">
 
   <Grid RowDefinitions="Auto,Auto,*,24">
-    <!-- Main toolbar: taller header, spaced icons, tooltips with descriptions -->
+    <!-- Main toolbar: compact -->
     <Border Grid.Row="0"
             Background="{DynamicResource ToolBarBgBrush}"
-            Padding="8,6"
-            MinHeight="44">
+            Padding="6,4"
+            MinHeight="36">
       <Grid ColumnDefinitions="*,Auto">
 
         <!-- Left Side: Tools & Tabs (scrollable for overflow) -->
         <ScrollViewer Grid.Column="0"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Disabled"
-                      MaxHeight="44">
-        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      MaxHeight="36">
+        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
            <!-- Source Manager (folder icon) -->
            <ToggleButton Classes="neon-action toolbar-btn"
                          IsChecked="{Binding IsSidebarVisible}"
@@ -59,7 +59,7 @@
              <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </ToggleButton>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
            <!-- Split Panes -->
            <Button Classes="neon-action toolbar-btn" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally&#x0a;Open another pane side-by-side">
@@ -69,7 +69,7 @@
              <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
            <!-- TABS (inlined in toolbar) -->
            <ItemsControl ItemsSource="{Binding Workspace.Tabs}" x:Name="TabBar" VerticalAlignment="Center">
@@ -105,7 +105,7 @@
         </ScrollViewer>
 
         <!-- Right Side: Navigation, Simulator, Pin, Settings -->
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
            
            <TextBlock Text="{Binding Workspace.ActiveLogView.NavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
 
@@ -120,7 +120,7 @@
              <TextBlock Text="&#xEAB5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource BookmarkMarkerBrush}" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
            <!-- Errors -->
            <Button Classes="neon-action toolbar-btn" Command="{Binding ErrorPrevCommand}" ToolTip.Tip="Previous error (Alt+PgUp)&#x0a;Jump to previous error or fatal line">
@@ -130,7 +130,7 @@
              <TextBlock Text="&#xEAB5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource TextErrorBrush}" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
            <!-- Search Hits -->
            <Button Classes="neon-action toolbar-btn" Command="{Binding SearchPrevCommand}" ToolTip.Tip="Previous search hit (Shift+F3)&#x0a;Jump to previous filter/search match">
@@ -140,7 +140,7 @@
              <TextBlock Text="&#xEAB5;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource SearchHitMarkerBrush}" />
            </Button>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
            <!-- Pin -->
            <ToggleButton Classes="neon-action toolbar-btn" IsChecked="{Binding IsTopmost}" ToolTip.Tip="Stay on top (T)&#x0a;Keep window above other windows">
@@ -166,7 +166,7 @@
              </DropDownButton.Flyout>
            </DropDownButton>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="6,4" />
+           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
            <!-- Theme -->
            <Button Classes="neon-action toolbar-btn"

@@ -187,9 +187,16 @@ public partial class LogViewPanel : UserControl
             {
                 if (DataContext is LogViewViewModel vm)
                 {
-                    int topIdx = (int)(_scroller.Offset.Y / LogLineRow.RowHeight);
-                    int visibleCount = (int)(_scroller.Viewport.Height / LogLineRow.RowHeight);
-                    vm.SetCurrentLine(topIdx + visibleCount / 2);
+                    // Prefer center line from realized rows (robust for any row height); fallback to uniform-height formula
+                    int centerLine = FindCenterVisibleLogRow();
+                    if (centerLine >= 0)
+                        vm.SetCurrentLine(centerLine);
+                    else
+                    {
+                        int topIdx = (int)(_scroller.Offset.Y / LogLineRow.RowHeight);
+                        int visibleCount = (int)(_scroller.Viewport.Height / LogLineRow.RowHeight);
+                        vm.SetCurrentLine(topIdx + visibleCount / 2);
+                    }
 
                     if (_minimap is not null)
                         UpdateMinimapViewport(_minimap);
@@ -426,6 +433,41 @@ public partial class LogViewPanel : UserControl
     }
 
     /// <summary>
+    /// Finds the line index of the row closest to the vertical center of the text viewport.
+    /// Uses realized LogLineRow elements so it works even if row heights vary; returns -1 if none realized.
+    /// </summary>
+    private int FindCenterVisibleLogRow()
+    {
+        if (_repeater is null || _scroller is null) return -1;
+
+        var rows = _repeater.GetVisualDescendants().OfType<LogLineRow>().ToList();
+        if (rows.Count == 0) return -1;
+
+        double viewportCenterY = _scroller.Offset.Y + _scroller.Viewport.Height / 2.0;
+        LogLineRow? centerRow = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var row in rows)
+        {
+            var toRepeater = row.TransformToVisual(_repeater);
+            if (!toRepeater.HasValue) continue;
+
+            var topLeft = toRepeater.Value.Transform(new global::Avalonia.Point(0, 0));
+            double rowCenterY = topLeft.Y + row.Bounds.Height / 2.0;
+            double distance = Math.Abs(rowCenterY - viewportCenterY);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                centerRow = row;
+            }
+        }
+
+        if (centerRow?.DataContext is LogLineViewModel line)
+            return (int)line.GlobalIndex;
+        return -1;
+    }
+
+    /// <summary>
     /// Finds the line index of the row closest to the vertical center of the grid viewport.
     /// Uses actual materialized rows instead of pixel ratio math, so it works correctly
     /// with variable-height rows (multiline, hierarchical headers).
@@ -638,13 +680,17 @@ public partial class LogViewPanel : UserControl
             double targetY = Math.Max(0, ratio * scroll.Extent.Height - scroll.Viewport.Height / 2);
             targetY = Math.Min(targetY, Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height));
             scroll.Offset = scroll.Offset.WithY(targetY);
-            // Post selection after layout so virtualized rows are realized
-            Dispatcher.UIThread.Post(() => SelectGridRowByLineIndex(lineIndex),
-                DispatcherPriority.Render);
+            // Post selection and bring row into view so variable-height rows end up correctly centered
+            Dispatcher.UIThread.Post(() =>
+            {
+                SelectGridRowByLineIndex(lineIndex);
+                BringGridRowIntoView(lineIndex);
+            }, DispatcherPriority.Render);
         }
         else
         {
             if (_scroller is null) return;
+            // Text view: uniform RowHeight per line (center line in viewport)
             double halfViewport = _scroller.Viewport.Height / 2;
             double targetY = Math.Max(0, lineIndex * LogLineRow.RowHeight - halfViewport);
             _scroller.Offset = new global::Avalonia.Vector(_scroller.Offset.X, targetY);
@@ -707,6 +753,20 @@ public partial class LogViewPanel : UserControl
         }
     }
 
+    /// <summary>Brings the grid row for the given line index into view (corrects for variable row height after ratio-based scroll).</summary>
+    private void BringGridRowIntoView(int lineIndex)
+    {
+        if (_logGrid is null) return;
+        foreach (var row in _logGrid.GetVisualDescendants().OfType<global::Avalonia.Controls.Primitives.TreeDataGridRow>())
+        {
+            if (row.DataContext is GridRowViewModel { Line: { } line } && line.GlobalIndex == lineIndex)
+            {
+                row.BringIntoView();
+                return;
+            }
+        }
+    }
+
     private void OnMinimapWheelScroll(PointerWheelEventArgs e)
     {
         // Scrolling up on minimap disables follow
@@ -765,6 +825,8 @@ public partial class LogViewPanel : UserControl
         if (row?.DataContext is GridRowViewModel gridRow && gridRow.Line is { } line)
         {
             _attachedViewModel.SelectLine((int)line.GlobalIndex);
+            if (_attachedViewModel.IsLinked)
+                _attachedViewModel.BroadcastSelectedLineTimestamp();
         }
     }
 
@@ -777,11 +839,30 @@ public partial class LogViewPanel : UserControl
         if (!currentPoint.Properties.IsLeftButtonPressed && !currentPoint.Properties.IsRightButtonPressed)
             return;
 
-        // Calculate line index from Y position — works for direct hits and gap clicks alike
-        var pos = e.GetPosition(_repeater);
-        int lineIndex = (int)(pos.Y / LogLineRow.RowHeight);
+        // Prefer line from the row actually under the pointer (robust for variable height); fallback to Y-based index
+        int lineIndex = GetLogLineIndexAtPosition(e.GetPosition(_repeater));
         if (lineIndex >= 0 && lineIndex < _attachedViewModel.TotalLineCount)
+        {
             _attachedViewModel.SelectLine(lineIndex);
+            if (_attachedViewModel.IsLinked)
+                _attachedViewModel.BroadcastSelectedLineTimestamp();
+        }
+    }
+
+    /// <summary>Gets the line index at the given position in repeater coordinates. Uses realized rows when available; otherwise uniform RowHeight.</summary>
+    private int GetLogLineIndexAtPosition(global::Avalonia.Point pos)
+    {
+        if (_repeater is null) return -1;
+        foreach (var row in _repeater.GetVisualDescendants().OfType<LogLineRow>())
+        {
+            var toRepeater = row.TransformToVisual(_repeater);
+            if (!toRepeater.HasValue) continue;
+            var topLeft = toRepeater.Value.Transform(new global::Avalonia.Point(0, 0));
+            var rect = new Rect(topLeft, row.Bounds.Size);
+            if (rect.Contains(pos) && row.DataContext is LogLineViewModel line)
+                return (int)line.GlobalIndex;
+        }
+        return (int)(pos.Y / LogLineRow.RowHeight);
     }
 
     private static T? FindVisualAncestorOrSelf<T>(object? source)

@@ -38,9 +38,9 @@
     <DockPanel>
 
       <!-- Search bar (top) -->
-      <Border DockPanel.Dock="Top" Height="32"
+      <Border DockPanel.Dock="Top" Height="28"
               Background="{DynamicResource ToolBarBgBrush}"
-              Padding="6,2">
+              Padding="4,2">
         <DockPanel>
           <!-- Close button -->
           <Button DockPanel.Dock="Right"

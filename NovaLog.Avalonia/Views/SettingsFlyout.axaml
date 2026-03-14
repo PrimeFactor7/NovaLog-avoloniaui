@@ -34,11 +34,11 @@
   <Border Background="{DynamicResource ToolBarBgBrush}"
           BorderBrush="{DynamicResource SeparatorBrush}"
           BorderThickness="1,0,0,0"
-          Padding="8"
+          Padding="6"
           Width="320">
     <DockPanel>
       <!-- Header -->
-      <DockPanel DockPanel.Dock="Top" Margin="4,0,4,12">
+      <DockPanel DockPanel.Dock="Top" Margin="4,0,4,8">
         <Button DockPanel.Dock="Right"
                 Classes="neon-action"
                 Content="X"

@@ -638,60 +638,104 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         return null;
     }
 
-    /// <summary>Seeks to the nearest line at or before the given timestamp.</summary>
+    /// <summary>Seeks to the line with the mathematically closest timestamp (nearest-neighbor), highlights it, and scrolls it to center.</summary>
     public void SeekToTimestamp(DateTime target)
     {
+        int lineCount = GetLoadedLineCount();
+        if (lineCount <= 0) return;
+
         if (_provider is not null)
         {
             _provider.ScrollToTimestamp(target, idx =>
             {
-                NavigateToLine((int)idx);
+                int nearest = GetNearestTimestampIndexFromProvider((int)idx, target);
+                NavigateToLine(nearest);
             });
         }
         else if (_memorySource is not null && _memorySource.Count > 0)
         {
-            // Binary search in memory
-            int lo = 0, hi = _memorySource.Count - 1, best = 0;
-            long targetTicks = target.Ticks;
+            int nearest = FindNearestTimestampIndexInMemory(target);
+            NavigateToLine(nearest);
+        }
+    }
 
-            while (lo <= hi)
+    /// <summary>Given an "at or before" index from the provider, returns the index with the closest timestamp (nearest neighbor).</summary>
+    private int GetNearestTimestampIndexFromProvider(int atOrBefore, DateTime target)
+    {
+        if (_provider is null) return atOrBefore;
+        int count = GetLoadedLineCount();
+        if (count <= 0) return 0;
+
+        atOrBefore = Math.Clamp(atOrBefore, 0, count - 1);
+
+        var ts0 = _provider.GetLine(atOrBefore)?.Timestamp;
+        if (atOrBefore + 1 >= count)
+            return ts0 != null ? atOrBefore : 0;
+
+        var ts1 = _provider.GetLine(atOrBefore + 1)?.Timestamp;
+        if (ts0 is null) return ts1 != null ? atOrBefore + 1 : atOrBefore;
+        if (ts1 is null) return atOrBefore;
+
+        long targetTicks = target.Ticks;
+        long d0 = Math.Abs(ts0.Value.Ticks - targetTicks);
+        long d1 = Math.Abs(ts1.Value.Ticks - targetTicks);
+        return d1 < d0 ? atOrBefore + 1 : atOrBefore;
+    }
+
+    /// <summary>Finds the line index in memory whose timestamp is closest to the target (nearest neighbor).</summary>
+    private int FindNearestTimestampIndexInMemory(DateTime target)
+    {
+        if (_memorySource is null || _memorySource.Count == 0) return 0;
+
+        // Binary search for "at or before"
+        int lo = 0, hi = _memorySource.Count - 1, best = 0;
+        long targetTicks = target.Ticks;
+
+        while (lo <= hi)
+        {
+            int mid = lo + (hi - lo) / 2;
+            var ts = _memorySource[mid].Timestamp;
+
+            if (ts == null)
             {
-                int mid = lo + (hi - lo) / 2;
-                var ts = _memorySource[mid].Timestamp;
-
-                // Handle null timestamps by probing backward to find a valid timestamp
-                if (ts == null)
+                int probe = mid - 1;
+                while (probe >= lo && _memorySource[probe].Timestamp == null) probe--;
+                if (probe >= lo)
                 {
-                    int probe = mid - 1;
-                    while (probe >= lo && _memorySource[probe].Timestamp == null) probe--;
-                    if (probe >= lo)
-                    {
-                        ts = _memorySource[probe].Timestamp;
-                        mid = probe;
-                    }
-                    else
-                    {
-                        // All timestamps in this region are null, skip to next region
-                        lo = mid + 1;
-                        continue;
-                    }
+                    ts = _memorySource[probe].Timestamp;
+                    mid = probe;
                 }
-
-                // Final safety check: if timestamp is still null after probing, skip this region
-                // (handles edge case of concurrent modification or entire null regions)
-                if (ts is null)
+                else
                 {
                     lo = mid + 1;
                     continue;
                 }
-
-                long midTicks = ts.Value.Ticks;
-                if (midTicks < targetTicks) { best = mid; lo = mid + 1; }
-                else if (midTicks > targetTicks) { hi = mid - 1; }
-                else { best = mid; break; }
             }
-            NavigateToLine(best);
+
+            if (ts is null)
+            {
+                lo = mid + 1;
+                continue;
+            }
+
+            long midTicks = ts.Value.Ticks;
+            if (midTicks < targetTicks) { best = mid; lo = mid + 1; }
+            else if (midTicks > targetTicks) { hi = mid - 1; }
+            else { return mid; }
         }
+
+        // Nearest neighbor: compare best with best+1
+        if (best + 1 >= _memorySource.Count)
+            return best;
+
+        var t0 = _memorySource[best].Timestamp;
+        var t1 = _memorySource[best + 1].Timestamp;
+        if (t0 is null) return t1 != null ? best + 1 : best;
+        if (t1 is null) return best;
+
+        long d0 = Math.Abs(t0.Value.Ticks - targetTicks);
+        long d1 = Math.Abs(t1.Value.Ticks - targetTicks);
+        return d1 < d0 ? best + 1 : best;
     }
 
     [RelayCommand]
@@ -712,6 +756,15 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         {
             _clock?.NotifyTimeChanged(ts.Value, this);
         }
+    }
+
+    /// <summary>Broadcasts the selected line's timestamp to all linked panes (click-to-sync). Call after user selects a row when this pane is linked.</summary>
+    public void BroadcastSelectedLineTimestamp()
+    {
+        if (!IsLinked) return;
+        var ts = GetCurrentTimestamp();
+        if (ts.HasValue)
+            _clock?.NotifyTimeChanged(ts.Value, this);
     }
 
     /// <summary>Returns the raw text of the current line, or null if unavailable.</summary>
