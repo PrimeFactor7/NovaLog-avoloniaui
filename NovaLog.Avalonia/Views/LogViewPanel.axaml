@@ -57,7 +57,7 @@
                      VerticalAlignment="Center"
                      FontSize="11"
                      TextTrimming="CharacterEllipsis"
-                     MaxWidth="300"
+                     MaxWidth="200"
                      Margin="0,0,12,0" />
           <!-- Left: Title first -->
           <TextBlock DockPanel.Dock="Left"
@@ -65,8 +65,10 @@
                      Foreground="{DynamicResource DimTextBrush}"
                      VerticalAlignment="Center"
                      FontSize="12"
+                     MaxWidth="250"
                      Margin="0,0,12,0"
-                     TextTrimming="CharacterEllipsis" />
+                     TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding Title}" />
           <!-- Left: Follow toggle -->
           <ToggleButton DockPanel.Dock="Left" Classes="neon-action pane-header-btn"
                         IsChecked="{Binding IsFollowMode}"

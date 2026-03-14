@@ -18,46 +18,39 @@
           </DockPanel>
         </Border>
 
-        <!-- Action bar -->
+        <!-- Action bar (icon-only buttons for compact layout) -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
                     Spacing="4" Margin="6,6">
           <Button Classes="neon-action" Click="OnAddFolderClick"
-                  ToolTip.Tip="Add Folder">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Text="Folder" VerticalAlignment="Center" />
-            </StackPanel>
+                  Width="32" Height="32" Padding="0"
+                  ToolTip.Tip="Add Folder&#x0a;Browse for a folder to add to sources">
+            <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
           </Button>
           <Button Classes="neon-action" Click="OnAddFileClick"
-                  ToolTip.Tip="Add File">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="&#xE8E5;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Text="File" VerticalAlignment="Center" />
-            </StackPanel>
+                  Width="32" Height="32" Padding="0"
+                  ToolTip.Tip="Add File&#x0a;Browse for a file to add to sources">
+            <TextBlock Text="&#xE8E5;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
           </Button>
 
           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="2" />
 
-          <Button Classes="neon-action" Click="OnRecentHistoryClick" ToolTip.Tip="Open Recent History">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Text="Recent" VerticalAlignment="Center" />
-            </StackPanel>
+          <Button Classes="neon-action" Click="OnRecentHistoryClick"
+                  Width="32" Height="32" Padding="0"
+                  ToolTip.Tip="Recent History&#x0a;View and open recently used sources">
+            <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
           </Button>
 
           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="2" />
 
-          <Button Classes="neon-action" Command="{Binding ToggleSelectAllCommand}" ToolTip.Tip="Select All">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="&#xE762;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Text="All" VerticalAlignment="Center" />
-            </StackPanel>
+          <Button Classes="neon-action" Command="{Binding ToggleSelectAllCommand}"
+                  Width="32" Height="32" Padding="0"
+                  ToolTip.Tip="Select All&#x0a;Toggle selection of all sources for merging">
+            <TextBlock Text="&#xE762;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
           </Button>
-          <Button Classes="neon-action" Command="{Binding ClearSelectedCommand}" IsEnabled="{Binding CanClear}" ToolTip.Tip="Clear Selected">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Text="Clear" VerticalAlignment="Center" />
-            </StackPanel>
+          <Button Classes="neon-action" Command="{Binding ClearSelectedCommand}" IsEnabled="{Binding CanClear}"
+                  Width="32" Height="32" Padding="0"
+                  ToolTip.Tip="Clear Selected&#x0a;Deselect all sources">
+            <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets, Avalonia.Fonts.Inter" FontSize="16" Foreground="{DynamicResource AccentBrush}" />
           </Button>
         </StackPanel>
 

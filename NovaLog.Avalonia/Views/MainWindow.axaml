@@ -17,10 +17,14 @@
             Background="{DynamicResource ToolBarBgBrush}"
             Padding="8,6"
             MinHeight="44">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        
-        <!-- Left Side: Tools & Tabs -->
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="*,Auto">
+
+        <!-- Left Side: Tools & Tabs (scrollable for overflow) -->
+        <ScrollViewer Grid.Column="0"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      MaxHeight="44">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
            <!-- Source Manager (folder icon) -->
            <ToggleButton Classes="neon-action toolbar-btn"
                          IsChecked="{Binding IsSidebarVisible}"
@@ -98,9 +102,10 @@
            <Button Classes="neon-action toolbar-btn" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close panes&#x0a;Close all panes in this tab (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
            <Button Classes="neon-action toolbar-btn" Content="Close tabs" Command="{Binding CloseTabsCommand}" ToolTip.Tip="Close tabs&#x0a;Close all tabs (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
         </StackPanel>
+        </ScrollViewer>
 
         <!-- Right Side: Navigation, Simulator, Pin, Settings -->
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
            
            <TextBlock Text="{Binding Workspace.ActiveLogView.NavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
 
