@@ -20,7 +20,7 @@
 
         <!-- Action bar (icon-only buttons for compact layout) -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
-                    Spacing="4" Margin="6,0,6,4">
+                    Spacing="4" Margin="6,4" Height="36">
           <Button Classes="neon-action" Click="OnAddFolderClick"
                   Width="28" Height="28" Padding="0"
                   ToolTip.Tip="Add Folder&#x0a;Browse for a folder to add to sources">
@@ -54,7 +54,7 @@
           </Button>
         </StackPanel>
 
-        <Border Classes="neon-separator" DockPanel.Dock="Top" Margin="0" />
+        <Border Classes="neon-separator" DockPanel.Dock="Top" />
 
         <!-- Footer -->
         <Border DockPanel.Dock="Bottom" Classes="neon-header">
