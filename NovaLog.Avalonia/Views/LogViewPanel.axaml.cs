@@ -9,6 +9,7 @@ using System.ComponentModel;
 using NovaLog.Avalonia.Controls;
 using NovaLog.Avalonia.ViewModels;
 using NovaLog.Core.Models;
+using Dock.Model.Controls;
 using Dock.Model.Core;
 using AvClipboard = global::Avalonia.Input.Platform.IClipboard;
 using System.Linq;
@@ -341,22 +342,21 @@ public partial class LogViewPanel : UserControl
     private void OnCloseRequested()
     {
         var mvm = FindMainViewModel();
-        if (mvm?.Workspace is not { Layout: not null, DockFactory: not null } ws) return;
+        if (mvm is null && global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            mvm = desktop.MainWindow?.DataContext as MainWindowViewModel;
+        if (mvm?.Workspace is not { DockFactory: not null } ws) return;
 
-        var allDocs = Docking.DockLayoutHelper.GetAllDocuments(ws.Layout);
-        var doc = allDocs.FirstOrDefault(d => d.LogView == _attachedViewModel);
+        // Find IDocument by visual tree so it works when pane is in a floating HostWindow.
+        var doc = this.GetVisualAncestors()
+            .Select(x => (x as Control)?.DataContext)
+            .OfType<IDocument>()
+            .FirstOrDefault(d => d.Context == _attachedViewModel
+                || (d is Docking.LogViewDocument lvd && lvd.LogView == _attachedViewModel));
+
         if (doc is null) return;
-
-        if (allDocs.Count <= 1)
-        {
-            // Last pane — just clear it instead of closing (keeps a valid blank pane)
-            _attachedViewModel?.ClearSource();
-            return;
-        }
 
         ws.DockFactory.CloseDockable(doc);
     }
-
 
     private MainWindowViewModel? FindMainViewModel()
     {

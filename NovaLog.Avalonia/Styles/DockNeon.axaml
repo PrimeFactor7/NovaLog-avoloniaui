@@ -43,11 +43,13 @@
     <Setter Property="MinHeight" Value="250" />
   </Style>
 
-  <!-- Floating HostWindow: zero-chrome, 1px Neon Cyan border, match app theme -->
+  <!-- Floating HostWindow: Full resize handles, no drawn chrome, 1px Neon Cyan border -->
   <Style Selector="dock|HostWindow">
     <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
-    <Setter Property="SystemDecorations" Value="None" />
+    <Setter Property="SystemDecorations" Value="Full" />
     <Setter Property="ExtendClientAreaToDecorationsHint" Value="True" />
+    <Setter Property="ExtendClientAreaChromeHints" Value="NoChrome" />
+    <Setter Property="ExtendClientAreaTitleBarHeightHint" Value="-1" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>

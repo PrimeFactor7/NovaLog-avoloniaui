@@ -23,6 +23,9 @@ namespace NovaLog.Avalonia.Docking;
 /// </summary>
 public class NovaLogDockFactory : Factory
 {
+    /// <summary>Main document dock in the primary window; used by "Join" to re-dock floating documents.</summary>
+    public IDocumentDock? MainDocumentDock { get; private set; }
+
     public NovaLogDockFactory()
     {
         // Maps the platform-agnostic IDockWindow to the Avalonia-specific HostWindow.
@@ -40,6 +43,7 @@ public class NovaLogDockFactory : Factory
     {
         var document = CreateDocument();
         var documentDock = CreateDocumentDock();
+        MainDocumentDock = documentDock;
         documentDock.VisibleDockables = CreateList<IDockable>(document);
         documentDock.ActiveDockable = document;
         documentDock.DefaultDockable = document;
@@ -66,18 +70,17 @@ public class NovaLogDockFactory : Factory
     public override void OnWindowOpened(IDockWindow? dockWindow)
     {
         base.OnWindowOpened(dockWindow);
-        // HostWindow IS the Avalonia Window (extends Window).
-        // host.Window is IDockWindow? (the model), NOT an Avalonia Window.
         if (dockWindow?.Host is not HostWindow host)
             return;
-        Dispatcher.UIThread.Post(() => AttachFloatingWindowChrome(host));
+        // Pass factory and dockWindow so the Join button knows where to return panes.
+        Dispatcher.UIThread.Post(() => AttachFloatingWindowChrome(this, host, dockWindow));
     }
 
     /// <summary>
-    /// Adds Pin/Opacity/Close controls and enables dragging for floating dock windows.
-    /// Does not depend on HostWindowTitleBar (DockNeon strips it); injects a hit-testable bar and wraps content.
+    /// Adds Join, Pin, Opacity, Close and enables dragging. host.Content is a DockControl (TemplatedControl), not Panel;
+    /// we detach it, wrap in a Grid with the control bar on top, and set after Loaded so the OS has assigned Content.
     /// </summary>
-    private static void AttachFloatingWindowChrome(HostWindow host)
+    private static void AttachFloatingWindowChrome(NovaLogDockFactory factory, HostWindow host, IDockWindow dockWindow)
     {
         var topmostToggle = new global::Avalonia.Controls.Primitives.ToggleButton
         {
@@ -115,7 +118,36 @@ public class NovaLogDockFactory : Factory
         ToolTip.SetTip(closeBtn, "Close floating window");
         closeBtn.Click += (_, _) => host.Close();
 
-        // Bar must have a nearly-invisible background to be hit-testable for dragging.
+        var codiconFont = Application.Current?.Resources["CodiconFont"] as FontFamily;
+        var joinBtn = new Button
+        {
+            Content = "\uEB52",
+            FontSize = 16,
+            FontFamily = codiconFont,
+            Padding = new Thickness(4, 2),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        ToolTip.SetTip(joinBtn, "Join back to main window");
+        joinBtn.Click += (_, _) =>
+        {
+            var floatingDock = dockWindow.Layout?.VisibleDockables?.OfType<IDock>().FirstOrDefault();
+            if (floatingDock is not null && factory.MainDocumentDock is not null)
+            {
+                var docsToMove = floatingDock.VisibleDockables?.ToList() ?? new List<IDockable>();
+                foreach (var d in docsToMove)
+                {
+                    floatingDock.VisibleDockables?.Remove(d);
+                    factory.MainDocumentDock.VisibleDockables?.Add(d);
+                    d.Owner = factory.MainDocumentDock;
+                }
+                factory.MainDocumentDock.ActiveDockable = docsToMove.LastOrDefault() ?? factory.MainDocumentDock.ActiveDockable;
+            }
+            host.Close();
+        };
+
         var controlBar = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)),
@@ -123,13 +155,13 @@ public class NovaLogDockFactory : Factory
             MinHeight = 32,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Top,
-            ZIndex = 100,
+            ZIndex = 1000,
             Child = new StackPanel
             {
                 Orientation = global::Avalonia.Layout.Orientation.Horizontal,
                 Spacing = 4,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Children = { topmostToggle, new TextBlock { Text = "Opacity", VerticalAlignment = VerticalAlignment.Center }, opacitySlider, closeBtn }
+                Children = { joinBtn, topmostToggle, new TextBlock { Text = "Opacity", VerticalAlignment = VerticalAlignment.Center }, opacitySlider, closeBtn }
             }
         };
 
@@ -142,13 +174,17 @@ public class NovaLogDockFactory : Factory
             }
         };
 
-        if (host.Content is Control existingContent)
+        // Robust content wrapping: run after Loaded so the OS has assigned host.Content (DockControl, not Panel).
+        Dispatcher.UIThread.Post(() =>
         {
-            host.Content = null;
-            host.Content = new Grid
+            if (host.Content is Control existingContent && existingContent is not Grid)
             {
-                Children = { existingContent, controlBar }
-            };
-        }
+                host.Content = null;
+                var wrapper = new Grid();
+                wrapper.Children.Add(existingContent);
+                wrapper.Children.Add(controlBar);
+                host.Content = wrapper;
+            }
+        }, DispatcherPriority.Loaded);
     }
 }
