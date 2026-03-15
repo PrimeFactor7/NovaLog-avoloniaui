@@ -191,7 +191,8 @@ public partial class MainWindow : Window
 
     private void OnTabBarDragOver(object? sender, DragEventArgs e)
     {
-        if (!e.Data.Contains(TabDragFormat))
+        var format = DataFormat.CreateStringApplicationFormat(TabDragFormat);
+        if (!e.DataTransfer.Contains(format))
         {
             e.DragEffects = DragDropEffects.None;
             return;
@@ -202,10 +203,11 @@ public partial class MainWindow : Window
 
     private void OnTabBarDrop(object? sender, DragEventArgs e)
     {
-        if (!e.Data.Contains(TabDragFormat)) return;
+        var format = DataFormat.CreateStringApplicationFormat(TabDragFormat);
+        if (!e.DataTransfer.Contains(format)) return;
         if (DataContext is not MainWindowViewModel vm) return;
 
-        var draggedId = e.Data.Get(TabDragFormat) as string;
+        var draggedId = e.DataTransfer.TryGetValue(format);
         if (string.IsNullOrEmpty(draggedId)) return;
 
         var fromIdx = vm.Workspace.Tabs.Select((t, i) => (t, i)).FirstOrDefault(x => x.t.Id == draggedId).i;
@@ -267,6 +269,13 @@ public partial class MainWindow : Window
                 vm.Workspace.CloseTab(idx);
                 break;
         }
+    }
+
+    private async void OnThemeMarketplaceClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        var dialog = new ThemeMarketplaceWindow(vm.ThemeService);
+        await dialog.ShowDialog(this);
     }
 
     private void OnWindowOpened(object? sender, EventArgs e)

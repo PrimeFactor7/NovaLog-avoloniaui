@@ -9,4 +9,17 @@
     <AssemblyName>ThemeProxy</AssemblyName>
   </PropertyGroup>
 
+  <!-- Build React client and copy dist to wwwroot before Publish; include wwwroot in publish output -->
+  <Target Name="BuildThemeClient" BeforeTargets="Publish" Condition="Exists('$(ProjectDir)../client/package.json')">
+    <Exec Command="npm run build" WorkingDirectory="$(ProjectDir)../client" />
+    <MakeDir Directories="$(ProjectDir)wwwroot" />
+    <ItemGroup>
+      <_DistFiles Include="$(ProjectDir)../client/dist/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_DistFiles)" DestinationFolder="$(ProjectDir)wwwroot/%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Include="$(ProjectDir)wwwroot/**/*" CopyToPublishDirectory="PreserveNewest" LinkBase="wwwroot" />
+    </ItemGroup>
+  </Target>
+
 </Project>

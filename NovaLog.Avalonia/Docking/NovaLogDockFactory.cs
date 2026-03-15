@@ -104,7 +104,7 @@ public class NovaLogDockFactory : Factory
         };
         opacitySlider.GetObservable(Slider.ValueProperty).Subscribe(v => host.Opacity = v);
 
-        var codiconFont = Application.Current?.Resources["CodiconFont"] as FontFamily;
+        var codiconFont = Application.Current?.Resources["CodiconFont"] as FontFamily ?? new FontFamily("Segoe UI Symbol");
         var joinBtn = new Button
         {
             Content = "\uEAE0", // log-in: box with arrow in (re-join / dock)

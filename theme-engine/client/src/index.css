@@ -71,6 +71,23 @@ body {
   font-size: 0.95rem;
 }
 
+.themed-log-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color, var(--default-border-color));
+}
+
+.themed-log-section h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.15rem;
+}
+
+.themed-log-hint {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
 /* Theme Manager: proxy status banners */
 .status-banner {
   display: flex;

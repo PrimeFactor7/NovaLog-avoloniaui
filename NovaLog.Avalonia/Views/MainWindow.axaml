@@ -213,6 +213,13 @@
              </StackPanel>
            </Button>
 
+           <!-- Theme Marketplace (native: search, fetch, apply VS Code themes) -->
+           <Button Classes="neon-action toolbar-btn" Click="OnThemeMarketplaceClick"
+                   ToolTip.Tip="Theme Marketplace&#x0a;Import VS Code themes (native, no browser)"
+                   AutomationProperties.AutomationId="btnThemeMarketplace">
+             <TextBlock Text="&#xEADF;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+           </Button>
+
            <!-- Settings -->
            <ToggleButton Classes="neon-action toolbar-btn" IsChecked="{Binding Settings.IsVisible}" ToolTip.Tip="Settings (Ctrl+,)&#x0a;Open settings flyout">
              <TextBlock Text="&#xEAF8;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />

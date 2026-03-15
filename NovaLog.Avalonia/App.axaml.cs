@@ -13,8 +13,6 @@ namespace NovaLog.Avalonia;
 
 public partial class App : Application
 {
-    private ThemeProxyManager? _themeProxyManager;
-
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -39,13 +37,8 @@ public partial class App : Application
                 vm.LoadPath(desktop.Args[0]);
             }
 
-            // Start theme proxy sidecar on Windows (job-bound so it exits with this process)
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                _themeProxyManager = new ThemeProxyManager();
-                _themeProxyManager.StartProxy(AppDomain.CurrentDomain.BaseDirectory);
-                desktop.Exit += (_, _) => _themeProxyManager?.StopProxy();
-            }
+            // Theme: native path uses VSCodeThemeService in-process (search + VSIX fetch). No proxy/WebView/Node.
+            // To run the React theme sandbox, start ThemeProxy.exe manually (e.g. from theme-engine/ThemeProxy) and open the client in a browser.
         }
 
         base.OnFrameworkInitializationCompleted();

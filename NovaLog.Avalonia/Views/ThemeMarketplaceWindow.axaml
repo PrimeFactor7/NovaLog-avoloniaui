@@ -1,0 +1,61 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+        x:Class="NovaLog.Avalonia.Views.ThemeMarketplaceWindow"
+        x:DataType="vm:ThemeMarketplaceViewModel"
+        Title="Theme Marketplace"
+        Width="560" Height="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        TextElement.Foreground="{DynamicResource TextDefaultBrush}">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*" ColumnDefinitions="*,*" Margin="12">
+    <!-- Search -->
+    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <TextBox Text="{Binding SearchTerm}" Watermark="Search themes..." MinWidth="200" />
+      <Button Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
+    </StackPanel>
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding SearchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding SearchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,0,0,4" />
+
+    <!-- Search results -->
+    <TextBlock Grid.Row="2" Grid.Column="0" Text="Extensions" FontWeight="Bold" Margin="0,0,0,4" />
+    <ListBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding SearchResults}" SelectedItem="{Binding SelectedExtension}"
+             Background="{DynamicResource PanelBgBrush}" MinHeight="100">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel>
+            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Publisher}" Opacity="0.85" FontSize="12" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <!-- Publisher / Extension / Version -->
+    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+      <TextBlock Text="Publisher" FontWeight="SemiBold" />
+      <TextBox Text="{Binding Publisher}" Watermark="e.g. GitHub" />
+      <TextBlock Text="Extension" FontWeight="SemiBold" Margin="0,4,0,0" />
+      <TextBox Text="{Binding Extension}" Watermark="e.g. github-vscode-theme" />
+      <TextBlock Text="Version (optional)" FontWeight="SemiBold" Margin="0,4,0,0" />
+      <TextBox Text="{Binding Version}" Watermark="latest if empty" />
+      <Button Content="Fetch themes" Command="{Binding FetchThemesCommand}" IsEnabled="{Binding !IsFetching}" Margin="0,8,0,0" />
+    </StackPanel>
+    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding FetchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding FetchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="8,0,0,0" VerticalAlignment="Top" />
+
+    <!-- Variants -->
+    <TextBlock Grid.Row="4" Grid.Column="0" Text="Theme variants" FontWeight="Bold" Margin="0,8,0,4" />
+    <ListBox Grid.Row="5" Grid.Column="0" ItemsSource="{Binding Variants}" SelectedItem="{Binding SelectedVariant}"
+             Background="{DynamicResource PanelBgBrush}" MinHeight="80">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Text="{Binding Label}" />
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <Button Grid.Row="5" Grid.Column="1" Content="Apply theme" Command="{Binding ApplyThemeCommand}"
+            IsEnabled="{Binding SelectedVariant, Converter={x:Static ObjectConverters.IsNotNull}}"
+            Margin="8,8,0,0" VerticalAlignment="Top" />
+  </Grid>
+</Window>

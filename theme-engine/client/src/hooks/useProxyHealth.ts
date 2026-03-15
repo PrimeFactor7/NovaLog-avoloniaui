@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export type ProxyStatus = 'initializing' | 'ready' | 'faulty';
 
-const MAX_ATTEMPTS = 10;
+const MAX_ATTEMPTS = 8;
 const RETRY_DELAY_MS = 1500;
 const HEALTH_TIMEOUT_MS = 1000;
 

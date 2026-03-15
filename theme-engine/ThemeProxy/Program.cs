@@ -3,7 +3,11 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = "wwwroot"
+});
 
 builder.Services.AddCors(options =>
 {
@@ -17,10 +21,14 @@ builder.Services.AddHttpClient();
 var app = builder.Build();
 app.UseCors();
 
+// Serve React app (index.html, JS, CSS) from wwwroot; API routes below take precedence
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // ==========================================
 // 0. HEALTH (for monitoring / scripts)
 // ==========================================
-app.MapGet("/health", () => Results.Ok(new { status = "ready", timestamp = DateTime.UtcNow }));
+app.MapGet("/health", () => Results.Ok(new { status = "ready", port = 15707 }));
 
 // ==========================================
 // 1. SEARCH ENDPOINT (Marketplace Search)
@@ -162,6 +170,9 @@ app.MapGet("/api/fetch-vscode-theme", async (
         return Results.Problem(detail: ex.Message, statusCode: 500);
     }
 });
+
+// SPA fallback: unknown paths (e.g. /) serve index.html
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

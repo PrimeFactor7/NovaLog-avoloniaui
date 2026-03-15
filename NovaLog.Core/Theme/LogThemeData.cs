@@ -79,6 +79,100 @@ public sealed class LogThemeData
         _                => TextDefault
     };
 
+    /// <summary>Create a new theme from a base and property overrides (e.g. from VSCodeThemeMapping.ToThemeOverrides).</summary>
+    public static LogThemeData WithOverrides(LogThemeData baseTheme, IReadOnlyDictionary<string, string>? propertyOverrides)
+    {
+        if (propertyOverrides == null || propertyOverrides.Count == 0)
+            return baseTheme;
+        string Get(string name) => propertyOverrides.TryGetValue(name, out var v) ? v : name switch
+        {
+            "Name" => baseTheme.Name,
+            "Background" => baseTheme.Background,
+            "PanelBg" => baseTheme.PanelBg,
+            "ToolBarBg" => baseTheme.ToolBarBg,
+            "StatusBarBg" => baseTheme.StatusBarBg,
+            "TabActiveBg" => baseTheme.TabActiveBg,
+            "TabHoverBg" => baseTheme.TabHoverBg,
+            "Separator" => baseTheme.Separator,
+            "SplitterBg" => baseTheme.SplitterBg,
+            "TextTrace" => baseTheme.TextTrace,
+            "TextVerbose" => baseTheme.TextVerbose,
+            "TextDebug" => baseTheme.TextDebug,
+            "TextInfo" => baseTheme.TextInfo,
+            "TextWarn" => baseTheme.TextWarn,
+            "TextError" => baseTheme.TextError,
+            "TextFatal" => baseTheme.TextFatal,
+            "TextDefault" => baseTheme.TextDefault,
+            "Accent" => baseTheme.Accent,
+            "Timestamp" => baseTheme.Timestamp,
+            "DimText" => baseTheme.DimText,
+            "WarnLineBg" => baseTheme.WarnLineBg,
+            "ErrorLineBg" => baseTheme.ErrorLineBg,
+            "FatalLineBg" => baseTheme.FatalLineBg,
+            "JsonKey" => baseTheme.JsonKey,
+            "JsonString" => baseTheme.JsonString,
+            "JsonNumber" => baseTheme.JsonNumber,
+            "JsonBool" => baseTheme.JsonBool,
+            "JsonPunctuation" => baseTheme.JsonPunctuation,
+            "JsonBrace" => baseTheme.JsonBrace,
+            "SqlKeyword" => baseTheme.SqlKeyword,
+            "SqlTable" => baseTheme.SqlTable,
+            "SqlValue" => baseTheme.SqlValue,
+            "SqlOperator" => baseTheme.SqlOperator,
+            "StackMethod" => baseTheme.StackMethod,
+            "StackFilePath" => baseTheme.StackFilePath,
+            "StackLineNumber" => baseTheme.StackLineNumber,
+            "StackKeyword" => baseTheme.StackKeyword,
+            "NumberLiteral" => baseTheme.NumberLiteral,
+            "BookmarkMarker" => baseTheme.BookmarkMarker,
+            "SearchHitMarker" => baseTheme.SearchHitMarker,
+            _ => ""
+        };
+        return new LogThemeData
+        {
+            Name = Get("Name"),
+            Background = Get("Background"),
+            PanelBg = Get("PanelBg"),
+            ToolBarBg = Get("ToolBarBg"),
+            StatusBarBg = Get("StatusBarBg"),
+            TabActiveBg = Get("TabActiveBg"),
+            TabHoverBg = Get("TabHoverBg"),
+            Separator = Get("Separator"),
+            SplitterBg = Get("SplitterBg"),
+            TextTrace = Get("TextTrace"),
+            TextVerbose = Get("TextVerbose"),
+            TextDebug = Get("TextDebug"),
+            TextInfo = Get("TextInfo"),
+            TextWarn = Get("TextWarn"),
+            TextError = Get("TextError"),
+            TextFatal = Get("TextFatal"),
+            TextDefault = Get("TextDefault"),
+            Accent = Get("Accent"),
+            Timestamp = Get("Timestamp"),
+            DimText = Get("DimText"),
+            WarnLineBg = Get("WarnLineBg"),
+            ErrorLineBg = Get("ErrorLineBg"),
+            FatalLineBg = Get("FatalLineBg"),
+            JsonKey = Get("JsonKey"),
+            JsonString = Get("JsonString"),
+            JsonNumber = Get("JsonNumber"),
+            JsonBool = Get("JsonBool"),
+            JsonPunctuation = Get("JsonPunctuation"),
+            JsonBrace = Get("JsonBrace"),
+            SqlKeyword = Get("SqlKeyword"),
+            SqlTable = Get("SqlTable"),
+            SqlValue = Get("SqlValue"),
+            SqlOperator = Get("SqlOperator"),
+            StackMethod = Get("StackMethod"),
+            StackFilePath = Get("StackFilePath"),
+            StackLineNumber = Get("StackLineNumber"),
+            StackKeyword = Get("StackKeyword"),
+            NumberLiteral = Get("NumberLiteral"),
+            BookmarkMarker = Get("BookmarkMarker"),
+            SearchHitMarker = Get("SearchHitMarker")
+        };
+    }
+
     // ── Presets ─────────────────────────────────────────────────
 
     public static LogThemeData Dark { get; } = new()
