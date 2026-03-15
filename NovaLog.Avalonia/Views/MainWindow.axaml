@@ -86,7 +86,7 @@
 
              <!-- Monitor Explosion -->
              <Button Classes="neon-action toolbar-btn" Command="{Binding ExplodeCommand}" ToolTip.Tip="Explode to monitors&#x0a;Distribute panes to secondary screens">
-               <TextBlock Text="&#xEB4B;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+               <TextBlock Text="&#xEADF;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
              </Button>
 
              <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />

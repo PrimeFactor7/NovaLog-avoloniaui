@@ -77,8 +77,7 @@ public class NovaLogDockFactory : Factory
     }
 
     /// <summary>
-    /// Adds Join, Pin, Opacity, Close and enables dragging. host.Content is a DockControl (TemplatedControl), not Panel;
-    /// we detach it, wrap in a Grid with the control bar on top, and set after Loaded so the OS has assigned Content.
+    /// Adds Join, Pin, Opacity, Minimize, Maximize/Restore, Close and enables dragging. Non-destructive overlay onto root Panel.
     /// </summary>
     private static void AttachFloatingWindowChrome(NovaLogDockFactory factory, HostWindow host, IDockWindow dockWindow)
     {
@@ -105,23 +104,10 @@ public class NovaLogDockFactory : Factory
         };
         opacitySlider.GetObservable(Slider.ValueProperty).Subscribe(v => host.Opacity = v);
 
-        var closeBtn = new Button
-        {
-            Content = "\u2715",
-            FontSize = 12,
-            Padding = new Thickness(4, 2),
-            Background = Brushes.Transparent,
-            BorderThickness = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Cursor = new Cursor(StandardCursorType.Hand)
-        };
-        ToolTip.SetTip(closeBtn, "Close floating window");
-        closeBtn.Click += (_, _) => host.Close();
-
         var codiconFont = Application.Current?.Resources["CodiconFont"] as FontFamily;
         var joinBtn = new Button
         {
-            Content = "\uEB52",
+            Content = "\uEAE0", // log-in: box with arrow in (re-join / dock)
             FontSize = 16,
             FontFamily = codiconFont,
             Padding = new Thickness(4, 2),
@@ -148,6 +134,63 @@ public class NovaLogDockFactory : Factory
             host.Close();
         };
 
+        var minBtn = new Button
+        {
+            Content = "\uEABF",
+            FontSize = 14,
+            FontFamily = codiconFont,
+            Padding = new Thickness(4, 2),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        ToolTip.SetTip(minBtn, "Minimize");
+        minBtn.Click += (_, _) => host.WindowState = WindowState.Minimized;
+
+        var maxBtn = new Button
+        {
+            Content = host.WindowState == WindowState.Maximized ? "\uEAC1" : "\uEAC0",
+            FontSize = 14,
+            FontFamily = codiconFont,
+            Padding = new Thickness(4, 2),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        ToolTip.SetTip(maxBtn, host.WindowState == WindowState.Maximized ? "Restore" : "Maximize");
+        maxBtn.Click += (_, _) =>
+        {
+            host.WindowState = host.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        };
+        host.GetObservable(Window.WindowStateProperty).Subscribe(state =>
+        {
+            if (state == WindowState.Maximized)
+            {
+                maxBtn.Content = "\uEAC1";
+                ToolTip.SetTip(maxBtn, "Restore");
+            }
+            else
+            {
+                maxBtn.Content = "\uEAC0";
+                ToolTip.SetTip(maxBtn, "Maximize");
+            }
+        });
+
+        var closeBtn = new Button
+        {
+            Content = "\u2715",
+            FontSize = 12,
+            Padding = new Thickness(4, 2),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        ToolTip.SetTip(closeBtn, "Close floating window");
+        closeBtn.Click += (_, _) => host.Close();
+
         var controlBar = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)),
@@ -161,7 +204,7 @@ public class NovaLogDockFactory : Factory
                 Orientation = global::Avalonia.Layout.Orientation.Horizontal,
                 Spacing = 4,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Children = { joinBtn, topmostToggle, new TextBlock { Text = "Opacity", VerticalAlignment = VerticalAlignment.Center }, opacitySlider, closeBtn }
+                Children = { joinBtn, topmostToggle, new TextBlock { Text = "Opacity", VerticalAlignment = VerticalAlignment.Center }, opacitySlider, minBtn, maxBtn, closeBtn }
             }
         };
 
@@ -169,27 +212,17 @@ public class NovaLogDockFactory : Factory
         {
             if (e.GetCurrentPoint(host).Properties.IsLeftButtonPressed)
             {
-                host.BeginMoveDrag(e);
+                if (host.WindowState != WindowState.Maximized)
+                    host.BeginMoveDrag(e);
                 e.Handled = true;
             }
         };
 
-        // Robust content wrapping: host.Content can be the ViewModel (IDockWindow), not a Control.
-        // Post at Loaded so the OS has assigned host.Content; wrap in ContentControl so DataTemplates render it.
         Dispatcher.UIThread.Post(() =>
         {
-            var originalContent = host.Content;
-
-            if (originalContent is Grid g && g.Children.Count > 1)
-                return;
-
-            host.Content = null;
-
-            var wrapper = new Grid();
-            var contentHost = new ContentControl { Content = originalContent };
-            wrapper.Children.Add(contentHost);
-            wrapper.Children.Add(controlBar);
-            host.Content = wrapper;
+            var rootVisual = host.GetVisualDescendants().OfType<Panel>().FirstOrDefault();
+            if (rootVisual is not null && !rootVisual.Children.Contains(controlBar))
+                rootVisual.Children.Add(controlBar);
         }, DispatcherPriority.Loaded);
     }
 }
