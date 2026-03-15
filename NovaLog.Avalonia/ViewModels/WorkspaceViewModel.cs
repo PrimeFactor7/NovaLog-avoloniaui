@@ -97,6 +97,30 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         };
     }
 
+    [RelayCommand] private void SplitVertical() => SplitFocused(false);
+    [RelayCommand] private void SplitHorizontal() => SplitFocused(true);
+
+    [RelayCommand] 
+    private void CloseAllPanesInActiveTab()
+    {
+        if (Layout != null && DockFactory != null)
+        {
+            var dockLayout = (IRootDock)DockFactory.CreateLayout();
+            DockFactory.InitLayout(dockLayout);
+            Layout = dockLayout;
+            InitializeDockDocuments();
+            OnPropertyChanged(nameof(ActiveLogView));
+            return;
+        }
+
+        var fresh = new PaneNodeViewModel();
+        ApplyDefaultFollowState(fresh);
+        if (_sourceManager != null && _theme != null)
+            fresh.LogView.Initialize(Clock, _sourceManager, _theme);
+        RootNode = fresh;
+        FocusPane(fresh);
+    }
+
     partial void OnLayoutChanged(IRootDock? value)
     {
         UnsubscribeLayoutActiveDockable();
