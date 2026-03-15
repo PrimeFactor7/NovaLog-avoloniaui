@@ -20,7 +20,7 @@ app.UseCors();
 // ==========================================
 // 0. HEALTH (for monitoring / scripts)
 // ==========================================
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", port = 15707 }));
+app.MapGet("/health", () => Results.Ok(new { status = "ready", timestamp = DateTime.UtcNow }));
 
 // ==========================================
 // 1. SEARCH ENDPOINT (Marketplace Search)

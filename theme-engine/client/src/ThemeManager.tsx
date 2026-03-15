@@ -10,8 +10,9 @@ import {
   getAppTokenKeys,
 } from './themeEngine';
 import type { ThemeTokens, ImportedThemeVariant, ProxyThemeResponse } from './types';
+import { useProxyHealth } from './hooks/useProxyHealth';
 
-const PROXY_BASE = import.meta.env.VITE_PROXY_URL ?? '';
+const PROXY_URL = import.meta.env.VITE_PROXY_URL ?? 'http://127.0.0.1:15707';
 
 interface ThemeManagerProps {
   initialBaseTokens?: ThemeTokens;
@@ -22,6 +23,7 @@ export function ThemeManager({
   initialBaseTokens = {},
   initialOverrides = {},
 }: ThemeManagerProps) {
+  const { status: proxyStatus, retry: retryProxy } = useProxyHealth(PROXY_URL);
   const [baseTokens, setBaseTokens] = useState<ThemeTokens>(initialBaseTokens);
   const [overrides, setOverrides] = useState<ThemeTokens>(initialOverrides);
   const [importedVariants, setImportedVariants] = useState<ImportedThemeVariant[]>([]);
@@ -48,7 +50,7 @@ export function ThemeManager({
       ...(version ? { version } : {}),
     });
     try {
-      const res = await fetch(`${PROXY_BASE}/api/fetch-vscode-theme?${params}`);
+      const res = await fetch(`${PROXY_URL}/api/fetch-vscode-theme?${params}`);
       const data: ProxyThemeResponse = await res.json();
       if (!res.ok) {
         const msg = (data as { error?: string; message?: string }).message
@@ -110,61 +112,79 @@ export function ThemeManager({
 
   return (
     <div className="theme-manager">
-      <section className="theme-manager-section gallery">
-        <h3>Import from VS Code Marketplace</h3>
-        <div className="import-form">
-          <input
-            type="text"
-            placeholder="Publisher"
-            value={publisher}
-            onChange={(e) => setPublisher(e.target.value)}
-            aria-label="Publisher"
-          />
-          <input
-            type="text"
-            placeholder="Extension"
-            value={extension}
-            onChange={(e) => setExtension(e.target.value)}
-            aria-label="Extension"
-          />
-          <input
-            type="text"
-            placeholder="Version (optional)"
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-            aria-label="Version"
-          />
-          <button
-            type="button"
-            onClick={fetchThemes}
-            disabled={importLoading}
-          >
-            {importLoading ? 'Fetching…' : 'Fetch themes'}
+      {proxyStatus === 'initializing' && (
+        <div className="status-banner" role="status">
+          <span className="spinner" aria-hidden />
+          <span>Connecting to Marketplace Engine…</span>
+        </div>
+      )}
+      {proxyStatus === 'faulty' && (
+        <div className="error-banner" role="alert">
+          <p>The theme engine failed to start.</p>
+          <button type="button" onClick={retryProxy}>
+            Retry Connection
           </button>
         </div>
-        {importError && (
-          <div className="theme-manager-error" role="alert">
-            {importError}
+      )}
+      <div
+        className={`theme-manager-proxy-content${proxyStatus !== 'ready' ? ' theme-manager-proxy-content--waiting' : ''}`}
+      >
+        <section className="theme-manager-section gallery">
+          <h3>Import from VS Code Marketplace</h3>
+          <div className="import-form">
+            <input
+              type="text"
+              placeholder="Publisher"
+              value={publisher}
+              onChange={(e) => setPublisher(e.target.value)}
+              aria-label="Publisher"
+            />
+            <input
+              type="text"
+              placeholder="Extension"
+              value={extension}
+              onChange={(e) => setExtension(e.target.value)}
+              aria-label="Extension"
+            />
+            <input
+              type="text"
+              placeholder="Version (optional)"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              aria-label="Version"
+            />
+            <button
+              type="button"
+              onClick={fetchThemes}
+              disabled={importLoading}
+            >
+              {importLoading ? 'Fetching…' : 'Fetch themes'}
+            </button>
           </div>
-        )}
-        {hasVariants && (
-          <div className="variant-picker">
-            <h4>Select variant</h4>
-            <div className="variant-buttons">
-              {importedVariants.map((variant) => (
-                <button
-                  key={variant.label}
-                  type="button"
-                  onClick={() => applyVariant(variant.tokens)}
-                >
-                  {variant.label}
-                  {variant.uiTheme ? ` (${variant.uiTheme})` : ''}
-                </button>
-              ))}
+          {importError && (
+            <div className="theme-manager-error" role="alert">
+              {importError}
+            </div>
+          )}
+          {hasVariants && (
+            <div className="variant-picker">
+              <h4>Select variant</h4>
+              <div className="variant-buttons">
+                {importedVariants.map((variant) => (
+                  <button
+                    key={variant.label}
+                    type="button"
+                    onClick={() => applyVariant(variant.tokens)}
+                  >
+                    {variant.label}
+                    {variant.uiTheme ? ` (${variant.uiTheme})` : ''}
+                  </button>
+                ))}
             </div>
           </div>
         )}
-      </section>
+        </section>
+      </div>
 
       <section className="theme-manager-section editor">
         <h3>Live editor</h3>
