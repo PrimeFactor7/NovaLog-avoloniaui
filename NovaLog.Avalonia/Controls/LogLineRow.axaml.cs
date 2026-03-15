@@ -313,15 +313,15 @@ public partial class LogLineRow : Control
     {
         return token.Type switch
         {
-            HighlightType.TextDefault => GetBrush("TextDefaultBrush") ?? Brushes.Green,
-            HighlightType.DimText => GetBrush("DimTextBrush") ?? Brushes.Gray,
+            HighlightType.TextDefault => ResolveBrush("TextDefaultBrush") ?? Brushes.Green,
+            HighlightType.DimText => ResolveBrush("DimTextBrush") ?? Brushes.Gray,
             
-            HighlightType.StackKeyword => GetBrush("StackKeywordBrush") ?? Brushes.Gray,
-            HighlightType.StackMethod => GetBrush("StackMethodBrush") ?? Brushes.Cyan,
-            HighlightType.StackArgs => GetBrush("StackArgsBrush") ?? FallbackStackArgs,
-            HighlightType.StackPath => GetBrush("StackPathBrush") ?? FallbackStackPath,
-            HighlightType.StackLineNumber => GetBrush("StackLineNumberBrush") ?? Brushes.Orange,
-            HighlightType.StackException => GetBrush("StackExceptionBrush") ?? Brushes.Red,
+            HighlightType.StackKeyword => ResolveBrush("StackKeywordBrush") ?? Brushes.Gray,
+            HighlightType.StackMethod => ResolveBrush("StackMethodBrush") ?? Brushes.Cyan,
+            HighlightType.StackArgs => ResolveBrush("StackArgsBrush") ?? FallbackStackArgs,
+            HighlightType.StackPath => ResolveBrush("StackPathBrush") ?? FallbackStackPath,
+            HighlightType.StackLineNumber => ResolveBrush("StackLineNumberBrush") ?? Brushes.Orange,
+            HighlightType.StackException => ResolveBrush("StackExceptionBrush") ?? Brushes.Red,
             
             HighlightType.JsonKey => ResolveBrush("JsonKeyBrush") ?? Brushes.Cyan,
             HighlightType.JsonString => ResolveBrush("JsonStringBrush") ?? Brushes.Green,
@@ -331,16 +331,16 @@ public partial class LogLineRow : Control
             HighlightType.JsonBrace => ResolveBrush("JsonBraceBrush") ?? FallbackJsonBraceBrush,
             HighlightType.JsonBracket => ResolveBrush("JsonBracketBrush") ?? FallbackJsonBracketBrush,
             
-            HighlightType.SqlKeyword => GetBrush("SqlKeywordBrush") ?? FallbackSqlKeywordBrush,
-            HighlightType.SqlString => GetBrush("SqlStringBrush") ?? Brushes.Green,
-            HighlightType.SqlOperator => GetBrush("SqlOperatorBrush") ?? Brushes.Gray,
-            HighlightType.SqlNumber => GetBrush("SqlNumberBrush") ?? Brushes.Orange,
+            HighlightType.SqlKeyword => ResolveBrush("SqlKeywordBrush") ?? FallbackSqlKeywordBrush,
+            HighlightType.SqlString => ResolveBrush("SqlStringBrush") ?? Brushes.Green,
+            HighlightType.SqlOperator => ResolveBrush("SqlOperatorBrush") ?? Brushes.Gray,
+            HighlightType.SqlNumber => ResolveBrush("SqlNumberBrush") ?? Brushes.Orange,
             
-            HighlightType.Guid => GetBrush("GuidBrush") ?? FallbackGuidBrush,
-            HighlightType.Url => GetBrush("UrlBrush") ?? FallbackUrlBrush,
-            HighlightType.IpAddress => GetBrush("IpAddressBrush") ?? FallbackIpBrush,
-            HighlightType.Hex => GetBrush("HexBrush") ?? FallbackHexBrush,
-            HighlightType.Number => GetBrush("NumberBrush") ?? Brushes.Orange,
+            HighlightType.Guid => ResolveBrush("GuidBrush") ?? FallbackGuidBrush,
+            HighlightType.Url => ResolveBrush("UrlBrush") ?? FallbackUrlBrush,
+            HighlightType.IpAddress => ResolveBrush("IpAddressBrush") ?? FallbackIpBrush,
+            HighlightType.Hex => ResolveBrush("HexBrush") ?? FallbackHexBrush,
+            HighlightType.Number => ResolveBrush("NumberBrush") ?? Brushes.Orange,
             
             HighlightType.CustomRule => !string.IsNullOrEmpty(token.CustomColorHex) ? ParseBrush(token.CustomColorHex) : Brushes.White,
             _ => Brushes.White
