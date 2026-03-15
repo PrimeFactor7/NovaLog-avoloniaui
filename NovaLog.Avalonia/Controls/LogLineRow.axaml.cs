@@ -29,20 +29,6 @@ public partial class LogLineRow : Control
     private static readonly IBrush SelectedLineBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x4F, 0xC3, 0xF7));
     private static readonly IPen SelectedLinePen = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x4F, 0xC3, 0xF7)), 1);
     internal static readonly ConcurrentDictionary<string, IBrush> ParsedBrushes = new(StringComparer.OrdinalIgnoreCase);
-    internal static readonly Regex StackMethodPattern = new(@"(?<atkw>at)\s+(?<method>[\w.+<>\[\]`,]+)\((?<args>[^)]*)\)", RegexOptions.Compiled);
-    internal static readonly Regex StackFilePattern = new(@"(?:(?<inkw>in)\s+)?(?<path>\w:[\\\/][^\s:]+|[\\\/][^\s:]+):(?:line\s+)?(?<line>\d+)", RegexOptions.Compiled);
-    internal static readonly Regex StackExceptionPattern = new(@"(?<extype>[\w.]+Exception)\b", RegexOptions.Compiled);
-    internal static readonly Regex HexPattern = new(@"\b0x[0-9a-fA-F]+\b", RegexOptions.Compiled);
-    internal static readonly Regex NumberPattern = new(@"\b\d+\.?\d*(?:[eE][-+]?\d+)?\b", RegexOptions.Compiled);
-    internal static readonly Regex GuidPattern = new(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    internal static readonly Regex IpPattern = new(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled);
-    internal static readonly Regex UrlPattern = new(@"\b(?:https?|ftp)://[^\s]+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    internal static readonly Regex SqlKeywordPattern = new(
-        @"\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|AND|OR|NOT|IN|INTO|VALUES|SET|CREATE|DROP|ALTER|TABLE|INDEX|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|BETWEEN|LIKE|IS|NULL|EXISTS|UNION|CASE|WHEN|THEN|ELSE|END|EXEC|EXECUTE|TOP|ASC|DESC)\b",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    internal static readonly Regex SqlStringPattern = new(@"'(?:[^'\\]|\\.)*'", RegexOptions.Compiled);
-    internal static readonly Regex SqlOperatorPattern = new(@"[=<>!]+|[(),;*]", RegexOptions.Compiled);
-    internal static readonly Regex SqlNumberPattern = new(@"\b\d+\.?\d*\b", RegexOptions.Compiled);
     internal static readonly IBrush FallbackText = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x41));
     internal static readonly IBrush FallbackDim = new SolidColorBrush(Color.FromRgb(0x78, 0x78, 0x96));
     internal static readonly IBrush FallbackTimestamp = new SolidColorBrush(Color.FromRgb(0x5A, 0x5A, 0x82));
@@ -302,272 +288,55 @@ public partial class LogLineRow : Control
 
     private void RenderMessage(DrawingContext context, double x, double y, LogLineViewModel vm, ThemeService? theme)
     {
-        var flavor = vm.Flavor;
-        if (theme != null)
+        double currentX = x;
+        foreach (var token in vm.MessageTokens)
         {
-            if (flavor == SyntaxFlavor.Json && !theme.JsonHighlightEnabled) flavor = SyntaxFlavor.None;
-            if (flavor == SyntaxFlavor.Sql && !theme.SqlHighlightEnabled) flavor = SyntaxFlavor.None;
-            if (flavor == SyntaxFlavor.StackTrace && !theme.StackTraceHighlightEnabled) flavor = SyntaxFlavor.None;
-            // Note: Number highlighting isn't fully separated into a flavor yet in this port, 
-            // but the infrastructure is now there to support it.
-        }
-
-        switch (flavor)
-        {
-            case SyntaxFlavor.Json:
-                RenderJsonMessage(context, x, y, vm.Message);
-                break;
-            case SyntaxFlavor.Sql:
-                RenderSqlMessage(context, x, y, vm.Message);
-                break;
-            case SyntaxFlavor.StackTrace:
-                RenderStackTraceMessage(context, x, y, vm.Message);
-                break;
-            default:
-                IBrush brush;
-                if (vm.IsContinuation)
-                {
-                    brush = GetBrush("DimTextBrush") ?? Brushes.Gray;
-                }
-                else
-                {
-                    brush = theme != null 
-                        ? ParseBrush(theme.GetMessageColor())
-                        : GetBrush("TextDefaultBrush") ?? Brushes.Green;
-                }
-                RenderMessageWithHighlights(context, x, y, vm.Message, brush);
-                break;
+            if (token.Length <= 0) continue;
+            
+            var text = vm.Message.Substring(token.Index, token.Length);
+            var brush = ResolveTokenBrush(token, theme);
+            var ft = CreateFormattedText(text, brush);
+            context.DrawText(ft, new Point(currentX, y));
+            currentX += text.Length * CharWidth;
         }
     }
 
-    private void RenderStackTraceMessage(DrawingContext context, double startX, double y, string message)
+    private IBrush ResolveTokenBrush(HighlightToken token, ThemeService? theme)
     {
-        var tokens = new List<(int Index, int Length, IBrush Brush, string Type)>();
-
-        // Exception types
-        foreach (Match m in StackExceptionPattern.Matches(message))
-            tokens.Add((m.Index, m.Length, GetBrush("StackExceptionBrush") ?? Brushes.Red, "exception"));
-
-        // Method calls
-        foreach (Match m in StackMethodPattern.Matches(message))
+        return token.Type switch
         {
-            if (m.Groups["atkw"].Success)
-                tokens.Add((m.Groups["atkw"].Index, m.Groups["atkw"].Length, GetBrush("StackKeywordBrush") ?? Brushes.Gray, "keyword"));
-            if (m.Groups["method"].Success)
-                tokens.Add((m.Groups["method"].Index, m.Groups["method"].Length, GetBrush("StackMethodBrush") ?? Brushes.Cyan, "method"));
-            if (m.Groups["args"].Success && m.Groups["args"].Length > 0)
-                tokens.Add((m.Groups["args"].Index, m.Groups["args"].Length, GetBrush("StackArgsBrush") ?? FallbackStackArgs, "args"));
-        }
-
-        // File paths and line numbers
-        foreach (Match m in StackFilePattern.Matches(message))
-        {
-            if (m.Groups["inkw"].Success)
-                tokens.Add((m.Groups["inkw"].Index, m.Groups["inkw"].Length, GetBrush("StackKeywordBrush") ?? Brushes.Gray, "keyword"));
-            if (m.Groups["path"].Success)
-                tokens.Add((m.Groups["path"].Index, m.Groups["path"].Length, GetBrush("StackPathBrush") ?? FallbackStackPath, "path"));
-            if (m.Groups["line"].Success)
-                tokens.Add((m.Groups["line"].Index, m.Groups["line"].Length, GetBrush("StackLineNumberBrush") ?? Brushes.Orange, "line"));
-        }
-
-        if (tokens.Count == 0)
-        {
-            var ft = CreateFormattedText(message, GetBrush("TextDefaultBrush") ?? Brushes.White);
-            context.DrawText(ft, new Point(startX, y));
-            return;
-        }
-
-        tokens.Sort((a, b) => a.Index.CompareTo(b.Index));
-
-        double x = startX;
-        int pos = 0;
-        var fallbackBrush = GetBrush("TextDefaultBrush") ?? Brushes.White;
-
-        foreach (var (index, length, brush, type) in tokens)
-        {
-            // Draw gap before token
-            if (pos < index)
-            {
-                var gap = message.Substring(pos, index - pos);
-                var ft = CreateFormattedText(gap, fallbackBrush);
-                context.DrawText(ft, new Point(x, y));
-                x += gap.Length * CharWidth;
-            }
-
-            // Draw token
-            var token = message.Substring(index, length);
-            var tokenFt = CreateFormattedText(token, brush);
-            context.DrawText(tokenFt, new Point(x, y));
-            x += token.Length * CharWidth;
-            pos = index + length;
-        }
-
-        // Draw remaining text
-        if (pos < message.Length)
-        {
-            var remaining = message.Substring(pos);
-            var ft = CreateFormattedText(remaining, fallbackBrush);
-            context.DrawText(ft, new Point(x, y));
-        }
-    }
-
-    private void RenderMessageWithHighlights(DrawingContext context, double startX, double y, string message, IBrush defaultBrush)
-    {
-        var tokens = new List<(int Index, int Length, IBrush Brush)>();
-
-        // GUIDs (highest priority)
-        foreach (Match m in GuidPattern.Matches(message))
-            tokens.Add((m.Index, m.Length, GetBrush("GuidBrush") ?? FallbackGuidBrush));
-
-        // URLs
-        foreach (Match m in UrlPattern.Matches(message))
-        {
-            bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
-            if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("UrlBrush") ?? FallbackUrlBrush));
-        }
-
-        // IP addresses
-        foreach (Match m in IpPattern.Matches(message))
-        {
-            bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
-            if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("IpAddressBrush") ?? FallbackIpBrush));
-        }
-
-        // Hex values (before regular numbers)
-        foreach (Match m in HexPattern.Matches(message))
-        {
-            bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
-            if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("HexBrush") ?? FallbackHexBrush));
-        }
-
-        // Regular numbers
-        foreach (Match m in NumberPattern.Matches(message))
-        {
-            bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
-            if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("NumberBrush") ?? Brushes.Orange));
-        }
-
-        if (tokens.Count == 0)
-        {
-            var ft = CreateFormattedText(message, defaultBrush);
-            context.DrawText(ft, new Point(startX, y));
-            return;
-        }
-
-        tokens.Sort((a, b) => a.Index.CompareTo(b.Index));
-
-        double x = startX;
-        int pos = 0;
-
-        foreach (var (index, length, brush) in tokens)
-        {
-            // Draw gap before token
-            if (pos < index)
-            {
-                var gap = message.Substring(pos, index - pos);
-                var ft = CreateFormattedText(gap, defaultBrush);
-                context.DrawText(ft, new Point(x, y));
-                x += gap.Length * CharWidth;
-            }
-
-            // Draw token
-            var token = message.Substring(index, length);
-            var tokenFt = CreateFormattedText(token, brush);
-            context.DrawText(tokenFt, new Point(x, y));
-            x += token.Length * CharWidth;
-            pos = index + length;
-        }
-
-        // Draw remaining text
-        if (pos < message.Length)
-        {
-            var remaining = message.Substring(pos);
-            var ft = CreateFormattedText(remaining, defaultBrush);
-            context.DrawText(ft, new Point(x, y));
-        }
-    }
-
-    private void RenderJsonMessage(DrawingContext context, double startX, double y, string message)
-    {
-        var tokens = JsonHighlightTokenizer.Tokenize(message);
-        double x = startX;
-
-        foreach (var (start, length, kind) in tokens)
-        {
-            if (length <= 0) continue;
-            var segment = message.Substring(start, length);
-            var brush = GetJsonBrush(kind, segment);
-            var ft = CreateFormattedText(segment, brush);
-            context.DrawText(ft, new Point(x, y));
-            x += segment.Length * CharWidth;
-        }
-    }
-
-    private void RenderSqlMessage(DrawingContext context, double startX, double y, string message)
-    {
-        // Collect all tokens
-        var tokens = new List<(int Index, int Length, IBrush Brush)>();
-
-        foreach (Match m in SqlKeywordPattern.Matches(message))
-            tokens.Add((m.Index, m.Length, GetBrush("SqlKeywordBrush") ?? FallbackSqlKeywordBrush));
-        foreach (Match m in SqlStringPattern.Matches(message))
-            tokens.Add((m.Index, m.Length, GetBrush("SqlStringBrush") ?? Brushes.Green));
-        foreach (Match m in SqlOperatorPattern.Matches(message))
-        {
-            bool overlaps = tokens.Any(t => m.Index >= t.Index && m.Index < t.Index + t.Length);
-            if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("SqlOperatorBrush") ?? Brushes.Gray));
-        }
-        foreach (Match m in SqlNumberPattern.Matches(message))
-        {
-            bool overlaps = tokens.Any(t => m.Index < t.Index + t.Length && m.Index + m.Length > t.Index);
-            if (!overlaps)
-                tokens.Add((m.Index, m.Length, GetBrush("SqlNumberBrush") ?? Brushes.Orange));
-        }
-
-        if (tokens.Count == 0)
-        {
-            var ft = CreateFormattedText(message, GetBrush("TextDefaultBrush") ?? Brushes.White);
-            context.DrawText(ft, new Point(startX, y));
-            return;
-        }
-
-        tokens.Sort((a, b) => a.Index.CompareTo(b.Index));
-
-        double x = startX;
-        int pos = 0;
-        var fallbackBrush = GetBrush("TextDefaultBrush") ?? Brushes.White;
-
-        foreach (var (index, length, brush) in tokens)
-        {
-            // Draw gap before token
-            if (pos < index)
-            {
-                var gap = message.Substring(pos, index - pos);
-                var ft = CreateFormattedText(gap, fallbackBrush);
-                context.DrawText(ft, new Point(x, y));
-                x += gap.Length * CharWidth;
-            }
-
-            // Draw token
-            var token = message.Substring(index, length);
-            var tokenFt = CreateFormattedText(token, brush);
-            context.DrawText(tokenFt, new Point(x, y));
-            x += token.Length * CharWidth;
-            pos = index + length;
-        }
-
-        // Draw remaining text
-        if (pos < message.Length)
-        {
-            var remaining = message.Substring(pos);
-            var ft = CreateFormattedText(remaining, fallbackBrush);
-            context.DrawText(ft, new Point(x, y));
-        }
+            HighlightType.TextDefault => theme != null ? ParseBrush(theme.GetMessageColor()) : GetBrush("TextDefaultBrush") ?? Brushes.Green,
+            HighlightType.DimText => GetBrush("DimTextBrush") ?? Brushes.Gray,
+            
+            HighlightType.StackKeyword => GetBrush("StackKeywordBrush") ?? Brushes.Gray,
+            HighlightType.StackMethod => GetBrush("StackMethodBrush") ?? Brushes.Cyan,
+            HighlightType.StackArgs => GetBrush("StackArgsBrush") ?? FallbackStackArgs,
+            HighlightType.StackPath => GetBrush("StackPathBrush") ?? FallbackStackPath,
+            HighlightType.StackLineNumber => GetBrush("StackLineNumberBrush") ?? Brushes.Orange,
+            HighlightType.StackException => GetBrush("StackExceptionBrush") ?? Brushes.Red,
+            
+            HighlightType.JsonKey => ResolveBrush("JsonKeyBrush") ?? Brushes.Cyan,
+            HighlightType.JsonString => ResolveBrush("JsonStringBrush") ?? Brushes.Green,
+            HighlightType.JsonNumber => ResolveBrush("JsonNumberBrush") ?? Brushes.Orange,
+            HighlightType.JsonBool => ResolveBrush("JsonBoolBrush") ?? Brushes.Red,
+            HighlightType.JsonPunctuation => ResolveBrush("JsonPunctuationBrush") ?? Brushes.Gray,
+            HighlightType.JsonBrace => ResolveBrush("JsonBraceBrush") ?? FallbackJsonBraceBrush,
+            HighlightType.JsonBracket => ResolveBrush("JsonBracketBrush") ?? FallbackJsonBracketBrush,
+            
+            HighlightType.SqlKeyword => GetBrush("SqlKeywordBrush") ?? FallbackSqlKeywordBrush,
+            HighlightType.SqlString => GetBrush("SqlStringBrush") ?? Brushes.Green,
+            HighlightType.SqlOperator => GetBrush("SqlOperatorBrush") ?? Brushes.Gray,
+            HighlightType.SqlNumber => GetBrush("SqlNumberBrush") ?? Brushes.Orange,
+            
+            HighlightType.Guid => GetBrush("GuidBrush") ?? FallbackGuidBrush,
+            HighlightType.Url => GetBrush("UrlBrush") ?? FallbackUrlBrush,
+            HighlightType.IpAddress => GetBrush("IpAddressBrush") ?? FallbackIpBrush,
+            HighlightType.Hex => GetBrush("HexBrush") ?? FallbackHexBrush,
+            HighlightType.Number => GetBrush("NumberBrush") ?? Brushes.Orange,
+            
+            HighlightType.CustomRule => !string.IsNullOrEmpty(token.CustomColorHex) ? ParseBrush(token.CustomColorHex) : Brushes.White,
+            _ => Brushes.White
+        };
     }
 
     private void RenderPlainMessage(DrawingContext context, double x, double y, string message, IBrush? brush)

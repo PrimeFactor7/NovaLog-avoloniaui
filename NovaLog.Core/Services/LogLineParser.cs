@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System;
 using NovaLog.Core.Models;
 
 namespace NovaLog.Core.Services;
@@ -6,14 +6,10 @@ namespace NovaLog.Core.Services;
 /// <summary>
 /// Parses raw log text into structured LogLine records.
 /// Format: "yyyy-MM-dd HH:mm:ss.fff level: \tmessage"
+/// Uses Span-based parsing for maximum performance and zero allocations.
 /// </summary>
 public static partial class LogLineParser
 {
-    [GeneratedRegex(
-        @"^(?<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s+(?<level>fatal|error|warn|info|debug|verbose|trace):\s*(?<msg>.*)",
-        RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture)]
-    private static partial Regex LinePattern();
-
     private const string FileSepPrefix = "$$FILE_SEP::";
 
     public static LogLine Parse(string rawText, int globalIndex)
@@ -35,33 +31,48 @@ public static partial class LogLineParser
             };
         }
 
-        var match = LinePattern().Match(rawText);
-        if (match.Success)
+        var span = rawText.AsSpan();
+
+        // 1. Try parse timestamp (exactly 23 chars: "yyyy-MM-dd HH:mm:ss.fff")
+        if (span.Length >= 23 && char.IsDigit(span[0]) && char.IsDigit(span[1]) && char.IsDigit(span[2]) && char.IsDigit(span[3]) && span[4] == '-')
         {
-            DateTime? ts = DateTime.TryParse(match.Groups["ts"].ValueSpan, out var parsed) ? parsed : null;
-
-            var level = match.Groups["level"].Value.ToLowerInvariant() switch
+            if (DateTime.TryParse(span[..23], out var ts))
             {
-                "fatal"   => LogLevel.Fatal,
-                "error"   => LogLevel.Error,
-                "warn"    => LogLevel.Warn,
-                "info"    => LogLevel.Info,
-                "debug"   => LogLevel.Debug,
-                "verbose" => LogLevel.Verbose,
-                "trace"   => LogLevel.Trace,
-                _         => LogLevel.Unknown
-            };
+                var afterTs = span[23..];
+                
+                // Skip spaces
+                int i = 0;
+                while (i < afterTs.Length && char.IsWhiteSpace(afterTs[i])) i++;
+                
+                if (i < afterTs.Length)
+                {
+                    var afterSpace = afterTs[i..];
+                    int colonIdx = afterSpace.IndexOf(':');
+                    if (colonIdx > 0)
+                    {
+                        var levelSpan = afterSpace[..colonIdx];
+                        var level = ParseLevel(levelSpan);
+                        if (level != LogLevel.Unknown)
+                        {
+                            var msgSpan = afterSpace[(colonIdx + 1)..];
+                            // Skip leading spaces in message
+                            int j = 0;
+                            while (j < msgSpan.Length && char.IsWhiteSpace(msgSpan[j])) j++;
+                            var message = msgSpan[j..].ToString();
 
-            var message = match.Groups["msg"].Value;
-            return new LogLine
-            {
-                GlobalIndex = globalIndex,
-                RawText = rawText,
-                Timestamp = ts,
-                Level = level,
-                Message = message,
-                Flavor = SyntaxResolver.Detect(message)
-            };
+                            return new LogLine
+                            {
+                                GlobalIndex = globalIndex,
+                                RawText = rawText,
+                                Timestamp = ts,
+                                Level = level,
+                                Message = message,
+                                Flavor = SyntaxResolver.Detect(message)
+                            };
+                        }
+                    }
+                }
+            }
         }
 
         return new LogLine
@@ -72,5 +83,17 @@ public static partial class LogLineParser
             Message = rawText,
             Flavor = SyntaxResolver.Detect(rawText)
         };
+    }
+
+    private static LogLevel ParseLevel(ReadOnlySpan<char> span)
+    {
+        if (span.Equals("info", StringComparison.OrdinalIgnoreCase)) return LogLevel.Info;
+        if (span.Equals("error", StringComparison.OrdinalIgnoreCase)) return LogLevel.Error;
+        if (span.Equals("warn", StringComparison.OrdinalIgnoreCase)) return LogLevel.Warn;
+        if (span.Equals("debug", StringComparison.OrdinalIgnoreCase)) return LogLevel.Debug;
+        if (span.Equals("fatal", StringComparison.OrdinalIgnoreCase)) return LogLevel.Fatal;
+        if (span.Equals("trace", StringComparison.OrdinalIgnoreCase)) return LogLevel.Trace;
+        if (span.Equals("verbose", StringComparison.OrdinalIgnoreCase)) return LogLevel.Verbose;
+        return LogLevel.Unknown;
     }
 }

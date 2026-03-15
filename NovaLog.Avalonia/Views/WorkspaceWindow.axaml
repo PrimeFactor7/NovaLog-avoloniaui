@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+        xmlns:views="using:NovaLog.Avalonia.Views"
+        xmlns:controls="using:NovaLog.Avalonia.Controls"
+        xmlns:dock="using:Dock.Avalonia.Controls"
+        xmlns:docking="using:NovaLog.Avalonia.Docking"
+        x:Class="NovaLog.Avalonia.Views.WorkspaceWindow"
+        x:DataType="vm:WorkspaceViewModel"
+        Title="{Binding ActiveLogView.Title, FallbackValue='NovaLog Workspace'}"
+        Width="1024" Height="768"
+        Background="{DynamicResource BackgroundBrush}"
+        TransparencyLevelHint="AcrylicBlur">
+
+  <Grid RowDefinitions="Auto,*,24">
+    <!-- Mini Toolbar for secondary window -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource ToolBarBgBrush}"
+            Padding="6,4"
+            MinHeight="36">
+      <DockPanel VerticalAlignment="Center">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+          <Button Classes="neon-action toolbar-btn" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close panes" Foreground="{DynamicResource DimTextBrush}" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4">
+          <!-- Follow All -->
+          <ToggleButton Classes="neon-action toolbar-btn"
+                        IsChecked="{Binding IsMasterFollowOn}"
+                        ToolTip.Tip="Follow all (F)">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource AccentBrush}" />
+            </StackPanel>
+          </ToggleButton>
+
+          <!-- Split Panes -->
+          <Button Classes="neon-action toolbar-btn" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally">
+            <TextBlock Text="&#xEB56;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+          </Button>
+          <Button Classes="neon-action toolbar-btn" Command="{Binding SplitVerticalCommand}" ToolTip.Tip="Split vertically">
+            <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+          </Button>
+        </StackPanel>
+
+        <TextBlock Text="{Binding ActiveLogView.Title}"
+                   Foreground="{DynamicResource DimTextBrush}"
+                   VerticalAlignment="Center"
+                   FontSize="12"
+                   HorizontalAlignment="Center" />
+      </DockPanel>
+    </Border>
+
+    <!-- Dock content -->
+    <dock:DockControl Grid.Row="1"
+                      Layout="{Binding Layout}"
+                      Factory="{Binding DockFactory}"
+                      InitializeLayout="True"
+                      EnableManagedWindowLayer="False" />
+
+    <!-- Status bar -->
+    <Border Grid.Row="2" Background="{DynamicResource ToolBarBgBrush}" BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,1,0,0">
+       <DockPanel Margin="8,0">
+         <TextBlock DockPanel.Dock="Left" Text="{Binding ActiveLogView.NavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" FontSize="11" />
+         <TextBlock DockPanel.Dock="Right" Text="{Binding ActiveLogView.TotalLineCount, StringFormat='\{0\} lines'}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" FontSize="11" />
+       </DockPanel>
+    </Border>
+  </Grid>
+</Window>

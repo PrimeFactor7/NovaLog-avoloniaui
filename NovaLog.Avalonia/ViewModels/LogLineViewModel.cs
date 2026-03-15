@@ -13,6 +13,7 @@ public sealed class LogLineViewModel
     public string Message { get; }
     public LogLevel Level { get; }
     public SyntaxFlavor Flavor { get; set; }
+    public IReadOnlyList<HighlightToken> MessageTokens { get; }
     public bool IsContinuation { get; }
     public bool IsFileSeparator { get; }
     public long FileSize { get; }
@@ -42,6 +43,8 @@ public sealed class LogLineViewModel
             : string.Empty;
 
         LevelText = line.IsContinuation ? string.Empty : LevelToString(line.Level);
+
+        MessageTokens = SyntaxHighlighter.Tokenize(Message, Flavor, IsContinuation);
     }
 
     private static string FormatFileSize(long bytes) => bytes switch

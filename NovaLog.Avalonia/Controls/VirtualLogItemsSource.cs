@@ -71,7 +71,7 @@ public sealed class VirtualLogItemsSource : IList, IReadOnlyList<LogLineViewMode
     private readonly Dictionary<long, (LogLineViewModel Vm, LinkedListNode<long> Node)> _cache = new();
     private readonly LinkedList<long> _lruOrder = new();
     private readonly object _cacheLock = new();
-    private const int CacheCapacity = 200;
+    private const int CacheCapacity = 2000;
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 

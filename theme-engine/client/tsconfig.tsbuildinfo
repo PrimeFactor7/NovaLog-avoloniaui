@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/thememanager.tsx","./src/main.tsx","./src/themeengine.ts","./src/types.ts","./src/vite-env.d.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/thememanager.tsx","./src/main.tsx","./src/themeengine.ts","./src/types.ts","./src/vite-env.d.ts","./src/components/themedlog.tsx","./src/hooks/useproxyhealth.ts"],"version":"5.9.3"}

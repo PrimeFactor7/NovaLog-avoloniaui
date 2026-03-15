@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls;
 using Dock.Model.Core;
@@ -9,9 +10,7 @@ namespace NovaLog.Avalonia.Services;
 
 /// <summary>
 /// Handles detection of monitor layouts and the "Explosion" of docking panes
-/// to secondary screens. Panes are distributed as native floating Dock windows
-/// so they remain redockable and connected to the global message bus (Clock, TimeSync).
-/// SplitToWindow expects position and size in logical pixels (DIPs); WorkingArea is device pixels so we scale by Screen.Scaling.
+/// or workspaces to secondary screens.
 /// </summary>
 public class MonitorManager
 {
@@ -23,32 +22,26 @@ public class MonitorManager
     }
 
     /// <summary>True if there are secondary screens available for explosion.</summary>
-    public bool HasSecondaryScreens
+    public bool HasSecondaryScreens => GetSecondaryScreens().Count > 0;
+
+    private List<Screen> GetSecondaryScreens()
     {
-        get
-        {
-            var currentScreen = _mainWindow.Screens.ScreenFromWindow(_mainWindow)
-                                ?? _mainWindow.Screens.Primary;
-            return _mainWindow.Screens.All
-                .Any(s => currentScreen is null || s.WorkingArea != currentScreen.WorkingArea);
-        }
+        var currentScreen = _mainWindow.Screens.ScreenFromWindow(_mainWindow)
+                            ?? _mainWindow.Screens.Primary;
+        return _mainWindow.Screens.All
+            .Where(s => currentScreen is null || s.WorkingArea != currentScreen.WorkingArea)
+            .ToList();
     }
 
     /// <summary>
-    /// Distributes all documents (except the first) from the active Dock layout to secondary monitors
-    /// as floating Dock windows. Uses <c>SplitToWindow</c> to create native redockable windows.
-    /// Round-robins across available screens.
+    /// Distributes all document panes (except the first one) of the ACTIVE workspace
+    /// to secondary monitors as floating Dock windows.
     /// </summary>
-    public void ExplodeToMonitors(WorkspaceViewModel workspace, NovaLogDockFactory factory)
+    public void ExplodePanesToMonitors(WorkspaceViewModel workspace, NovaLogDockFactory factory)
     {
         if (workspace.Layout is null) return;
 
-        var currentScreen = _mainWindow.Screens.ScreenFromWindow(_mainWindow)
-                            ?? _mainWindow.Screens.Primary;
-        var secondaryScreens = _mainWindow.Screens.All
-            .Where(s => currentScreen is null || s.WorkingArea != currentScreen.WorkingArea)
-            .ToList();
-
+        var secondaryScreens = GetSecondaryScreens();
         if (secondaryScreens.Count == 0) return;
 
         var docs = DockLayoutHelper.GetAllDocuments(workspace.Layout);
@@ -70,9 +63,51 @@ public class MonitorManager
             var w = wa.Width * 0.9 / scale;
             var h = wa.Height * 0.9 / scale;
 
-            // HostWindowLocator in the factory constructor ensures the library can create an Avalonia HostWindow for the new IDockWindow.
             factory.SplitToWindow(ownerDock, doc, x, y, w, h);
+            screenIndex++;
+        }
+    }
 
+    /// <summary>
+    /// Distributes all workspaces (tabs) EXCEPT the active one to secondary monitors.
+    /// Each exploded workspace gets its own native Window hosting the layout.
+    /// </summary>
+    public void ExplodeTabsToMonitors(WorkspaceViewModel workspace, SourceManagerViewModel sourceManager, Core.Theme.ThemeService theme)
+    {
+        var secondaryScreens = GetSecondaryScreens();
+        if (secondaryScreens.Count == 0) return;
+
+        var tabsToExplode = workspace.Tabs.Where(t => !t.IsActive).ToList();
+        if (tabsToExplode.Count == 0) return;
+
+        int screenIndex = 0;
+        foreach (var tab in tabsToExplode)
+        {
+            var screen = secondaryScreens[screenIndex % secondaryScreens.Count];
+            var wa = screen.WorkingArea;
+
+            // Create secondary workspace VM that shares services but only has THIS layout
+            var secondaryWorkspace = new WorkspaceViewModel();
+            secondaryWorkspace.Initialize(sourceManager, theme);
+            secondaryWorkspace.DockFactory = workspace.DockFactory;
+            
+            if (tab.SavedDockLayout != null)
+                secondaryWorkspace.Layout = tab.SavedDockLayout;
+            else if (tab.SavedLayout != null)
+                secondaryWorkspace.RootNode = tab.SavedLayout;
+
+            var win = new Views.WorkspaceWindow
+            {
+                DataContext = secondaryWorkspace,
+                WindowStartupLocation = WindowStartupLocation.Manual
+            };
+
+            win.Show();
+            win.Position = new Avalonia.PixelPoint(wa.X, wa.Y);
+            win.WindowState = WindowState.Maximized;
+
+            // Remove from the main tab list
+            workspace.Tabs.Remove(tab);
             screenIndex++;
         }
     }

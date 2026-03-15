@@ -48,11 +48,6 @@ public partial class MainWindow : Window
         SidebarPanel.AddFileRequested += OnOpenFileClick;
         SidebarPanel.AddFolderRequested += OnOpenFolderClick;
 
-        // Tab bar: handle tab clicks and middle-click close
-        TabBar.AddHandler(Button.ClickEvent, OnTabButtonClick);
-        TabBar.AddHandler(PointerPressedEvent, OnTabBarPointerPressed, handledEventsToo: true);
-        TabBar.AddHandler(PointerMovedEvent, OnTabBarPointerMoved, handledEventsToo: true);
-
         // Tab bar drag-drop reorder
         DragDrop.SetAllowDrop(TabBar, true);
         TabBar.AddHandler(DragDrop.DragOverEvent, OnTabBarDragOver);

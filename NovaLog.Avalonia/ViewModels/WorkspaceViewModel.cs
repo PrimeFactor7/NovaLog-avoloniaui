@@ -20,6 +20,24 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     [ObservableProperty] private SplitNodeViewModel _rootNode;
     [ObservableProperty] private PaneNodeViewModel? _focusedPane;
     [ObservableProperty] private int _activeTabIndex;
+    private int _previousTabIndex = -1;
+
+    partial void OnActiveTabIndexChanged(int value)
+    {
+        if (value == _previousTabIndex) return;
+
+        // Save layout of the PREVIOUS tab before switching to the NEW one
+        if (_previousTabIndex >= 0 && _previousTabIndex < Tabs.Count)
+        {
+            Tabs[_previousTabIndex].SavedLayout = RootNode;
+            if (Layout is not null)
+                Tabs[_previousTabIndex].SavedDockLayout = Layout;
+        }
+
+        _previousTabIndex = value;
+        ActivateTab(value, saveCurrent: false);
+    }
+
     [ObservableProperty] private bool _isMasterFollowOn = true;
 
     /// <summary>When set, the Dock is used for layout; ActiveLogView and GetAllPanes() use the Dock.</summary>
@@ -712,43 +730,32 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
     public void AddTab(string name)
     {
-        SyncActiveTabLayout();
-
-        foreach (var t in Tabs)
-            t.IsActive = false;
-
         // In Dock mode, create a fresh Dock layout for the new tab
         if (DockFactory is not null)
         {
             var newLayout = (IRootDock)DockFactory.CreateLayout();
             DockFactory.InitLayout(newLayout);
-            var newTab = new WorkspaceTabItem(name, true);
+            var newTab = new WorkspaceTabItem(name, false);
+            newTab.SavedDockLayout = newLayout;
             Tabs.Add(newTab);
             ActiveTabIndex = Tabs.Count - 1;
             OnPropertyChanged(nameof(HasMultipleTabs));
-            Layout = newLayout;
-            OnPropertyChanged(nameof(ActiveLogView));
             return;
         }
 
         var fresh = CreateFreshPaneNode();
-        var newTab2 = new WorkspaceTabItem(name, true);
+        var newTab2 = new WorkspaceTabItem(name, false);
         newTab2.SavedLayout = fresh;
         Tabs.Add(newTab2);
 
         ActiveTabIndex = Tabs.Count - 1;
         OnPropertyChanged(nameof(HasMultipleTabs));
-
-        RootNode = fresh;
-        FocusPane(fresh);
     }
 
     public void SwitchTab(int index)
     {
         if (index < 0 || index >= Tabs.Count) return;
-        if (index == ActiveTabIndex) return; // Already on this tab
-
-        ActivateTab(index, saveCurrent: true);
+        ActiveTabIndex = index;
     }
 
     public void CloseTab(int index)
@@ -760,8 +767,6 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         }
 
         bool closingActive = index == ActiveTabIndex;
-        if (closingActive)
-            SyncActiveTabLayout();
 
         DisposeTab(Tabs[index]);
         Tabs.RemoveAt(index);
@@ -769,11 +774,17 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         if (closingActive)
         {
             var nextIndex = Math.Clamp(index, 0, Tabs.Count - 1);
-            ActivateTab(nextIndex, saveCurrent: false);
+            if (ActiveTabIndex == nextIndex)
+                _previousTabIndex = -1; // Force re-activation since content at this index changed
+            
+            ActiveTabIndex = nextIndex;
         }
         else if (index < ActiveTabIndex)
         {
-            ActiveTabIndex--;
+            // Shift index without triggering layout swap
+            _activeTabIndex--;
+            _previousTabIndex--;
+            OnPropertyChanged(nameof(ActiveTabIndex));
         }
 
         OnPropertyChanged(nameof(HasMultipleTabs));
@@ -782,8 +793,6 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     public void CloseOtherTabs(int keepIndex)
     {
         if (keepIndex < 0 || keepIndex >= Tabs.Count) return;
-
-        SyncActiveTabLayout();
 
         var keep = Tabs[keepIndex];
         for (int i = Tabs.Count - 1; i >= 0; i--)
@@ -794,7 +803,8 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
         Tabs.Clear();
         Tabs.Add(keep);
-        ActivateTab(0, saveCurrent: false);
+        _previousTabIndex = -1;
+        ActiveTabIndex = 0;
 
         OnPropertyChanged(nameof(HasMultipleTabs));
     }
@@ -931,8 +941,6 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
         for (int i = 0; i < Tabs.Count; i++)
             Tabs[i].IsActive = i == index;
-
-        ActiveTabIndex = index;
 
         // Dock mode: restore saved Dock layout (or create fresh)
         if (DockFactory is not null)

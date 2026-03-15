@@ -361,10 +361,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void Explode()
+    private void ExplodePanes()
     {
         if (_monitorManager is null || Workspace.DockFactory is null) return;
-        _monitorManager.ExplodeToMonitors(Workspace, Workspace.DockFactory);
+        _monitorManager.ExplodePanesToMonitors(Workspace, Workspace.DockFactory);
+    }
+
+    [RelayCommand]
+    private void ExplodeTabs()
+    {
+        if (_monitorManager is null) return;
+        _monitorManager.ExplodeTabsToMonitors(Workspace, SourceManager, ThemeService);
     }
 
     [RelayCommand] 
