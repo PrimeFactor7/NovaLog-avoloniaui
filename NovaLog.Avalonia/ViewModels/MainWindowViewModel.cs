@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Dock.Model.Controls;
 using NovaLog.Avalonia.Controls;
+using NovaLog.Avalonia.Docking;
 using NovaLog.Core.Models;
 using NovaLog.Core.Services;
 using NovaLog.Core.Theme;
@@ -21,6 +23,12 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly WorkspaceManager _workspaceManager = new();
     private AppSettings _appSettings = new();
     private LogViewViewModel? _observedActiveLogView;
+    private EventHandler<Dock.Model.Core.Events.DockableClosedEventArgs>? _dockableClosedHandler;
+    private Action<string, SourceKind>? _sourceSelectedHandler;
+    private Action<string, SourceKind>? _sourceNewTabHandler;
+    private Func<string, Task<string?>>? _aliasInputHandler;
+    private Action? _closeRequestedHandler;
+    private Action<SourceItemViewModel>? _sourceRemovedHandler;
 
     public MainWindowViewModel()
     {
@@ -44,13 +52,14 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         Workspace.SetFormattingOptions(BuildFormattingOptions(), applyToExisting: true);
         Workspace.SetSearchDefaults(Settings.SearchResultCap, Settings.SearchNewestFirst, applyToExisting: true);
         LogLineRow.RowHeight = Settings.LineHeight;
+        CreateDockLayout();
         Workspace.PropertyChanged += OnWorkspacePropertyChanged;
         AttachActiveLogView(Workspace.ActiveLogView);
 
         Settings.SettingsChanged += OnSettingsChanged;
         Settings.PropertyChanged += OnSettingsPropertyChanged;
 
-        SourceManager.SourceSelected += (path, kind) =>
+        _sourceSelectedHandler = (path, kind) =>
         {
             if (kind == SourceKind.File) Workspace.ActiveLogView?.LoadFile(path);
             else if (kind == SourceKind.Folder) Workspace.ActiveLogView?.LoadFolder(path);
@@ -63,10 +72,15 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             if (Workspace.ActiveLogView is { } alv)
                 RestoreBookmarksForPane(alv);
         };
+        SourceManager.SourceSelected += _sourceSelectedHandler;
 
-        SourceManager.SourceNewTabRequested += (path, kind) =>
+        _sourceNewTabHandler = (path, kind) =>
         {
-            Workspace.AddTab($"Workspace {Workspace.Tabs.Count + 1}");
+            // If the active pane is empty, load into it directly instead of creating a new tab
+            var active = Workspace.ActiveLogView;
+            if (active is null || !active.IsEmpty)
+                Workspace.AddTab($"Workspace {Workspace.Tabs.Count + 1}");
+
             if (kind == SourceKind.File) Workspace.ActiveLogView?.LoadFile(path);
             else if (kind == SourceKind.Folder) Workspace.ActiveLogView?.LoadFolder(path);
             else if (kind == SourceKind.Merge && path.StartsWith("merge://"))
@@ -76,8 +90,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 Workspace.ActiveLogView?.LoadMerge(sourcesToMerge);
             }
         };
+        SourceManager.SourceNewTabRequested += _sourceNewTabHandler;
 
-        SourceManager.AliasInputRequested += async (oldAlias) =>
+        _aliasInputHandler = async (oldAlias) =>
         {
             try
             {
@@ -91,22 +106,79 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             }
             return null;
         };
+        SourceManager.AliasInputRequested += _aliasInputHandler;
 
-        SourceManager.CloseRequested += () => IsSidebarVisible = false;
+        _closeRequestedHandler = () => IsSidebarVisible = false;
+        SourceManager.CloseRequested += _closeRequestedHandler;
 
-        SourceManager.SourceRemoved += (removedSource) =>
+        _sourceRemovedHandler = (removedSource) =>
         {
-            // Notify all panes to clear if they have this source loaded
             foreach (var pane in Workspace.GetAllPanes())
-            {
                 pane.LogView.ClearIfSourceRemoved(removedSource);
-            }
         };
+        SourceManager.SourceRemoved += _sourceRemovedHandler;
 
         LoadSession();
         AttachActiveLogView(Workspace.ActiveLogView);
         RaiseStatusProperties();
         ApplySettingsToTheme();
+    }
+
+    /// <summary>Builds or restores Dock layout. If layout.json is missing or invalid, creates a fresh layout.
+    /// To force a fresh layout (e.g. empty document pane after restore), delete <see cref="LayoutPersistence.GetLayoutPath"/>.</summary>
+    private void CreateDockLayout()
+    {
+        var factory = new NovaLogDockFactory();
+        var layout = LayoutPersistence.Load();
+        if (layout is null)
+        {
+            layout = (IRootDock)factory.CreateLayout();
+            factory.InitLayout(layout);
+        }
+        else
+        {
+            try
+            {
+                factory.InitLayout(layout);
+            }
+            catch
+            {
+                layout = (IRootDock)factory.CreateLayout();
+                factory.InitLayout(layout);
+            }
+        }
+        // When a document is closed, detach its event handler and dispose it.
+        // If the last document is closed, create a fresh empty one.
+        _dockableClosedHandler = (_, args) =>
+        {
+            if (args.Dockable is not Docking.LogViewDocument closedDoc) return;
+            closedDoc.Detach();
+            closedDoc.LogView.Dispose();
+
+            var remaining = Docking.DockLayoutHelper.GetAllDocuments(Workspace.Layout);
+            if (remaining.Count > 0) return;
+
+            // All documents gone — add a fresh one
+            var newDoc = (Docking.LogViewDocument)factory.CreateDocument();
+            Workspace.InitializeDockDocument(newDoc.LogView);
+            var docDock = DockLayoutHelper.FindFirstDocumentDock(Workspace.Layout);
+            if (docDock is not null)
+            {
+                factory.AddDockable(docDock, newDoc);
+                docDock.ActiveDockable = newDoc;
+            }
+        };
+        factory.DockableClosed += _dockableClosedHandler;
+
+        Workspace.DockFactory = factory;
+        Workspace.Layout = layout;
+    }
+
+    /// <summary>Called on window close to persist Dock layout to %AppData%/NovaLog/layout.json.</summary>
+    public void SaveDockLayout()
+    {
+        if (Workspace.Layout is { } layout)
+            LayoutPersistence.Save(layout);
     }
 
     [RelayCommand]
@@ -422,6 +494,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (_observedActiveLogView is not null)
             _observedActiveLogView.PropertyChanged -= OnActiveLogViewPropertyChanged;
+
+        // Unsubscribe SourceManager events
+        if (_sourceSelectedHandler is not null) SourceManager.SourceSelected -= _sourceSelectedHandler;
+        if (_sourceNewTabHandler is not null) SourceManager.SourceNewTabRequested -= _sourceNewTabHandler;
+        if (_aliasInputHandler is not null) SourceManager.AliasInputRequested -= _aliasInputHandler;
+        if (_closeRequestedHandler is not null) SourceManager.CloseRequested -= _closeRequestedHandler;
+        if (_sourceRemovedHandler is not null) SourceManager.SourceRemoved -= _sourceRemovedHandler;
+
+        // Unsubscribe DockableClosed
+        if (_dockableClosedHandler is not null && Workspace.DockFactory is not null)
+            Workspace.DockFactory.DockableClosed -= _dockableClosedHandler;
 
         foreach (var sim in _simulators)
         {

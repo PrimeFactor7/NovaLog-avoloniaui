@@ -443,6 +443,9 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
             _clock?.NotifyTimeChanged(ts.Value, this);
     }
 
+    /// <summary>True when no source (file/folder/merge) has been loaded into this pane.</summary>
+    public bool IsEmpty => _loadedSourceIds.Count == 0 && _loadedPaths.Count == 0;
+
     /// <summary>Tracks which source IDs are currently loaded in this pane (for clearing when source is removed).</summary>
     private readonly HashSet<string> _loadedSourceIds = new();
 
@@ -1348,6 +1351,18 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         Filter.Dispose();
     }
 
+    /// <summary>Resets pane to blank placeholder state, disposing any loaded source.</summary>
+    public void ClearSource()
+    {
+        DisposeProvider();
+        _loadedSourceIds.Clear();
+        _loadedPaths.Clear();
+        _delegatingSource.SetInner(PlaceholderLine);
+        Title = "No file loaded";
+        TotalLineCount = 1;
+        Filter.OnSourceChanged(null);
+    }
+
     /// <summary>Clear contents if the removed source is loaded in this pane.</summary>
     public void ClearIfSourceRemoved(SourceItemViewModel removedSource)
     {
@@ -1366,17 +1381,7 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
         }
 
         if (shouldClear)
-        {
-            DisposeProvider();
-            _loadedSourceIds.Clear();
-            _loadedPaths.Clear();
-            _delegatingSource.SetInner(PlaceholderLine);
-            Title = "No file loaded";
-            TotalLineCount = 1;
-
-            // Clear filter subscriptions
-            Filter.OnSourceChanged(null);
-        }
+            ClearSource();
     }
 }
 

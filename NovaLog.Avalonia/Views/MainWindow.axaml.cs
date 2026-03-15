@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -12,6 +13,8 @@ namespace NovaLog.Avalonia.Views;
 
 public partial class MainWindow : Window
 {
+    private ContextMenu? _tabOverflowMenu;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -42,10 +45,16 @@ public partial class MainWindow : Window
         // Tab bar: handle tab clicks and middle-click close
         TabBar.AddHandler(Button.ClickEvent, OnTabButtonClick);
         TabBar.AddHandler(PointerPressedEvent, OnTabBarPointerPressed, handledEventsToo: true);
+
+        // Tab overflow dropdown: click handler opens a ContextMenu
     }
 
     private void OnTabButtonClick(object? sender, RoutedEventArgs e)
     {
+        // Ignore clicks on the tab close button (handled by OnTabCloseClick)
+        if (e.Source is Button { Tag: "tab-close" })
+            return;
+
         if (e.Source is Button btn && btn.DataContext is WorkspaceTabItem tab &&
             DataContext is MainWindowViewModel vm)
         {
@@ -53,6 +62,62 @@ public partial class MainWindow : Window
             if (idx >= 0)
                 vm.Workspace.SwitchTab(idx);
         }
+    }
+
+    private void OnTabCloseClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is WorkspaceTabItem tab &&
+            DataContext is MainWindowViewModel vm)
+        {
+            var idx = vm.Workspace.Tabs.IndexOf(tab);
+            if (idx >= 0)
+                vm.Workspace.CloseTab(idx);
+            e.Handled = true;
+        }
+    }
+
+    private void OnTabOverflowClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        _tabOverflowMenu ??= new ContextMenu();
+        _tabOverflowMenu.Items.Clear();
+
+        for (int i = 0; i < vm.Workspace.Tabs.Count; i++)
+        {
+            var tab = vm.Workspace.Tabs[i];
+            var tabId = tab.Id; // capture stable ID, not index
+
+            if (i > 0)
+                _tabOverflowMenu.Items.Add(new Separator());
+
+            var tabItem = new MenuItem
+            {
+                Header = tab.IsActive ? $"\u25B6 {tab.Name}" : $"   {tab.Name}",
+                FontWeight = global::Avalonia.Media.FontWeight.Bold,
+            };
+            tabItem.Click += (_, _) =>
+            {
+                var idx = vm.Workspace.Tabs.Select((t, j) => (t, j)).FirstOrDefault(x => x.t.Id == tabId).j;
+                if (idx >= 0 && idx < vm.Workspace.Tabs.Count)
+                    vm.Workspace.SwitchTab(idx);
+            };
+            _tabOverflowMenu.Items.Add(tabItem);
+
+            var titles = vm.Workspace.GetTabSourceTitles(i);
+            foreach (var title in titles)
+            {
+                _tabOverflowMenu.Items.Add(new MenuItem
+                {
+                    Header = $"      {title}",
+                    IsEnabled = false,
+                    FontSize = 11,
+                });
+            }
+        }
+
+        _tabOverflowMenu.Open(btn);
     }
 
     private void OnTabBarPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -149,6 +214,7 @@ public partial class MainWindow : Window
                 (int)Height,
                 WindowState == WindowState.Maximized);
             vm.SaveSettings();
+            vm.SaveDockLayout();
             vm.Dispose();
         }
     }

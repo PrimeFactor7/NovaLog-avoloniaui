@@ -1,5 +1,9 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Dock.Model.Core;
+using Dock.Model.Controls;
+using NovaLog.Avalonia.Docking;
 using NovaLog.Core.Services;
 using NovaLog.Core.Models;
 using NovaLog.Core.Theme;
@@ -18,6 +22,11 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _isMasterFollowOn = true;
 
+    /// <summary>When set, the Dock is used for layout; ActiveLogView and GetAllPanes() use the Dock.</summary>
+    [ObservableProperty] private IRootDock? _layout;
+    /// <summary>Factory that created <see cref="Layout"/>; set together with Layout.</summary>
+    public NovaLogDockFactory? DockFactory { get; set; }
+
     public ObservableCollection<WorkspaceTabItem> Tabs { get; } = [];
     public GlobalClockService Clock { get; } = new();
     public TimeSyncBarViewModel TimeSync { get; } = new();
@@ -31,12 +40,13 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     private FormattingOptions? _defaultFormattingOptions;
     private int _defaultSearchResultCap = 500;
     private bool _defaultSearchNewestFirst = true;
+    private List<IDock>? _layoutDockSubscriptions;
 
     /// <summary>True when more than one tab exists (shows tab bar).</summary>
     public bool HasMultipleTabs => Tabs.Count > 1;
 
-    /// <summary>Convenience: the focused pane's LogViewViewModel.</summary>
-    public LogViewViewModel? ActiveLogView => FocusedPane?.LogView;
+    /// <summary>Convenience: the focused pane's LogViewViewModel (from Dock when Layout is set, else from FocusedPane).</summary>
+    public LogViewViewModel? ActiveLogView => Layout != null ? DockLayoutHelper.GetActiveLogView(Layout) : FocusedPane?.LogView;
 
     public WorkspaceViewModel()
     {
@@ -59,6 +69,71 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
             }
             HandleTimeChanged(timestamp, sender);
         };
+    }
+
+    partial void OnLayoutChanged(IRootDock? value)
+    {
+        UnsubscribeLayoutActiveDockable();
+        _layoutDockSubscriptions = null;
+        if (value is null)
+            return;
+        _layoutDockSubscriptions = new List<IDock>();
+        SubscribeDock(value);
+        InitializeDockDocuments();
+    }
+
+    private void SubscribeDock(IDock dock)
+    {
+        if (dock is INotifyPropertyChanged npc)
+        {
+            _layoutDockSubscriptions!.Add(dock);
+            npc.PropertyChanged += OnLayoutDockPropertyChanged;
+        }
+        if (dock.VisibleDockables is null) return;
+        foreach (var d in dock.VisibleDockables)
+        {
+            if (d is IDock child)
+                SubscribeDock(child);
+        }
+    }
+
+    private void UnsubscribeLayoutActiveDockable()
+    {
+        if (_layoutDockSubscriptions is null) return;
+        foreach (var dock in _layoutDockSubscriptions)
+        {
+            if (dock is INotifyPropertyChanged npc)
+                npc.PropertyChanged -= OnLayoutDockPropertyChanged;
+        }
+    }
+
+    private void OnLayoutDockPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IDock.ActiveDockable))
+            OnPropertyChanged(nameof(ActiveLogView));
+    }
+
+    /// <summary>Initializes all LogViews in the Dock layout (Clock, SourceManager, Theme, follow defaults). Call after setting Layout.</summary>
+    public void InitializeDockDocuments()
+    {
+        if (Layout is null || _sourceManager is null || _theme is null) return;
+        var logViews = DockLayoutHelper.GetAllLogViews(Layout);
+        foreach (var lv in logViews)
+            InitializeDockDocument(lv);
+    }
+
+    /// <summary>Initializes a single LogViewViewModel with workspace defaults.</summary>
+    public void InitializeDockDocument(LogViewViewModel lv)
+    {
+        if (_sourceManager is null || _theme is null) return;
+        lv.Initialize(Clock, _sourceManager, _theme);
+        lv.IsFollowMode = _defaultMainFollow;
+        lv.Filter.IsFollowMode = _defaultFilterFollow;
+        lv.Filter.SearchResultCap = _defaultSearchResultCap;
+        lv.Filter.SearchNewestFirst = _defaultSearchNewestFirst;
+        lv.IsGridMode = _defaultGridMode;
+        lv.GridMultiline = _defaultGridMultiline;
+        lv.SetFormattingOptions(_defaultFormattingOptions);
     }
 
     private void HandleTimeChanged(DateTime timestamp, object sender)
@@ -187,15 +262,42 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         for (int i = 0; i < Tabs.Count; i++)
         {
             var tab = Tabs[i];
-            var layoutNode = i == ActiveTabIndex
-                ? RootNode
-                : tab.SavedLayout ?? CreateFreshPaneNode();
+            SplitLayoutNode? serialized = null;
+
+            // Dock mode: serialize source IDs from dock documents as a flat leaf list
+            var dockLayout = i == ActiveTabIndex ? Layout : tab.SavedDockLayout;
+            if (dockLayout is not null)
+            {
+                var logViews = DockLayoutHelper.GetAllLogViews(dockLayout);
+                if (logViews.Count <= 1)
+                {
+                    var lv = logViews.Count == 1 ? logViews[0] : null;
+                    serialized = SplitLayoutNode.Leaf(lv?.GetLoadedSourceId(), null, 0, lv?.IsFollowMode ?? true);
+                }
+                else
+                {
+                    // Serialize multiple docs as a horizontal branch chain
+                    serialized = SplitLayoutNode.Leaf(logViews[^1].GetLoadedSourceId(), null, 0, logViews[^1].IsFollowMode);
+                    for (int j = logViews.Count - 2; j >= 0; j--)
+                    {
+                        var leaf = SplitLayoutNode.Leaf(logViews[j].GetLoadedSourceId(), null, 0, logViews[j].IsFollowMode);
+                        serialized = SplitLayoutNode.Branch(SplitOrientation.Vertical, 1.0 / (j + 2), leaf, serialized);
+                    }
+                }
+            }
+            else
+            {
+                var layoutNode = i == ActiveTabIndex
+                    ? RootNode
+                    : tab.SavedLayout ?? CreateFreshPaneNode();
+                serialized = SerializeNode(layoutNode);
+            }
 
             result.Add(new WorkspaceTabLayout
             {
                 Id = tab.Id,
                 DisplayName = tab.Name,
-                Layout = SerializeNode(layoutNode),
+                Layout = serialized,
                 IsActive = i == ActiveTabIndex
             });
         }
@@ -216,14 +318,22 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
         foreach (var layout in layouts)
         {
-            var savedLayout = layout.Layout is not null
-                ? DeserializeNode(layout.Layout)
-                : CreateFreshPaneNode();
+            var tab = new WorkspaceTabItem(layout.DisplayName, false, layout.Id);
 
-            var tab = new WorkspaceTabItem(layout.DisplayName, false, layout.Id)
+            // In Dock mode, create a Dock layout and restore sources into it
+            if (DockFactory is not null && layout.Layout is not null)
             {
-                SavedLayout = savedLayout
-            };
+                var dockLayout = (IRootDock)DockFactory.CreateLayout();
+                DockFactory.InitLayout(dockLayout);
+                RestoreSourcesIntoDock(dockLayout, layout.Layout);
+                tab.SavedDockLayout = dockLayout;
+            }
+            else
+            {
+                tab.SavedLayout = layout.Layout is not null
+                    ? DeserializeNode(layout.Layout)
+                    : CreateFreshPaneNode();
+            }
 
             Tabs.Add(tab);
         }
@@ -235,6 +345,71 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
             activeIndex = 0;
 
         ActivateTab(activeIndex, saveCurrent: false);
+    }
+
+    /// <summary>Restores sources from a serialized split layout into a Dock layout's first document.</summary>
+    private void RestoreSourcesIntoDock(IRootDock dockLayout, SplitLayoutNode node)
+    {
+        var sourceIds = new List<(string? SourceId, bool IsFollowMode)>();
+        CollectLeafSourceIds(node, sourceIds);
+
+        var docs = DockLayoutHelper.GetAllDocuments(dockLayout);
+
+        // First source goes into the existing document (created by factory)
+        for (int i = 0; i < sourceIds.Count; i++)
+        {
+            LogViewViewModel lv;
+            if (i == 0 && docs.Count > 0)
+            {
+                lv = docs[0].LogView;
+            }
+            else if (DockFactory is not null)
+            {
+                var newDoc = (LogViewDocument)DockFactory.CreateDocument();
+                var docDock = DockLayoutHelper.FindFirstDocumentDock(dockLayout);
+                if (docDock is not null)
+                    DockFactory.AddDockable(docDock, newDoc);
+                lv = newDoc.LogView;
+            }
+            else continue;
+
+            InitializeDockDocument(lv);
+            lv.IsFollowMode = sourceIds[i].IsFollowMode;
+            LoadSourceById(lv, sourceIds[i].SourceId);
+        }
+    }
+
+    private static void CollectLeafSourceIds(SplitLayoutNode node, List<(string? SourceId, bool IsFollowMode)> result)
+    {
+        if (node.IsLeaf)
+        {
+            result.Add((node.SourceId, node.IsFollowMode));
+        }
+        else
+        {
+            if (node.Child1 is not null) CollectLeafSourceIds(node.Child1, result);
+            if (node.Child2 is not null) CollectLeafSourceIds(node.Child2, result);
+        }
+    }
+
+    private void LoadSourceById(LogViewViewModel lv, string? sourceId)
+    {
+        if (string.IsNullOrEmpty(sourceId) || _sourceManager is null) return;
+
+        var source = _sourceManager.Sources.FirstOrDefault(s => s.SourceId == sourceId);
+        if (source is null) return;
+
+        if (source.Kind == SourceKind.File && File.Exists(source.PhysicalPath))
+            lv.LoadFile(source.PhysicalPath);
+        else if (source.Kind == SourceKind.Folder && Directory.Exists(source.PhysicalPath))
+            lv.LoadFolder(source.PhysicalPath);
+        else if (source.Kind == SourceKind.Merge && source.PhysicalPath.StartsWith("merge://"))
+        {
+            var ids = source.PhysicalPath.Substring(8).Split('|');
+            var sourcesToMerge = _sourceManager.Sources.Where(s => ids.Contains(s.SourceId)).ToList();
+            if (sourcesToMerge.Count > 0)
+                lv.LoadMerge(sourcesToMerge);
+        }
     }
 
     private SplitLayoutNode SerializeNode(SplitNodeViewModel node)
@@ -334,8 +509,48 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
     public PaneNodeViewModel? SplitFocused(bool horizontal)
     {
+        // Use Dock API when dock layout is active
+        if (Layout is not null && DockFactory is not null)
+        {
+            SplitDockFocused(horizontal);
+            return null; // Dock mode doesn't use PaneNodeViewModel
+        }
+
         if (FocusedPane is null) return null;
         return SplitPane(FocusedPane, horizontal);
+    }
+
+    /// <summary>Splits the active Dock document into a new pane using the Dock API.</summary>
+    private void SplitDockFocused(bool horizontal)
+    {
+        if (Layout is null || DockFactory is null) return;
+
+        var activeDoc = DockLayoutHelper.GetActiveDocument(Layout);
+        var ownerDock = activeDoc?.Owner as IDock;
+        if (ownerDock is null) return;
+
+        // Create a new document with a fresh LogViewViewModel
+        var newDoc = (LogViewDocument)DockFactory.CreateDocument();
+        var lv = newDoc.LogView;
+        if (_sourceManager is not null && _theme is not null)
+        {
+            lv.Initialize(Clock, _sourceManager, _theme);
+            lv.IsFollowMode = _defaultMainFollow;
+            lv.Filter.IsFollowMode = _defaultFilterFollow;
+            lv.Filter.SearchResultCap = _defaultSearchResultCap;
+            lv.Filter.SearchNewestFirst = _defaultSearchNewestFirst;
+            lv.IsGridMode = _defaultGridMode;
+            lv.GridMultiline = _defaultGridMultiline;
+            lv.SetFormattingOptions(_defaultFormattingOptions);
+        }
+
+        // horizontal param: true = side-by-side (Right), false = top/bottom (Bottom)
+        var operation = horizontal
+            ? Dock.Model.Core.DockOperation.Right
+            : Dock.Model.Core.DockOperation.Bottom;
+
+        DockFactory.SplitToDock(ownerDock, newDoc, operation);
+        OnPropertyChanged(nameof(ActiveLogView));
     }
 
     public PaneNodeViewModel? SplitTarget(PaneNodeViewModel target, bool horizontal)
@@ -349,7 +564,7 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         ApplyDefaultFollowState(newPane);
         if (_sourceManager != null && _theme != null)
             newPane.LogView.Initialize(Clock, _sourceManager, _theme);
-        
+
         var originalParent = target.Parent;
         var branch = new SplitBranchViewModel(target, newPane, horizontal);
 
@@ -446,10 +661,24 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         foreach (var t in Tabs)
             t.IsActive = false;
 
+        // In Dock mode, create a fresh Dock layout for the new tab
+        if (DockFactory is not null)
+        {
+            var newLayout = (IRootDock)DockFactory.CreateLayout();
+            DockFactory.InitLayout(newLayout);
+            var newTab = new WorkspaceTabItem(name, true);
+            Tabs.Add(newTab);
+            ActiveTabIndex = Tabs.Count - 1;
+            OnPropertyChanged(nameof(HasMultipleTabs));
+            Layout = newLayout;
+            OnPropertyChanged(nameof(ActiveLogView));
+            return;
+        }
+
         var fresh = CreateFreshPaneNode();
-        var newTab = new WorkspaceTabItem(name, true);
-        newTab.SavedLayout = fresh;
-        Tabs.Add(newTab);
+        var newTab2 = new WorkspaceTabItem(name, true);
+        newTab2.SavedLayout = fresh;
+        Tabs.Add(newTab2);
 
         ActiveTabIndex = Tabs.Count - 1;
         OnPropertyChanged(nameof(HasMultipleTabs));
@@ -468,12 +697,17 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
     public void CloseTab(int index)
     {
-        if (Tabs.Count <= 1) return;
+        if (Tabs.Count <= 1)
+        {
+            ResetToSingleTab();
+            return;
+        }
 
         bool closingActive = index == ActiveTabIndex;
         if (closingActive)
             SyncActiveTabLayout();
 
+        DisposeTab(Tabs[index]);
         Tabs.RemoveAt(index);
 
         if (closingActive)
@@ -496,6 +730,11 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         SyncActiveTabLayout();
 
         var keep = Tabs[keepIndex];
+        for (int i = Tabs.Count - 1; i >= 0; i--)
+        {
+            if (i != keepIndex)
+                DisposeTab(Tabs[i]);
+        }
 
         Tabs.Clear();
         Tabs.Add(keep);
@@ -556,8 +795,13 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         }
     }
 
-    public List<PaneNodeViewModel> GetAllPanes()
+    public IReadOnlyList<IWorkspacePane> GetAllPanes()
     {
+        if (Layout != null)
+        {
+            var logViews = DockLayoutHelper.GetAllLogViews(Layout);
+            return logViews.ConvertAll(lv => (IWorkspacePane)new DockPaneWrapper(lv));
+        }
         var list = new List<PaneNodeViewModel>();
         CollectPanes(RootNode, list);
         return list;
@@ -595,7 +839,11 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     private void SyncActiveTabLayout()
     {
         if (ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count)
+        {
             Tabs[ActiveTabIndex].SavedLayout = RootNode;
+            if (Layout is not null)
+                Tabs[ActiveTabIndex].SavedDockLayout = Layout;
+        }
     }
 
     private void ActivateTab(int index, bool saveCurrent)
@@ -611,6 +859,21 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
 
         ActiveTabIndex = index;
 
+        // Dock mode: restore saved Dock layout (or create fresh)
+        if (DockFactory is not null)
+        {
+            var dockLayout = Tabs[index].SavedDockLayout;
+            if (dockLayout is null)
+            {
+                dockLayout = (IRootDock)DockFactory.CreateLayout();
+                DockFactory.InitLayout(dockLayout);
+                Tabs[index].SavedDockLayout = dockLayout;
+            }
+            Layout = dockLayout;
+            OnPropertyChanged(nameof(ActiveLogView));
+            return;
+        }
+
         var layout = Tabs[index].SavedLayout;
         if (layout is null)
         {
@@ -624,25 +887,96 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
             FocusPane(firstPane);
     }
 
+    /// <summary>Disposes all LogViewViewModels held by a tab (both Dock and split-tree layouts).</summary>
+    private void DisposeTab(WorkspaceTabItem tab)
+    {
+        if (tab.SavedDockLayout is not null)
+        {
+            var docs = DockLayoutHelper.GetAllDocuments(tab.SavedDockLayout);
+            foreach (var doc in docs)
+            {
+                doc.Detach();
+                doc.LogView.Dispose();
+            }
+        }
+        else if (tab.SavedLayout is not null)
+        {
+            var panes = new List<PaneNodeViewModel>();
+            CollectPanes(tab.SavedLayout, panes);
+            foreach (var pane in panes)
+                pane.LogView.Dispose();
+        }
+    }
+
     private void ResetToSingleTab()
     {
+        foreach (var tab in Tabs)
+            DisposeTab(tab);
         Tabs.Clear();
 
-        var fresh = CreateFreshPaneNode();
-        var newTab = new WorkspaceTabItem("Workspace 1", true)
-        {
-            SavedLayout = fresh
-        };
-
+        var newTab = new WorkspaceTabItem("Workspace 1", true);
         Tabs.Add(newTab);
         ActiveTabIndex = 0;
-        RootNode = fresh;
-        FocusPane(fresh);
+
+        if (DockFactory is not null)
+        {
+            var newLayout = (IRootDock)DockFactory.CreateLayout();
+            DockFactory.InitLayout(newLayout);
+            Layout = newLayout;
+        }
+        else
+        {
+            var fresh = CreateFreshPaneNode();
+            newTab.SavedLayout = fresh;
+            RootNode = fresh;
+            FocusPane(fresh);
+        }
+
         OnPropertyChanged(nameof(HasMultipleTabs));
+        OnPropertyChanged(nameof(ActiveLogView));
+    }
+
+    /// <summary>Returns a list of source titles for the given tab index (for overflow menu display).</summary>
+    public List<string> GetTabSourceTitles(int tabIndex)
+    {
+        if (tabIndex == ActiveTabIndex)
+        {
+            var panes = GetAllPanes();
+            return panes.Select(p => p.LogView.Title).ToList();
+        }
+
+        var tab = Tabs[tabIndex];
+
+        // Dock mode: get titles from the saved Dock layout
+        if (tab.SavedDockLayout is not null)
+        {
+            var logViews = DockLayoutHelper.GetAllLogViews(tab.SavedDockLayout);
+            if (logViews.Count > 0)
+                return logViews.Select(lv => lv.Title).ToList();
+            return ["(empty)"];
+        }
+
+        if (tab.SavedLayout is null) return ["(empty)"];
+
+        var titles = new List<string>();
+        CollectSourceTitles(tab.SavedLayout, titles);
+        return titles.Count > 0 ? titles : ["(empty)"];
+    }
+
+    private static void CollectSourceTitles(SplitNodeViewModel node, List<string> titles)
+    {
+        if (node is PaneNodeViewModel pane)
+            titles.Add(pane.LogView.Title);
+        else if (node is SplitBranchViewModel branch)
+        {
+            CollectSourceTitles(branch.Child1, titles);
+            CollectSourceTitles(branch.Child2, titles);
+        }
     }
 
     public void Dispose()
     {
+        UnsubscribeLayoutActiveDockable();
         foreach (var pane in GetAllPanes())
             pane.LogView.Dispose();
         Clock.Dispose();
@@ -658,6 +992,9 @@ public partial class WorkspaceTabItem : ObservableObject
 
     /// <summary>Stores this tab's workspace layout (split tree structure).</summary>
     public SplitNodeViewModel? SavedLayout { get; set; }
+
+    /// <summary>Stores this tab's Dock layout (used when Dock mode is active).</summary>
+    public IRootDock? SavedDockLayout { get; set; }
 
     public WorkspaceTabItem(string name, bool isActive, string? id = null)
     {

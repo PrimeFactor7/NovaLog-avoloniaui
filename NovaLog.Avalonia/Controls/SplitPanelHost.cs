@@ -15,6 +15,8 @@ namespace NovaLog.Avalonia.Controls;
 /// Recursively renders a <see cref="SplitNodeViewModel"/> tree.
 /// Leaf nodes become <see cref="LogViewPanel"/> instances.
 /// Branch nodes become Grid + GridSplitter + two child SplitPanelHosts.
+/// Deprecated: main content now uses <see cref="Dock.Avalonia.Controls.DockControl"/> with Dock layout;
+/// this control is kept for compatibility (e.g. workspace tab saved layouts) but is not used in the main window.
 /// </summary>
 public class SplitPanelHost : ContentControl
 {

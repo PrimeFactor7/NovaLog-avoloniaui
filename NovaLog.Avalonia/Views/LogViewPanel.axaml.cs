@@ -9,6 +9,7 @@ using System.ComponentModel;
 using NovaLog.Avalonia.Controls;
 using NovaLog.Avalonia.ViewModels;
 using NovaLog.Core.Models;
+using Dock.Model.Core;
 using AvClipboard = global::Avalonia.Input.Platform.IClipboard;
 using System.Linq;
 using System;
@@ -288,10 +289,21 @@ public partial class LogViewPanel : UserControl
         var sourceId = TryExtractSourceId(e.Data);
         if (!string.IsNullOrEmpty(sourceId))
         {
+            // Legacy event path (SplitPanelHost) or self-handle in Dock mode
             if (zone == DropZone.Center)
-                SourceIdDropped?.Invoke(sourceId);
+            {
+                if (SourceIdDropped is not null)
+                    SourceIdDropped.Invoke(sourceId);
+                else
+                    HandleSourceIdDrop(sourceId);
+            }
             else
-                SourceIdSplitRequested?.Invoke(sourceId, horizontal);
+            {
+                if (SourceIdSplitRequested is not null)
+                    SourceIdSplitRequested.Invoke(sourceId, horizontal);
+                else
+                    HandleSourceIdSplitDrop(sourceId, zone);
+            }
 
             e.Handled = true;
             return;
@@ -307,15 +319,159 @@ public partial class LogViewPanel : UserControl
 
             if (zone == DropZone.Center)
             {
-                NewFileDropped?.Invoke(path);
+                if (NewFileDropped is not null)
+                    NewFileDropped.Invoke(path);
+                else
+                    HandleFileDrop(path);
             }
             else
             {
-                SplitRequested?.Invoke(path, horizontal);
+                if (SplitRequested is not null)
+                    SplitRequested.Invoke(path, horizontal);
+                else
+                    HandleFileSplitDrop(path, zone);
             }
 
             e.Handled = true;
         }
+    }
+
+    // ── Self-handled actions (Dock mode, no SplitPanelHost) ────────
+
+    private void OnCloseRequested()
+    {
+        var mvm = FindMainViewModel();
+        if (mvm?.Workspace is not { Layout: not null, DockFactory: not null } ws) return;
+
+        var allDocs = Docking.DockLayoutHelper.GetAllDocuments(ws.Layout);
+        var doc = allDocs.FirstOrDefault(d => d.LogView == _attachedViewModel);
+        if (doc is null) return;
+
+        if (allDocs.Count <= 1)
+        {
+            // Last pane — just clear it instead of closing (keeps a valid blank pane)
+            _attachedViewModel?.ClearSource();
+            return;
+        }
+
+        ws.DockFactory.CloseDockable(doc);
+    }
+
+
+    private MainWindowViewModel? FindMainViewModel()
+    {
+        var window = this.FindAncestorOfType<MainWindow>();
+        return window?.DataContext as MainWindowViewModel;
+    }
+
+    private void HandleSourceIdDrop(string sourceId)
+    {
+        var mvm = FindMainViewModel();
+        if (mvm is null || DataContext is not LogViewViewModel logView) return;
+
+        var src = mvm.SourceManager.Sources.FirstOrDefault(s => s.SourceId == sourceId);
+        if (src is not null)
+            LoadSourceIntoLogView(mvm, logView, src);
+    }
+
+    private void HandleSourceIdSplitDrop(string sourceId, DropZone zone)
+    {
+        var mvm = FindMainViewModel();
+        if (mvm is null) return;
+
+        var src = mvm.SourceManager.Sources.FirstOrDefault(s => s.SourceId == sourceId);
+        if (src is null) return;
+
+        var newLogView = SplitThisPane(mvm, zone);
+        if (newLogView is not null)
+            LoadSourceIntoLogView(mvm, newLogView, src);
+    }
+
+    private void HandleFileDrop(string path)
+    {
+        var mvm = FindMainViewModel();
+        if (mvm is null || DataContext is not LogViewViewModel logView) return;
+
+        logView.LoadFile(path);
+        mvm.SourceManager.AddSource(path, SourceKind.File);
+    }
+
+    private void HandleFileSplitDrop(string path, DropZone zone)
+    {
+        var mvm = FindMainViewModel();
+        if (mvm is null) return;
+
+        var newLogView = SplitThisPane(mvm, zone);
+        newLogView?.LoadFile(path);
+        mvm.SourceManager.AddSource(path, SourceKind.File);
+    }
+
+    /// <summary>Splits the document that owns THIS panel (not the globally active one).</summary>
+    private LogViewViewModel? SplitThisPane(MainWindowViewModel mvm, DropZone zone)
+    {
+        var ws = mvm.Workspace;
+        if (ws is not { Layout: not null, DockFactory: not null }) return null;
+
+        var thisDoc = Docking.DockLayoutHelper.GetAllDocuments(ws.Layout)
+            .FirstOrDefault(d => d.LogView == _attachedViewModel);
+        var ownerDock = thisDoc?.Owner as IDock;
+        if (ownerDock is null) return null;
+
+        var newDoc = (Docking.LogViewDocument)ws.DockFactory.CreateDocument();
+        var lv = newDoc.LogView;
+        ws.InitializeDockDocument(lv);
+
+        var operation = zone switch
+        {
+            DropZone.Left => DockOperation.Left,
+            DropZone.Right => DockOperation.Right,
+            DropZone.Top => DockOperation.Top,
+            DropZone.Bottom => DockOperation.Bottom,
+            _ => DockOperation.Right
+        };
+
+        ws.DockFactory.SplitToDock(ownerDock, newDoc, operation);
+        return lv;
+    }
+
+    private static void LoadSourceIntoLogView(
+        MainWindowViewModel mvm, LogViewViewModel logView, SourceItemViewModel src)
+    {
+        switch (src.Kind)
+        {
+            case SourceKind.File:
+                logView.LoadFile(src.PhysicalPath);
+                break;
+            case SourceKind.Folder:
+                logView.LoadFolder(src.PhysicalPath);
+                break;
+            case SourceKind.Merge:
+            {
+                var sourceIds = GetMergeSourceIds(src);
+                var sourcesToMerge = mvm.SourceManager.Sources
+                    .Where(s => sourceIds.Contains(s.SourceId))
+                    .ToList();
+                if (sourcesToMerge.Count >= 2)
+                    logView.LoadMerge(sourcesToMerge);
+                break;
+            }
+        }
+    }
+
+    private static HashSet<string> GetMergeSourceIds(SourceItemViewModel src)
+    {
+        if (src.ChildSourceIds.Count > 0)
+            return src.ChildSourceIds.ToHashSet(StringComparer.Ordinal);
+
+        const string mergePrefix = "merge://";
+        if (src.PhysicalPath.StartsWith(mergePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return src.PhysicalPath[mergePrefix.Length..]
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.Ordinal);
+        }
+
+        return [];
     }
 
     private static string? TryExtractSourceId(IDataObject data)
@@ -391,6 +547,7 @@ public partial class LogViewPanel : UserControl
             _attachedViewModel.SelectedLineChanged -= OnSelectedLineChanged;
             _attachedViewModel.RowVisualsChanged -= OnRowVisualsChanged;
             _attachedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _attachedViewModel.CloseRequested -= OnCloseRequested;
         }
 
         if (_attachedFilterViewModel is not null)
@@ -413,6 +570,7 @@ public partial class LogViewPanel : UserControl
             _attachedViewModel.SelectedLineChanged += OnSelectedLineChanged;
             _attachedViewModel.RowVisualsChanged += OnRowVisualsChanged;
             _attachedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _attachedViewModel.CloseRequested += OnCloseRequested;
             _attachedFilterViewModel?.PropertyChanged += OnFilterViewModelPropertyChanged;
 
             if (_minimap is not null)

@@ -27,6 +27,11 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Dock.Avalonia" Version="11.3.11.22" />
+    <PackageReference Include="Dock.Model" Version="11.3.11.22" />
+    <PackageReference Include="Dock.Model.Mvvm" Version="11.3.11.22" />
+    <PackageReference Include="Dock.Serializer.SystemTextJson" Version="11.3.11.22" />
+    <PackageReference Include="Dock.Avalonia.Themes.Simple" Version="11.3.11.22" />
   </ItemGroup>
 </Project>

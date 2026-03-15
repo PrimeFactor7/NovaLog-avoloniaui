@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using NovaLog.Avalonia.Docking;
 
 namespace NovaLog.Avalonia.ViewModels;
 
@@ -15,7 +16,7 @@ public abstract class SplitNodeViewModel : ObservableObject
 /// <summary>
 /// Leaf node wrapping a single LogViewViewModel pane.
 /// </summary>
-public sealed partial class PaneNodeViewModel : SplitNodeViewModel
+public sealed partial class PaneNodeViewModel : SplitNodeViewModel, IWorkspacePane
 {
     public LogViewViewModel LogView { get; } = new();
 

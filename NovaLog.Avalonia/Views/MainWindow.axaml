@@ -3,6 +3,8 @@
         xmlns:vm="using:NovaLog.Avalonia.ViewModels"
         xmlns:views="using:NovaLog.Avalonia.Views"
         xmlns:controls="using:NovaLog.Avalonia.Controls"
+        xmlns:dock="using:Dock.Avalonia.Controls"
+        xmlns:docking="using:NovaLog.Avalonia.Docking"
         x:Class="NovaLog.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="NovaLog (Avalonia)"
@@ -19,90 +21,117 @@
             MinHeight="36">
       <Grid ColumnDefinitions="*,Auto">
 
-        <!-- Left Side: Tools & Tabs (scrollable for overflow) -->
-        <ScrollViewer Grid.Column="0"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Disabled"
-                      MaxHeight="36">
-        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-           <!-- Source Manager (folder icon) -->
-           <ToggleButton Classes="neon-action toolbar-btn"
-                         IsChecked="{Binding IsSidebarVisible}"
-                         ToolTip.Tip="Source manager (Ctrl+E)&#x0a;Open folder or file list, add/remove sources"
-                         AutomationProperties.AutomationId="btnSources">
-             <TextBlock Text="&#xEAF0;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
-           </ToggleButton>
+        <!-- Left Side: Tools & Tabs -->
+        <DockPanel Grid.Column="0" VerticalAlignment="Center">
 
-           <!-- Search/Filter -->
-           <ToggleButton Classes="neon-action toolbar-btn"
-                         IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}"
-                         ToolTip.Tip="Filter / search (Ctrl+F)&#x0a;Show search and filter panel in active pane"
-                         AutomationProperties.AutomationId="btnFilter">
-             <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
-           </ToggleButton>
+           <!-- Right-docked: overflow, close buttons (always visible) -->
+           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+             <!-- Tab overflow dropdown: shows all tabs with their sources -->
+             <Button Classes="neon-action toolbar-btn" x:Name="TabOverflowBtn"
+                     ToolTip.Tip="All tabs"
+                     Padding="4,4" MinWidth="0"
+                     Click="OnTabOverflowClick">
+               <TextBlock Text="&#xEAB4;" FontFamily="{StaticResource CodiconFont}" FontSize="14" />
+             </Button>
 
-           <!-- Follow All -->
-           <ToggleButton Classes="neon-action toolbar-btn"
-                         IsChecked="{Binding Workspace.IsMasterFollowOn}"
-                         ToolTip.Tip="Follow all (F)&#x0a;All panes auto-scroll to newest lines"
-                         AutomationProperties.AutomationId="btnFollow">
-             <StackPanel Orientation="Horizontal" Spacing="4">
-               <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource AccentBrush}" />
-               <TextBlock Text="Follow" VerticalAlignment="Center" />
-             </StackPanel>
-           </ToggleButton>
+             <Button Classes="neon-action toolbar-btn" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close panes&#x0a;Close all panes in this tab (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
+             <Button Classes="neon-action toolbar-btn" Content="Close tabs" Command="{Binding CloseTabsCommand}" ToolTip.Tip="Close tabs&#x0a;Close all tabs (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
+           </StackPanel>
 
-           <!-- Grid View (grid icon; checked = grid, unchecked = text) -->
-           <ToggleButton Classes="neon-action toolbar-btn"
-                         IsChecked="{Binding Workspace.ActiveLogView.IsGridMode}"
-                         ToolTip.Tip="Grid view (G)&#x0a;Table with File/Timestamp, Level, Message columns. Toggle for text view.">
-             <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
-           </ToggleButton>
+           <!-- Left-docked: tool icons (always visible) -->
+           <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4">
+             <!-- Source Manager (folder icon) -->
+             <ToggleButton Classes="neon-action toolbar-btn"
+                           IsChecked="{Binding IsSidebarVisible}"
+                           ToolTip.Tip="Source manager (Ctrl+E)&#x0a;Open folder or file list, add/remove sources"
+                           AutomationProperties.AutomationId="btnSources">
+               <TextBlock Text="&#xEAF0;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+             </ToggleButton>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
+             <!-- Search/Filter -->
+             <ToggleButton Classes="neon-action toolbar-btn"
+                           IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}"
+                           ToolTip.Tip="Filter / search (Ctrl+F)&#x0a;Show search and filter panel in active pane"
+                           AutomationProperties.AutomationId="btnFilter">
+               <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+             </ToggleButton>
 
-           <!-- Split Panes -->
-           <Button Classes="neon-action toolbar-btn" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally&#x0a;Open another pane side-by-side">
-             <TextBlock Text="&#xEB56;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
-           </Button>
-           <Button Classes="neon-action toolbar-btn" Command="{Binding SplitVerticalCommand}" ToolTip.Tip="Split vertically&#x0a;Stack another pane below">
-             <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
-           </Button>
+             <!-- Follow All -->
+             <ToggleButton Classes="neon-action toolbar-btn"
+                           IsChecked="{Binding Workspace.IsMasterFollowOn}"
+                           ToolTip.Tip="Follow all (F)&#x0a;All panes auto-scroll to newest lines"
+                           AutomationProperties.AutomationId="btnFollow">
+               <StackPanel Orientation="Horizontal" Spacing="4">
+                 <TextBlock Text="&#xEA9A;" FontFamily="{StaticResource CodiconFont}" FontSize="18" Foreground="{DynamicResource AccentBrush}" />
+                 <TextBlock Text="Follow" VerticalAlignment="Center" />
+               </StackPanel>
+             </ToggleButton>
 
-           <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
+             <!-- Grid View (grid icon; checked = grid, unchecked = text) -->
+             <ToggleButton Classes="neon-action toolbar-btn"
+                           IsChecked="{Binding Workspace.ActiveLogView.IsGridMode}"
+                           ToolTip.Tip="Grid view (G)&#x0a;Table with File/Timestamp, Level, Message columns. Toggle for text view.">
+               <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+             </ToggleButton>
 
-           <!-- TABS (inlined in toolbar) -->
-           <ItemsControl ItemsSource="{Binding Workspace.Tabs}" x:Name="TabBar" VerticalAlignment="Center">
-             <ItemsControl.ItemsPanel>
-               <ItemsPanelTemplate>
-                 <StackPanel Orientation="Horizontal" Spacing="2" />
-               </ItemsPanelTemplate>
-             </ItemsControl.ItemsPanel>
-             <ItemsControl.ItemTemplate>
-               <DataTemplate x:DataType="vm:WorkspaceTabItem">
-                 <Button Classes="neon-tab"
-                         Content="{Binding Name}"
-                         FontWeight="{Binding IsActive, Converter={x:Static vm:BoolToFontWeightConverter.Instance}}"
-                         Opacity="{Binding IsActive, Converter={x:Static vm:BoolToOpacityConverter.Instance}}">
-                   <Button.ContextMenu>
-                     <ContextMenu>
-                       <MenuItem Header="Rename" Tag="rename" Click="OnTabContextMenuItemClick" />
-                       <MenuItem Header="Close Panes" Tag="closepanes" Click="OnTabContextMenuItemClick" />
-                       <MenuItem Header="Close Others" Tag="closeothers" Click="OnTabContextMenuItemClick" />
-                       <MenuItem Header="Close All" Tag="closeall" Click="OnTabContextMenuItemClick" />
-                       <Separator />
-                       <MenuItem Header="Close" Tag="close" Click="OnTabContextMenuItemClick" />
-                     </ContextMenu>
-                   </Button.ContextMenu>
-                 </Button>
-               </DataTemplate>
-             </ItemsControl.ItemTemplate>
-           </ItemsControl>
+             <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
 
-           <Button Classes="neon-action toolbar-btn" Content="Close panes" Command="{Binding CloseAllPanesInActiveTabCommand}" ToolTip.Tip="Close panes&#x0a;Close all panes in this tab (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
-           <Button Classes="neon-action toolbar-btn" Content="Close tabs" Command="{Binding CloseTabsCommand}" ToolTip.Tip="Close tabs&#x0a;Close all tabs (sources stay in list)" Foreground="{DynamicResource DimTextBrush}" />
-        </StackPanel>
-        </ScrollViewer>
+             <!-- Split Panes -->
+             <Button Classes="neon-action toolbar-btn" Command="{Binding SplitHorizontalCommand}" ToolTip.Tip="Split horizontally&#x0a;Open another pane side-by-side">
+               <TextBlock Text="&#xEB56;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+             </Button>
+             <Button Classes="neon-action toolbar-btn" Command="{Binding SplitVerticalCommand}" ToolTip.Tip="Split vertically&#x0a;Stack another pane below">
+               <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+             </Button>
+
+             <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
+           </StackPanel>
+
+           <!-- Center: TABS fill remaining space, clip overflow -->
+           <Border ClipToBounds="True">
+             <ItemsControl ItemsSource="{Binding Workspace.Tabs}" x:Name="TabBar" VerticalAlignment="Center">
+               <ItemsControl.ItemsPanel>
+                 <ItemsPanelTemplate>
+                   <StackPanel Orientation="Horizontal" Spacing="2" />
+                 </ItemsPanelTemplate>
+               </ItemsControl.ItemsPanel>
+               <ItemsControl.ItemTemplate>
+                 <DataTemplate x:DataType="vm:WorkspaceTabItem">
+                   <Button Classes="neon-tab"
+                           FontWeight="{Binding IsActive, Converter={x:Static vm:BoolToFontWeightConverter.Instance}}"
+                           Opacity="{Binding IsActive, Converter={x:Static vm:BoolToOpacityConverter.Instance}}"
+                           AutomationProperties.Name="{Binding Name}">
+                     <StackPanel Orientation="Horizontal" Spacing="4">
+                       <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                       <Button Classes="neon-action tab-close-btn"
+                               Tag="tab-close"
+                               Content="&#x2715;"
+                               FontSize="10"
+                               Padding="2"
+                               Margin="2,-1,0,0"
+                               MinWidth="0" MinHeight="0"
+                               Width="16" Height="16"
+                               VerticalAlignment="Center"
+                               AutomationProperties.Name="Close tab"
+                               Click="OnTabCloseClick" />
+                     </StackPanel>
+                     <Button.ContextMenu>
+                       <ContextMenu>
+                         <MenuItem Header="Rename" Tag="rename" Click="OnTabContextMenuItemClick" />
+                         <MenuItem Header="Close Panes" Tag="closepanes" Click="OnTabContextMenuItemClick" />
+                         <MenuItem Header="Close Others" Tag="closeothers" Click="OnTabContextMenuItemClick" />
+                         <MenuItem Header="Close All" Tag="closeall" Click="OnTabContextMenuItemClick" />
+                         <Separator />
+                         <MenuItem Header="Close" Tag="close" Click="OnTabContextMenuItemClick" />
+                       </ContextMenu>
+                     </Button.ContextMenu>
+                   </Button>
+                 </DataTemplate>
+               </ItemsControl.ItemTemplate>
+             </ItemsControl>
+           </Border>
+
+        </DockPanel>
 
         <!-- Right Side: Navigation, Simulator, Pin, Settings -->
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
@@ -205,9 +234,21 @@
                     Background="{DynamicResource SplitterBgBrush}"
                     IsVisible="{Binding IsSidebarVisible}" />
 
-      <controls:SplitPanelHost Grid.Column="2"
-                               Node="{Binding Workspace.RootNode}"
-                               AutomationProperties.AutomationId="logViewPanel" />
+      <dock:DockControl Grid.Column="2"
+                        Layout="{Binding Workspace.Layout}"
+                        Factory="{Binding Workspace.DockFactory}"
+                        InitializeLayout="True"
+                        AutomationProperties.AutomationId="logViewPanel">
+        <dock:DockControl.DataTemplates>
+          <docking:DockViewLocator />
+          <DataTemplate DataType="docking:LogViewDocument">
+            <views:LogViewPanel DataContext="{Binding Context}" />
+          </DataTemplate>
+          <DataTemplate DataType="vm:LogViewViewModel">
+            <views:LogViewPanel />
+          </DataTemplate>
+        </dock:DockControl.DataTemplates>
+      </dock:DockControl>
 
       <!-- Settings flyout (right-docked) -->
       <views:SettingsFlyout Grid.Column="3"

@@ -1,0 +1,24 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:psp="using:Dock.Controls.ProportionalStackPanel"
+        xmlns:dock="using:Dock.Avalonia.Controls">
+
+  <!-- 2px splitters, Neon Cyan hover (zero-chrome aesthetic) -->
+  <Style Selector="psp|ProportionalStackPanelSplitter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Thickness" Value="2" />
+  </Style>
+  <Style Selector="psp|ProportionalStackPanelSplitter:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <!-- Hide the Dock document tab strip (we have our own tab bar) -->
+  <Style Selector="dock|DocumentTabStrip">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+  <!-- Floating HostWindow: minimal chrome, match app theme -->
+  <Style Selector="dock|HostWindow">
+    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+  </Style>
+</Styles>
