@@ -26,6 +26,11 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     public ObservableCollection<VSCodeThemeVariant> Variants { get; } = new();
     [ObservableProperty] private VSCodeThemeVariant? _selectedVariant;
 
+    /// <summary>When applying, use theme for app UI (sidebar, tabs, panels).</summary>
+    [ObservableProperty] private bool _applyToApp = true;
+    /// <summary>When applying, use theme for log content and syntax (JSON/SQL, levels).</summary>
+    [ObservableProperty] private bool _applyToLogs = true;
+
     public ThemeMarketplaceViewModel(ThemeService themeService)
     {
         _themeService = themeService;
@@ -104,9 +109,18 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     private void ApplyTheme()
     {
         if (SelectedVariant == null) return;
-        var overrides = VSCodeThemeMapping.ToThemeOverrides(SelectedVariant.Colors);
-        var baseTheme = _themeService.CurrentTheme;
-        var theme = LogThemeData.WithOverrides(baseTheme, overrides);
-        _themeService.SetTheme(theme);
+        var variant = SelectedVariant;
+        if (ApplyToApp)
+        {
+            var uiOverrides = VSCodeThemeMapping.ToThemeOverrides(variant.Colors);
+            var appTheme = LogThemeData.WithOverrides(_themeService.AppTheme, uiOverrides);
+            _themeService.SetAppTheme(appTheme);
+        }
+        if (ApplyToLogs)
+        {
+            var syntaxOverrides = VSCodeThemeMapping.ToSyntaxOverrides(variant.TokenColors);
+            var logTheme = LogThemeData.WithOverrides(_themeService.LogTheme, syntaxOverrides);
+            _themeService.SetLogTheme(logTheme);
+        }
     }
 }

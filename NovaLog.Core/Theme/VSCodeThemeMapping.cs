@@ -1,11 +1,43 @@
 namespace NovaLog.Core.Theme;
 
 /// <summary>
-/// Maps VS Code theme color keys to LogThemeData property names.
-/// Used to build a NovaLog theme from a VS Code theme's colors.
+/// Maps VS Code theme color keys and tokenColors scopes to LogThemeData property names.
+/// Used to build a NovaLog theme from a VS Code theme's colors and syntax tokens.
 /// </summary>
 public static class VSCodeThemeMapping
 {
+    /// <summary>Scope selector (prefix match) → LogThemeData syntax property. Order: more specific first.</summary>
+    private static readonly (string ScopePrefix, string Property)[] ScopeToSyntaxProperty =
+    {
+        ("support.type.property-name.json", "JsonKey"),
+        ("entity.name.tag", "JsonKey"),
+        ("variable.other.key", "JsonKey"),
+        ("keyword.control.sql", "SqlKeyword"),
+        ("keyword.other.sql", "SqlKeyword"),
+        ("storage.type.sql", "SqlKeyword"),
+        ("keyword", "SqlKeyword"),
+        ("string.quoted.double.json", "JsonString"),
+        ("string.quoted.single.sql", "SqlValue"),
+        ("string.quoted", "JsonString"),
+        ("string", "JsonString"),
+        ("constant.numeric", "JsonNumber"),
+        ("constant.numeric", "NumberLiteral"),
+        ("constant.language.boolean", "JsonBool"),
+        ("constant.character", "JsonString"),
+        ("punctuation.separator.key-value", "JsonPunctuation"),
+        ("punctuation.definition.string", "JsonPunctuation"),
+        ("punctuation.brace", "JsonBrace"),
+        ("punctuation", "JsonPunctuation"),
+        ("entity.name.table", "SqlTable"),
+        ("entity.name.type", "SqlTable"),
+        ("variable.other", "SqlValue"),
+        ("keyword.operator", "SqlOperator"),
+        ("comment", "DimText"),
+        ("meta.structure.dictionary.json", "JsonKey"),
+        ("support.function", "StackMethod"),
+        ("entity.name.function", "StackMethod"),
+    };
+
     /// <summary>VS Code theme key → LogThemeData property name (for WithOverrides).</summary>
     private static readonly Dictionary<string, string> VSCodeToProperty = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -67,5 +99,41 @@ public static class VSCodeThemeMapping
             }
         }
         return overrides;
+    }
+
+    /// <summary>Convert tokenColors (scope → foreground) to LogThemeData syntax property overrides. Uses first matching scope per property.</summary>
+    public static IReadOnlyDictionary<string, string> ToSyntaxOverrides(IReadOnlyList<(string Scope, string Foreground)>? tokenColors)
+    {
+        if (tokenColors == null || tokenColors.Count == 0)
+            return new Dictionary<string, string>();
+
+        var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (scopePrefix, property) in ScopeToSyntaxProperty)
+        {
+            if (overrides.ContainsKey(property)) continue;
+            foreach (var (scope, foreground) in tokenColors)
+            {
+                if (string.IsNullOrWhiteSpace(foreground)) continue;
+                if (scope.StartsWith(scopePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var raw = foreground.TrimStart('#');
+                    overrides[property] = (raw.Length == 6 || raw.Length == 8) ? "#" + raw : foreground;
+                    break;
+                }
+            }
+        }
+        return overrides;
+    }
+
+    /// <summary>Classify theme as Full (UI + syntax), UIOnly, or SyntaxOnly.</summary>
+    public static VSCodeThemeKind GetThemeKind(
+        IReadOnlyDictionary<string, string> colors,
+        IReadOnlyList<(string Scope, string Foreground)> tokenColors)
+    {
+        var hasUi = colors != null && colors.Count > 0;
+        var hasSyntax = tokenColors != null && tokenColors.Count > 0;
+        if (hasUi && hasSyntax) return VSCodeThemeKind.Full;
+        if (hasSyntax) return VSCodeThemeKind.SyntaxOnly;
+        return VSCodeThemeKind.UIOnly;
     }
 }

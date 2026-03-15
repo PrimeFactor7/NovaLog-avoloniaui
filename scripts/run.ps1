@@ -38,7 +38,12 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -Er
     $global:PSNativeCommandUseErrorActionPreference = $false
 }
 
-# Build first so latest code is always run
+# Clean Avalonia obj so precompiled XAML is regenerated (avoids "No precompiled XAML found" when using --no-build)
+$avaloniaObj = Join-Path $root 'NovaLog.Avalonia\obj'
+if (Test-Path $avaloniaObj) {
+    Remove-Item -Recurse -Force $avaloniaObj
+    Write-Log "Cleaned NovaLog.Avalonia obj for fresh XAML compile."
+}
 Write-Log "Building..."
 & dotnet build $project -c Debug --nologo -v q 2>&1 | ForEach-Object {
     $line = $_.ToString() -replace "`0", ""

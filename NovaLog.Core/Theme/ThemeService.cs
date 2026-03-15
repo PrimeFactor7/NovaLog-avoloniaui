@@ -9,7 +9,8 @@ namespace NovaLog.Core.Theme;
 /// </summary>
 public sealed class ThemeService
 {
-    private LogThemeData _theme = LogThemeData.Dark;
+    private LogThemeData _appTheme = LogThemeData.Dark;
+    private LogThemeData _logTheme = LogThemeData.Dark;
 
     // ── Overrides ────────────────────────────────────────────────
     private string? _overrideTimestamp;
@@ -17,27 +18,51 @@ public sealed class ThemeService
     private readonly Dictionary<LogLevel, string?> _overrideLevelFg = new();
     private readonly Dictionary<LogLevel, string?> _overrideLevelBg = new();
 
-    public LogThemeData CurrentTheme => _theme;
-    public bool IsDark => _theme.Name == LogThemeData.Dark.Name;
+    /// <summary>Theme for app UI (sidebar, tabs, panels).</summary>
+    public LogThemeData AppTheme => _appTheme;
+    /// <summary>Theme for log content and syntax (levels, JSON/SQL, stack traces).</summary>
+    public LogThemeData LogTheme => _logTheme;
+    /// <summary>Same as AppTheme for backward compatibility.</summary>
+    public LogThemeData CurrentTheme => _appTheme;
+    public bool IsDark => _appTheme.Name == LogThemeData.Dark.Name;
 
     public event Action<LogThemeData>? ThemeChanged;
 
     public void SetTheme(string themeId)
     {
-        _theme = themeId == AppConstants.ThemeLight ? LogThemeData.Light : LogThemeData.Dark;
-        ThemeChanged?.Invoke(_theme);
+        var theme = themeId == AppConstants.ThemeLight ? LogThemeData.Light : LogThemeData.Dark;
+        _appTheme = theme;
+        _logTheme = theme;
+        ThemeChanged?.Invoke(_appTheme);
     }
 
     public void SetTheme(LogThemeData theme)
     {
-        _theme = theme;
-        ThemeChanged?.Invoke(_theme);
+        _appTheme = theme;
+        _logTheme = theme;
+        ThemeChanged?.Invoke(_appTheme);
+    }
+
+    /// <summary>Apply theme only to app UI (panels, tabs, sidebar).</summary>
+    public void SetAppTheme(LogThemeData theme)
+    {
+        _appTheme = theme;
+        ThemeChanged?.Invoke(_appTheme);
+    }
+
+    /// <summary>Apply theme only to log/syntax (levels, message, JSON/SQL highlighting).</summary>
+    public void SetLogTheme(LogThemeData theme)
+    {
+        _logTheme = theme;
+        ThemeChanged?.Invoke(_logTheme);
     }
 
     public void CycleTheme()
     {
-        _theme = _theme.Name == LogThemeData.Dark.Name ? LogThemeData.Light : LogThemeData.Dark;
-        ThemeChanged?.Invoke(_theme);
+        var next = _appTheme.Name == LogThemeData.Dark.Name ? LogThemeData.Light : LogThemeData.Dark;
+        _appTheme = next;
+        _logTheme = next;
+        ThemeChanged?.Invoke(_appTheme);
     }
 
     public bool LevelEntireLineEnabled { get; set; }
@@ -48,10 +73,10 @@ public sealed class ThemeService
 
     // ── Override API ─────────────────────────────────────────────
 
-    public void SetTimestampOverride(string? hex) { _overrideTimestamp = hex; ThemeChanged?.Invoke(_theme); }
-    public void SetMessageOverride(string? hex) { _overrideMessage = hex; ThemeChanged?.Invoke(_theme); }
-    public void SetLevelFgOverride(LogLevel level, string? hex) { _overrideLevelFg[level] = hex; ThemeChanged?.Invoke(_theme); }
-    public void SetLevelBgOverride(LogLevel level, string? hex) { _overrideLevelBg[level] = hex; ThemeChanged?.Invoke(_theme); }
+    public void SetTimestampOverride(string? hex) { _overrideTimestamp = hex; ThemeChanged?.Invoke(_appTheme); }
+    public void SetMessageOverride(string? hex) { _overrideMessage = hex; ThemeChanged?.Invoke(_appTheme); }
+    public void SetLevelFgOverride(LogLevel level, string? hex) { _overrideLevelFg[level] = hex; ThemeChanged?.Invoke(_appTheme); }
+    public void SetLevelBgOverride(LogLevel level, string? hex) { _overrideLevelBg[level] = hex; ThemeChanged?.Invoke(_appTheme); }
 
     public void ClearOverrides()
     {
@@ -59,17 +84,17 @@ public sealed class ThemeService
         _overrideMessage = null;
         _overrideLevelFg.Clear();
         _overrideLevelBg.Clear();
-        ThemeChanged?.Invoke(_theme);
+        ThemeChanged?.Invoke(_appTheme);
     }
 
-    public string GetTimestampColor() => _overrideTimestamp ?? _theme.Timestamp;
-    public string GetMessageColor() => _overrideMessage ?? _theme.TextDefault;
+    public string GetTimestampColor() => _overrideTimestamp ?? _logTheme.Timestamp;
+    public string GetMessageColor() => _overrideMessage ?? _logTheme.TextDefault;
 
     public string GetLevelColorHex(LogLevel level)
     {
         if (_overrideLevelFg.TryGetValue(level, out var hex) && !string.IsNullOrEmpty(hex))
             return hex;
-        return _theme.GetLevelColorHex(level);
+        return _logTheme.GetLevelColorHex(level);
     }
 
     public string? GetLevelBgColorHex(LogLevel level)
@@ -78,9 +103,9 @@ public sealed class ThemeService
             return hex;
         return level switch
         {
-            LogLevel.Warn => _theme.WarnLineBg,
-            LogLevel.Error => _theme.ErrorLineBg,
-            LogLevel.Fatal => _theme.FatalLineBg,
+            LogLevel.Warn => _logTheme.WarnLineBg,
+            LogLevel.Error => _logTheme.ErrorLineBg,
+            LogLevel.Fatal => _logTheme.FatalLineBg,
             _ => null
         };
     }

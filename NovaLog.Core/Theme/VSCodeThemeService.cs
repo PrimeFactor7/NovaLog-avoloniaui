@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -11,10 +12,22 @@ namespace NovaLog.Core.Theme;
 /// </summary>
 public sealed class VSCodeThemeService
 {
-    private readonly HttpClient _http = new()
+    private static readonly HttpClient SharedHttp = CreateHttpClient();
+
+    private static HttpClient CreateHttpClient()
     {
-        Timeout = TimeSpan.FromSeconds(60)
-    };
+        var handler = new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.All,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+        };
+        var client = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(60)
+        };
+        client.DefaultRequestHeaders.Add("Accept", "application/json;api-version=3.0-preview.1");
+        return client;
+    }
 
     private const string GalleryQueryUrl = "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery";
 
@@ -36,8 +49,8 @@ public sealed class VSCodeThemeService
                 {
                     criteria = new[]
                     {
-                        new { filterType = 8, value = "Microsoft.VisualStudio.Code.Extension" },
-                        new { filterType = 5, value = "category:\"Themes\"" },
+                        new { filterType = 8, value = "Microsoft.VisualStudio.Code" },
+                        new { filterType = 5, value = "Themes" },
                         new { filterType = 10, value = searchTerm ?? "" }
                     },
                     pageNumber = 1,
@@ -46,10 +59,11 @@ public sealed class VSCodeThemeService
                     sortOrder = 0
                 }
             },
+            assetTypes = Array.Empty<string>(),
             flags = 914
         };
 
-        using var response = await _http.PostAsJsonAsync(GalleryQueryUrl, payload, cancellationToken).ConfigureAwait(false);
+        using var response = await SharedHttp.PostAsJsonAsync(GalleryQueryUrl, payload, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var root = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken).ConfigureAwait(false);
         if (!root.TryGetProperty("results", out var results) || results.GetArrayLength() == 0)
@@ -84,7 +98,7 @@ public sealed class VSCodeThemeService
         var versionSegment = string.IsNullOrWhiteSpace(version) ? "" : $"/{Uri.EscapeDataString(version)}";
         var vsixUrl = $"https://marketplace.visualstudio.com/_apis/public/gallery/publishers/{Uri.EscapeDataString(publisher)}/vsextensions/{Uri.EscapeDataString(extension)}{versionSegment}/vspackage";
 
-        var bytes = await _http.GetByteArrayAsync(vsixUrl, cancellationToken).ConfigureAwait(false);
+        var bytes = await SharedHttp.GetByteArrayAsync(vsixUrl, cancellationToken).ConfigureAwait(false);
         using var stream = new MemoryStream(bytes);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
 
@@ -126,9 +140,39 @@ public sealed class VSCodeThemeService
                     if (!string.IsNullOrEmpty(val))
                         colorsDict[prop.Name] = val;
                 }
+                var tokenColorsList = new List<(string Scope, string Foreground)>();
+                if (root.TryGetProperty("tokenColors", out var tokenColorsArr))
+                {
+                    foreach (var entry in tokenColorsArr.EnumerateArray())
+                    {
+                        var foreground = entry.TryGetProperty("settings", out var settings) && settings.TryGetProperty("foreground", out var fg)
+                            ? fg.GetString()
+                            : null;
+                        if (string.IsNullOrWhiteSpace(foreground)) continue;
+                        if (entry.TryGetProperty("scope", out var scopeEl))
+                        {
+                            if (scopeEl.ValueKind == JsonValueKind.String)
+                            {
+                                var s = scopeEl.GetString();
+                                if (!string.IsNullOrEmpty(s))
+                                    tokenColorsList.Add((s.Trim(), foreground));
+                            }
+                            else if (scopeEl.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var item in scopeEl.EnumerateArray())
+                                {
+                                    var s = item.GetString();
+                                    if (!string.IsNullOrEmpty(s))
+                                        tokenColorsList.Add((s.Trim(), foreground));
+                                }
+                            }
+                        }
+                    }
+                }
                 var label = theme?["label"]?.GetValue<string>() ?? "Unnamed Theme";
                 var uiTheme = theme?["uiTheme"]?.GetValue<string>();
-                resultList.Add(new VSCodeThemeVariant(label, uiTheme, colorsDict));
+                var kind = VSCodeThemeMapping.GetThemeKind(colorsDict, tokenColorsList);
+                resultList.Add(new VSCodeThemeVariant(label, uiTheme, kind, colorsDict, tokenColorsList));
             }
             catch (JsonException)
             {
@@ -145,4 +189,21 @@ public sealed class VSCodeThemeService
 
 public sealed record VSCodeExtensionSummary(string ExtensionName, string Publisher, string DisplayName, string? Version);
 
-public sealed record VSCodeThemeVariant(string Label, string? UiTheme, IReadOnlyDictionary<string, string> Colors);
+/// <summary>UI only, syntax only (tokenColors), or both.</summary>
+public enum VSCodeThemeKind { UIOnly, SyntaxOnly, Full }
+
+public sealed record VSCodeThemeVariant(
+    string Label,
+    string? UiTheme,
+    VSCodeThemeKind Kind,
+    IReadOnlyDictionary<string, string> Colors,
+    IReadOnlyList<(string Scope, string Foreground)> TokenColors)
+{
+    public string KindDisplay => Kind switch
+    {
+        VSCodeThemeKind.Full => "Full (UI + syntax)",
+        VSCodeThemeKind.UIOnly => "UI only",
+        VSCodeThemeKind.SyntaxOnly => "Syntax only",
+        _ => Kind.ToString()
+    };
+}

@@ -4,26 +4,34 @@
         x:Class="NovaLog.Avalonia.Views.ThemeMarketplaceWindow"
         x:DataType="vm:ThemeMarketplaceViewModel"
         Title="Theme Marketplace"
-        Width="560" Height="480"
+        Width="920" Height="720"
+        MinWidth="700" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}"
         TextElement.Foreground="{DynamicResource TextDefaultBrush}">
 
-  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*" ColumnDefinitions="*,*" Margin="12">
-    <!-- Search -->
-    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <TextBox Text="{Binding SearchTerm}" Watermark="Search themes..." MinWidth="200" />
-      <Button Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
+  <Grid RowDefinitions="Auto,Auto,Auto,*,*,Auto" ColumnDefinitions="*,*" Margin="20">
+    <!-- Header + Search -->
+    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="6">
+      <TextBlock Text="Theme Marketplace" FontSize="18" FontWeight="Bold" />
+      <TextBlock Text="Search VS Code theme extensions, fetch a theme, then apply its colors to the app UI and/or log syntax (JSON, SQL, levels)." Opacity="0.9" TextWrapping="Wrap" MaxWidth="800" />
+      <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+        <TextBox Text="{Binding SearchTerm}" Watermark="e.g. dark, monokai, github" MinWidth="280" />
+        <Button Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
+      </StackPanel>
+      <TextBlock Text="{Binding SearchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding SearchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
     </StackPanel>
-    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding SearchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding SearchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,0,0,4" />
 
-    <!-- Search results -->
-    <TextBlock Grid.Row="2" Grid.Column="0" Text="Extensions" FontWeight="Bold" Margin="0,0,0,4" />
+    <!-- Left column: Extensions list -->
+    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4">
+      <TextBlock Text="Extensions" FontWeight="SemiBold" FontSize="14" />
+      <TextBlock Text="Theme extensions from the VS Code Marketplace. Select one to fill publisher/extension below and fetch its theme variants." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+    </StackPanel>
     <ListBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding SearchResults}" SelectedItem="{Binding SelectedExtension}"
-             Background="{DynamicResource PanelBgBrush}" MinHeight="100">
+             Background="{DynamicResource PanelBgBrush}" MinHeight="180" Padding="4">
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <StackPanel>
+          <StackPanel Margin="4,6">
             <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding Publisher}" Opacity="0.85" FontSize="12" />
           </StackPanel>
@@ -31,31 +39,47 @@
       </ListBox.ItemTemplate>
     </ListBox>
 
-    <!-- Publisher / Extension / Version -->
-    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,0,0,0">
-      <TextBlock Text="Publisher" FontWeight="SemiBold" />
-      <TextBox Text="{Binding Publisher}" Watermark="e.g. GitHub" />
-      <TextBlock Text="Extension" FontWeight="SemiBold" Margin="0,4,0,0" />
-      <TextBox Text="{Binding Extension}" Watermark="e.g. github-vscode-theme" />
-      <TextBlock Text="Version (optional)" FontWeight="SemiBold" Margin="0,4,0,0" />
-      <TextBox Text="{Binding Version}" Watermark="latest if empty" />
-      <Button Content="Fetch themes" Command="{Binding FetchThemesCommand}" IsEnabled="{Binding !IsFetching}" Margin="0,8,0,0" />
+    <!-- Right column: Fetch by publisher/extension -->
+    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
+      <TextBlock Text="Fetch by ID" FontWeight="SemiBold" FontSize="14" />
+      <TextBlock Text="Paste or edit publisher and extension name (and optional version), then click Fetch themes to load variants from the extension's VSIX." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
     </StackPanel>
-    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding FetchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding FetchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="8,0,0,0" VerticalAlignment="Top" />
+    <StackPanel Grid.Row="3" Grid.Column="1" Spacing="6" VerticalAlignment="Top">
+      <TextBox Text="{Binding Publisher}" Watermark="e.g. zoxon, GitHub" />
+      <TextBox Text="{Binding Extension}" Watermark="e.g. monokai-light, github-vscode-theme" />
+      <TextBox Text="{Binding Version}" Watermark="optional, e.g. 0.1.2" />
+      <Button Content="Fetch themes" Command="{Binding FetchThemesCommand}" IsEnabled="{Binding !IsFetching}" HorizontalAlignment="Left" />
+      <TextBlock Text="{Binding FetchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding FetchError, Converter={x:Static ObjectConverters.IsNotNull}}" TextWrapping="Wrap" />
+    </StackPanel>
 
-    <!-- Variants -->
-    <TextBlock Grid.Row="4" Grid.Column="0" Text="Theme variants" FontWeight="Bold" Margin="0,8,0,4" />
+    <!-- Left: Theme variants list -->
+    <StackPanel Grid.Row="4" Grid.Column="0" Spacing="4">
+      <TextBlock Text="Theme variants" FontWeight="SemiBold" FontSize="14" />
+      <TextBlock Text="Color schemes inside the extension (e.g. Dark+, Light+). Full = UI and syntax colors; UI only or Syntax only = partial. Select one and choose what to apply below." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+    </StackPanel>
     <ListBox Grid.Row="5" Grid.Column="0" ItemsSource="{Binding Variants}" SelectedItem="{Binding SelectedVariant}"
-             Background="{DynamicResource PanelBgBrush}" MinHeight="80">
+             Background="{DynamicResource PanelBgBrush}" MinHeight="200" Padding="4">
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <TextBlock Text="{Binding Label}" />
+          <StackPanel Margin="4,6">
+            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding KindDisplay}" Opacity="0.8" FontSize="12" />
+          </StackPanel>
         </DataTemplate>
       </ListBox.ItemTemplate>
     </ListBox>
 
-    <Button Grid.Row="5" Grid.Column="1" Content="Apply theme" Command="{Binding ApplyThemeCommand}"
-            IsEnabled="{Binding SelectedVariant, Converter={x:Static ObjectConverters.IsNotNull}}"
-            Margin="8,8,0,0" VerticalAlignment="Top" />
+    <!-- Right: Apply options -->
+    <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4" VerticalAlignment="Top">
+      <TextBlock Text="Apply options" FontWeight="SemiBold" FontSize="14" />
+      <TextBlock Text="Choose whether to apply the selected variant to the app chrome (panels, tabs, sidebar) and/or to log content (level colors, JSON/SQL highlighting). You can mix themes (e.g. one for UI, another for logs)." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+    </StackPanel>
+    <StackPanel Grid.Row="5" Grid.Column="1" Spacing="12" VerticalAlignment="Top">
+      <CheckBox IsChecked="{Binding ApplyToApp}" Content="Apply to App — panels, tabs, toolbar, sidebar" />
+      <CheckBox IsChecked="{Binding ApplyToLogs}" Content="Apply to Logs — level text, JSON/SQL/code highlighting in messages" />
+      <Button Content="Apply theme" Command="{Binding ApplyThemeCommand}"
+              IsEnabled="{Binding SelectedVariant, Converter={x:Static ObjectConverters.IsNotNull}}"
+              HorizontalAlignment="Left" Padding="24,8" />
+    </StackPanel>
   </Grid>
 </Window>
