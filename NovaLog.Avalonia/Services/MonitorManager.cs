@@ -104,7 +104,7 @@ public class MonitorManager
             };
 
             win.Show();
-            win.Position = new Avalonia.PixelPoint(wa.X, wa.Y);
+            win.Position = new global::Avalonia.PixelPoint(wa.X, wa.Y);
             win.WindowState = WindowState.Maximized;
 
             // Remove from the main tab list

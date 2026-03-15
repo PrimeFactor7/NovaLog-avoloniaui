@@ -782,7 +782,7 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         else if (index < ActiveTabIndex)
         {
             // Shift index without triggering layout swap
-            _activeTabIndex--;
+            ActiveTabIndex--;
             _previousTabIndex--;
             OnPropertyChanged(nameof(ActiveTabIndex));
         }

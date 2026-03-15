@@ -303,9 +303,17 @@ public partial class LogLineRow : Control
 
     private IBrush ResolveTokenBrush(HighlightToken token, ThemeService? theme)
     {
+        if (token.Type == HighlightType.TextDefault && theme != null)
+            return ParseBrush(theme.GetMessageColor());
+            
+        return ResolveTokenBrushStatic(token);
+    }
+
+    internal static IBrush ResolveTokenBrushStatic(HighlightToken token)
+    {
         return token.Type switch
         {
-            HighlightType.TextDefault => theme != null ? ParseBrush(theme.GetMessageColor()) : GetBrush("TextDefaultBrush") ?? Brushes.Green,
+            HighlightType.TextDefault => GetBrush("TextDefaultBrush") ?? Brushes.Green,
             HighlightType.DimText => GetBrush("DimTextBrush") ?? Brushes.Gray,
             
             HighlightType.StackKeyword => GetBrush("StackKeywordBrush") ?? Brushes.Gray,
