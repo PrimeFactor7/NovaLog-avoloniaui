@@ -73,6 +73,10 @@ coverage/
 *.coveragexml
 TestResults/
 
+# Node (theme-engine)
+node_modules/
+**/dist/
+
 # Misc
 *.bak
 *.tmp

@@ -1,0 +1,255 @@
+/* ==========================================
+   FILE: styles.css (Core Fallback Architecture)
+   Engine injects --* vars on :root. All use var(--x, var(--default-x)).
+   ========================================== */
+
+:root {
+  /* Default App Theme (Fallbacks) */
+  --default-bg-primary: #0d1117;
+  --default-bg-sidebar: #161b22;
+  --default-text-primary: #c9d1d9;
+  --default-btn-primary-bg: #238636;
+  --default-btn-primary-fg: #ffffff;
+  --default-border-color: #30363d;
+  --default-bg-line-highlight: rgba(255, 255, 255, 0.04);
+  --default-bg-selection: rgba(56, 139, 253, 0.3);
+  --default-cursor-color: #aeafad;
+  --default-text-line-number: #6e7681;
+  --default-text-line-number-active: #c9d1d9;
+  --default-text-sidebar: #c9d1d9;
+  --default-text-sidebar-title: #8b949e;
+  --default-bg-titlebar: #161b22;
+  --default-text-titlebar: #c9d1d9;
+  --default-btn-primary-hover: #2ea043;
+  --default-input-bg: #0d1117;
+  --default-input-fg: #c9d1d9;
+  --default-input-border: #30363d;
+  --default-bg-list-selection: rgba(56, 139, 253, 0.2);
+  --default-text-list-selection: #c9d1d9;
+  --default-bg-list-hover: rgba(110, 118, 129, 0.15);
+  --default-bg-list-inactive-selection: rgba(110, 118, 129, 0.1);
+  --default-scrollbar-bg: rgba(110, 118, 129, 0.2);
+  --default-scrollbar-hover: rgba(110, 118, 129, 0.35);
+  --default-scrollbar-active: rgba(110, 118, 129, 0.5);
+  --default-bg-statusbar: #161b22;
+  --default-text-statusbar: #8b949e;
+  --default-bg-tab-active: #0d1117;
+  --default-text-tab-active: #c9d1d9;
+  --default-bg-tab-inactive: #161b22;
+  --default-text-tab-inactive: #8b949e;
+  --default-bg-panel: #0d1117;
+  --default-focus-border: #58a6ff;
+  --default-bg-widget: #161b22;
+}
+
+body {
+  background-color: var(--bg-primary, var(--default-bg-primary));
+  color: var(--text-primary, var(--default-text-primary));
+  font-family: system-ui, -apple-system, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.app-header {
+  margin-bottom: 1.5rem;
+}
+
+.app-header h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+}
+
+.app-header p {
+  margin: 0;
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+
+/* Theme Manager sections */
+.theme-manager-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, var(--default-border-color));
+  border-radius: 8px;
+  background-color: var(--bg-widget, var(--default-bg-widget));
+}
+
+.theme-manager-section h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1rem;
+}
+
+.theme-manager-section h4 {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.import-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.import-form input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--input-border, var(--default-input-border));
+  border-radius: 4px;
+  background: var(--input-bg, var(--default-input-bg));
+  color: var(--input-fg, var(--default-input-fg));
+  font-size: 0.9rem;
+  min-width: 120px;
+}
+
+.import-form button {
+  padding: 0.5rem 1rem;
+  background: var(--btn-primary-bg, var(--default-btn-primary-bg));
+  color: var(--btn-primary-fg, var(--default-btn-primary-fg));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.import-form button:hover:not(:disabled) {
+  background: var(--btn-primary-hover, var(--default-btn-primary-hover));
+}
+
+.import-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.theme-manager-error {
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  border-radius: 4px;
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  font-size: 0.9rem;
+}
+
+.variant-picker .variant-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.variant-picker button {
+  padding: 0.4rem 0.8rem;
+  background: var(--btn-primary-bg, var(--default-btn-primary-bg));
+  color: var(--btn-primary-fg, var(--default-btn-primary-fg));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.variant-picker button:hover {
+  background: var(--btn-primary-hover, var(--default-btn-primary-hover));
+}
+
+.editor-hint {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.editor-empty {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.color-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.color-row label {
+  min-width: 180px;
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.color-row-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.color-row input[type="color"] {
+  width: 32px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--border-color, var(--default-border-color));
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--input-bg, var(--default-input-bg));
+}
+
+.color-row .color-hex {
+  width: 7rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--input-border, var(--default-input-border));
+  border-radius: 4px;
+  background: var(--input-bg, var(--default-input-bg));
+  color: var(--input-fg, var(--default-input-fg));
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.color-row .clear-override {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--text-primary, var(--default-text-primary));
+  border: 1px solid var(--border-color, var(--default-border-color));
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.color-row .clear-override:hover {
+  background: var(--bg-list-hover, var(--default-bg-list-hover));
+}
+
+.export-btn {
+  padding: 0.5rem 1rem;
+  background: var(--btn-primary-bg, var(--default-btn-primary-bg));
+  color: var(--btn-primary-fg, var(--default-btn-primary-fg));
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.export-btn:hover {
+  background: var(--btn-primary-hover, var(--default-btn-primary-hover));
+}
+
+/* Sidebar demo (optional block to show sidebar token) */
+.sidebar {
+  background-color: var(--bg-sidebar, var(--default-bg-sidebar));
+  border-right: 1px solid var(--border-color, var(--default-border-color));
+}

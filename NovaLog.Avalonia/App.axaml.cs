@@ -1,16 +1,20 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using NovaLog.Avalonia.Services;
 using NovaLog.Avalonia.ViewModels;
 using NovaLog.Avalonia.Views;
 using NovaLog.Core.Services;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace NovaLog.Avalonia;
 
 public partial class App : Application
 {
+    private ThemeProxyManager? _themeProxyManager;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -33,6 +37,14 @@ public partial class App : Application
             if (desktop.Args is { Length: > 0 } && !string.IsNullOrWhiteSpace(desktop.Args[0]))
             {
                 vm.LoadPath(desktop.Args[0]);
+            }
+
+            // Start theme proxy sidecar on Windows (job-bound so it exits with this process)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                _themeProxyManager = new ThemeProxyManager();
+                _themeProxyManager.StartProxy(AppDomain.CurrentDomain.BaseDirectory, port: 5000);
+                desktop.Exit += (_, _) => _themeProxyManager?.StopProxy();
             }
         }
 
