@@ -174,17 +174,22 @@ public class NovaLogDockFactory : Factory
             }
         };
 
-        // Robust content wrapping: run after Loaded so the OS has assigned host.Content (DockControl, not Panel).
+        // Robust content wrapping: host.Content can be the ViewModel (IDockWindow), not a Control.
+        // Post at Loaded so the OS has assigned host.Content; wrap in ContentControl so DataTemplates render it.
         Dispatcher.UIThread.Post(() =>
         {
-            if (host.Content is Control existingContent && existingContent is not Grid)
-            {
-                host.Content = null;
-                var wrapper = new Grid();
-                wrapper.Children.Add(existingContent);
-                wrapper.Children.Add(controlBar);
-                host.Content = wrapper;
-            }
+            var originalContent = host.Content;
+
+            if (originalContent is Grid g && g.Children.Count > 1)
+                return;
+
+            host.Content = null;
+
+            var wrapper = new Grid();
+            var contentHost = new ContentControl { Content = originalContent };
+            wrapper.Children.Add(contentHost);
+            wrapper.Children.Add(controlBar);
+            host.Content = wrapper;
         }, DispatcherPriority.Loaded);
     }
 }
