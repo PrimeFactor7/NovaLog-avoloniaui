@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Avalonia.Controls;
 using Dock.Model.Core;
 using NovaLog.Avalonia.Docking;
@@ -50,19 +52,14 @@ public class MonitorManager
         if (secondaryScreens.Count == 0) return;
 
         var docs = DockLayoutHelper.GetAllDocuments(workspace.Layout);
-        if (docs.Count <= 1) return; // Keep at least one in main window
+        if (docs.Count <= 1) return;
 
-        // DockService.DockDockableIntoWindow passes root.ActiveDockable (targetWindowOwner) to SplitToWindow, not doc.Owner.
-        var root = workspace.Layout;
-        if (root.ActiveDockable is not IDock targetWindowOwner)
-            return;
-
-        // Iterate in REVERSE to avoid stale references when SplitToWindow mutates the layout.
         int screenIndex = 0;
+        // Iterate backwards so indices don't shift when removing items.
         for (int i = docs.Count - 1; i >= 1; i--)
         {
             var doc = docs[i];
-            if (doc.Owner is null) continue;
+            if (doc.Owner is not IDock ownerDock) continue;
 
             var screen = secondaryScreens[screenIndex % secondaryScreens.Count];
             var wa = screen.WorkingArea;
@@ -73,8 +70,8 @@ public class MonitorManager
             var w = wa.Width * 0.9 / scale;
             var h = wa.Height * 0.9 / scale;
 
-            // Manual hoist: use same signature as DockService.DockDockableIntoWindow so the library creates and shows the host.
-            factory.SplitToWindow(targetWindowOwner, doc, x, y, w, h);
+            // HostWindowLocator in the factory constructor ensures the library can create an Avalonia HostWindow for the new IDockWindow.
+            factory.SplitToWindow(ownerDock, doc, x, y, w, h);
 
             screenIndex++;
         }

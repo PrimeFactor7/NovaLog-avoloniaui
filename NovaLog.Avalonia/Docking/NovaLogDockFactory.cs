@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -20,6 +23,16 @@ namespace NovaLog.Avalonia.Docking;
 /// </summary>
 public class NovaLogDockFactory : Factory
 {
+    public NovaLogDockFactory()
+    {
+        // Maps the platform-agnostic IDockWindow to the Avalonia-specific HostWindow.
+        // Without this, SplitToWindow detaches the pane but has no host and it vanishes.
+        HostWindowLocator = new Dictionary<string, Func<IHostWindow?>>
+        {
+            [nameof(IDockWindow)] = () => new HostWindow()
+        };
+    }
+
     /// <summary>
     /// Creates the default layout: one root with one document dock containing one log view document.
     /// </summary>
@@ -85,13 +98,7 @@ public class NovaLogDockFactory : Factory
             Margin = new Thickness(4, 0)
         };
         ToolTip.SetTip(topmostToggle, "Always on top");
-        topmostToggle.IsCheckedChanged += (_, _) =>
-        {
-            if (topmostToggle.IsChecked == true)
-                host.Topmost = true;
-            else if (topmostToggle.IsChecked == false)
-                host.Topmost = false;
-        };
+        topmostToggle.IsCheckedChanged += (_, _) => host.Topmost = topmostToggle.IsChecked == true;
         host.GetObservable(Window.TopmostProperty).Subscribe(v => topmostToggle.IsChecked = v);
 
         var opacitySlider = new Slider
