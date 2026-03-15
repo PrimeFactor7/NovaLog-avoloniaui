@@ -44,6 +44,9 @@ public partial class DropZoneOverlay : Control
         }
     }
 
+    /// <summary>Minimum pane dimension. Edge splits that would produce panes below this threshold force Center (tab-merge).</summary>
+    private const double MinPaneDimension = 250;
+
     public DropZone CalculateZone(Point clientPos)
     {
         double w = Bounds.Width;
@@ -53,11 +56,20 @@ public partial class DropZoneOverlay : Control
         double marginX = w / 4;
         double marginY = h / 4;
 
-        if (clientPos.X < marginX) return DropZone.Left;
-        if (clientPos.X > w - marginX) return DropZone.Right;
-        if (clientPos.Y < marginY) return DropZone.Top;
-        if (clientPos.Y > h - marginY) return DropZone.Bottom;
-        return DropZone.Center;
+        DropZone zone;
+        if (clientPos.X < marginX) zone = DropZone.Left;
+        else if (clientPos.X > w - marginX) zone = DropZone.Right;
+        else if (clientPos.Y < marginY) zone = DropZone.Top;
+        else if (clientPos.Y > h - marginY) zone = DropZone.Bottom;
+        else return DropZone.Center;
+
+        // Tab Fairness: if splitting would create a pane below 250px, force Center (tab-merge visual)
+        if (zone is DropZone.Left or DropZone.Right && w < MinPaneDimension * 2)
+            return DropZone.Center;
+        if (zone is DropZone.Top or DropZone.Bottom && h < MinPaneDimension * 2)
+            return DropZone.Center;
+
+        return zone;
     }
 
     public override void Render(DrawingContext context)

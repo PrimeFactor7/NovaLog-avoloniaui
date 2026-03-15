@@ -31,6 +31,8 @@
     <Border Grid.Row="0" Height="32"
             Background="{DynamicResource ToolBarBgBrush}"
             Padding="6,4"
+            ZIndex="100"
+            ClipToBounds="False"
             x:Name="HeaderBorder">
       <Panel>
         <DockPanel>
@@ -239,8 +241,8 @@
                            IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible}" />
 
       <!-- Overlays -->
-      <controls:DropZoneOverlay x:Name="DropOverlay" Grid.ColumnSpan="2" IsVisible="False" />
-      <controls:PanePickerOverlay DataContext="{Binding Picker}" Grid.ColumnSpan="2" />
+      <controls:DropZoneOverlay x:Name="DropOverlay" Grid.ColumnSpan="2" IsVisible="False" ZIndex="1000" />
+      <controls:PanePickerOverlay DataContext="{Binding Picker}" Grid.ColumnSpan="2" ZIndex="1000" />
     </Grid>
 
     <GridSplitter x:Name="FilterSplitter"

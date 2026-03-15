@@ -27,6 +27,13 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     /// <summary>Factory that created <see cref="Layout"/>; set together with Layout.</summary>
     public NovaLogDockFactory? DockFactory { get; set; }
 
+    /// <summary>
+    /// Callback from the view layer that checks whether the active pane is large enough to split.
+    /// Returns true if splitting is allowed, false if the pane is too small (below 500px in the split direction).
+    /// Parameter: true = horizontal split (check width), false = vertical (check height).
+    /// </summary>
+    public Func<bool, bool>? SplitSizeChecker { get; set; }
+
     public ObservableCollection<WorkspaceTabItem> Tabs { get; } = [];
     public GlobalClockService Clock { get; } = new();
     public TimeSyncBarViewModel TimeSync { get; } = new();
@@ -136,6 +143,7 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         lv.SetFormattingOptions(_defaultFormattingOptions);
     }
 
+    /// <summary>Temporal anchoring: active pane broadcasts its viewport center line's timestamp; linked panes seek to the nearest timestamp and scroll that line to center (not pixel-ratio).</summary>
     private void HandleTimeChanged(DateTime timestamp, object sender)
     {
         TimeSync.Pin(timestamp);
@@ -293,13 +301,26 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
                 serialized = SerializeNode(layoutNode);
             }
 
-            result.Add(new WorkspaceTabLayout
+            var tabLayout = new WorkspaceTabLayout
             {
                 Id = tab.Id,
                 DisplayName = tab.Name,
                 Layout = serialized,
                 IsActive = i == ActiveTabIndex
-            });
+            };
+            // Per-tab Dock: persist full layout JSON so split geometry is restored
+            if (dockLayout is not null)
+            {
+                try
+                {
+                    tabLayout.DockLayoutJson = LayoutPersistence.SerializeToJson(dockLayout);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SaveTabs] Dock layout JSON serialize failed for tab {i}: {ex.Message}");
+                }
+            }
+            result.Add(tabLayout);
         }
 
         return result;
@@ -320,13 +341,36 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         {
             var tab = new WorkspaceTabItem(layout.DisplayName, false, layout.Id);
 
-            // In Dock mode, create a Dock layout and restore sources into it
-            if (DockFactory is not null && layout.Layout is not null)
+            if (DockFactory is not null)
             {
-                var dockLayout = (IRootDock)DockFactory.CreateLayout();
-                DockFactory.InitLayout(dockLayout);
-                RestoreSourcesIntoDock(dockLayout, layout.Layout);
-                tab.SavedDockLayout = dockLayout;
+                // Prefer full Dock layout JSON so split geometry is restored
+                var dockLayout = LayoutPersistence.DeserializeFromJson(layout.DockLayoutJson);
+                if (dockLayout is not null)
+                {
+                    try
+                    {
+                        DockFactory.InitLayout(dockLayout);
+                        tab.SavedDockLayout = dockLayout;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[LoadTabs] Dock layout init failed, falling back to source list: {ex.Message}");
+                        dockLayout = null;
+                    }
+                }
+                if (dockLayout is null && layout.Layout is not null)
+                {
+                    var fallbackLayout = (IRootDock)DockFactory.CreateLayout();
+                    DockFactory.InitLayout(fallbackLayout);
+                    RestoreSourcesIntoDock(fallbackLayout, layout.Layout);
+                    tab.SavedDockLayout = fallbackLayout;
+                }
+                else if (dockLayout is null)
+                {
+                    var freshLayout = (IRootDock)DockFactory.CreateLayout();
+                    DockFactory.InitLayout(freshLayout);
+                    tab.SavedDockLayout = freshLayout;
+                }
             }
             else
             {
@@ -529,6 +573,10 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
         var ownerDock = activeDoc?.Owner as IDock;
         if (ownerDock is null) return;
 
+        // Tab Fairness: check if pane is large enough (>= 500px) to split.
+        // If too small, fall back to tab-merge (add as sibling tab in same DocumentDock).
+        bool canSplit = SplitSizeChecker?.Invoke(horizontal) ?? true;
+
         // Create a new document with a fresh LogViewViewModel
         var newDoc = (LogViewDocument)DockFactory.CreateDocument();
         var lv = newDoc.LogView;
@@ -544,12 +592,20 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
             lv.SetFormattingOptions(_defaultFormattingOptions);
         }
 
-        // horizontal param: true = side-by-side (Right), false = top/bottom (Bottom)
-        var operation = horizontal
-            ? Dock.Model.Core.DockOperation.Right
-            : Dock.Model.Core.DockOperation.Bottom;
+        if (!canSplit)
+        {
+            // Tab-merge: add to the same DocumentDock as a sibling tab
+            DockFactory.AddDockable(ownerDock, newDoc);
+        }
+        else
+        {
+            // horizontal param: true = side-by-side (Right), false = top/bottom (Bottom)
+            var operation = horizontal
+                ? Dock.Model.Core.DockOperation.Right
+                : Dock.Model.Core.DockOperation.Bottom;
 
-        DockFactory.SplitToDock(ownerDock, newDoc, operation);
+            DockFactory.SplitToDock(ownerDock, newDoc, operation);
+        }
         OnPropertyChanged(nameof(ActiveLogView));
     }
 
@@ -752,6 +808,25 @@ public partial class WorkspaceViewModel : ObservableObject, IDisposable
     {
         if (index >= 0 && index < Tabs.Count)
             Tabs[index].Name = newName;
+    }
+
+    public void ReorderTab(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= Tabs.Count) return;
+        if (toIndex < 0 || toIndex >= Tabs.Count) return;
+        if (fromIndex == toIndex) return;
+
+        Tabs.Move(fromIndex, toIndex);
+
+        // Recalculate ActiveTabIndex from IsActive flags
+        for (int i = 0; i < Tabs.Count; i++)
+        {
+            if (Tabs[i].IsActive)
+            {
+                ActiveTabIndex = i;
+                break;
+            }
+        }
     }
 
     // ── Tree helpers ────────────────────────────────────────────────

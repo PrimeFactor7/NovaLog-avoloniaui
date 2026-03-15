@@ -1,8 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Dock.Avalonia.Controls;
 using Dock.Model.Controls;
 using Dock.Model.Core;
@@ -51,64 +53,92 @@ public class NovaLogDockFactory : Factory
     public override void OnWindowOpened(IDockWindow? dockWindow)
     {
         base.OnWindowOpened(dockWindow);
-        if (dockWindow?.Host is not HostWindow host || host.Window is not Window win)
+        // HostWindow IS the Avalonia Window (extends Window).
+        // host.Window is IDockWindow? (the model), NOT an Avalonia Window.
+        if (dockWindow?.Host is not HostWindow host)
             return;
-        Dispatcher.UIThread.Post(() => AttachFloatingWindowChrome(win, dockWindow));
+        Dispatcher.UIThread.Post(() => AttachFloatingWindowChrome(host));
     }
 
-    /// <summary>Adds Always on Top toggle and Transparency slider to a floating dock window.</summary>
-    private static void AttachFloatingWindowChrome(Window win, IDockWindow dockWindow)
+    /// <summary>
+    /// Adds Pin/Opacity/Close controls to a floating dock window without replacing
+    /// the existing content (preserves Dock.Avalonia's template parts for native drag-to-dock).
+    /// Chrome removal (SystemDecorations=None) is handled via the HostWindow style in DockNeon.axaml.
+    /// </summary>
+    private static void AttachFloatingWindowChrome(HostWindow host)
     {
-        if (win.Content is not Control existingContent)
+        // Find the existing HostWindowTitleBar inside the HostWindow template
+        var titleBar = host.GetVisualDescendants()
+            .OfType<HostWindowTitleBar>()
+            .FirstOrDefault();
+
+        if (titleBar is null)
             return;
+
+        // Build our controls and insert them into the existing title bar
         var topmostToggle = new global::Avalonia.Controls.Primitives.ToggleButton
         {
             Content = "Pin",
-            IsChecked = win.Topmost
+            IsChecked = host.Topmost,
+            VerticalAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(4, 2),
+            Margin = new Thickness(4, 0)
         };
         ToolTip.SetTip(topmostToggle, "Always on top");
         topmostToggle.IsCheckedChanged += (_, _) =>
         {
             if (topmostToggle.IsChecked == true)
-                win.Topmost = true;
+                host.Topmost = true;
             else if (topmostToggle.IsChecked == false)
-                win.Topmost = false;
+                host.Topmost = false;
         };
-        win.GetObservable(Window.TopmostProperty).Subscribe(v => topmostToggle.IsChecked = v);
+        host.GetObservable(Window.TopmostProperty).Subscribe(v => topmostToggle.IsChecked = v);
 
         var opacitySlider = new Slider
         {
             Minimum = 0.2,
             Maximum = 1,
-            Value = win.Opacity,
+            Value = host.Opacity,
             Width = 80,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0)
         };
-        opacitySlider.GetObservable(Slider.ValueProperty).Subscribe(v => win.Opacity = v);
+        opacitySlider.GetObservable(Slider.ValueProperty).Subscribe(v => host.Opacity = v);
 
-        var bar = new Border
+        var closeBtn = new Button
+        {
+            Content = "\u2715",
+            FontSize = 12,
+            Padding = new Thickness(4, 2),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        ToolTip.SetTip(closeBtn, "Close floating window");
+        closeBtn.Click += (_, _) => host.Close();
+
+        // Add chrome without replacing host.Content (avoids breaking Dock template bindings).
+        // If Content is already a Panel (e.g. Grid from the theme), add our bar as a child; otherwise skip overlay.
+        var controlBar = new Border
         {
             Background = Brushes.Transparent,
             Padding = new Thickness(6, 2),
+            MinHeight = 24,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Top,
+            ZIndex = 100,
             Child = new StackPanel
             {
                 Orientation = global::Avalonia.Layout.Orientation.Horizontal,
-                Spacing = 8,
-                VerticalAlignment = VerticalAlignment.Center,
-                Children =
-                {
-                    topmostToggle,
-                    new TextBlock { Text = "Opacity", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) },
-                    opacitySlider
-                }
+                Spacing = 4,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Children = { topmostToggle, new TextBlock { Text = "Opacity", VerticalAlignment = VerticalAlignment.Center }, opacitySlider, closeBtn }
             }
         };
-        var topBar = new Border { Child = bar, MinHeight = 28 };
-        DockPanel.SetDock(topBar, global::Avalonia.Controls.Dock.Top);
-        win.Content = new DockPanel
-        {
-            LastChildFill = true,
-            Children = { topBar, existingContent }
-        };
+
+        // Only inject into existing Panel (e.g. theme Grid); never replace host.Content.
+        if (host.Content is Panel panel)
+            panel.Children.Add(controlBar);
     }
 }

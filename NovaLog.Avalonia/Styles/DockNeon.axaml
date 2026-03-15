@@ -3,22 +3,52 @@
         xmlns:psp="using:Dock.Controls.ProportionalStackPanel"
         xmlns:dock="using:Dock.Avalonia.Controls">
 
-  <!-- 2px splitters, Neon Cyan hover (zero-chrome aesthetic) -->
+  <!-- Spillover menus: render above dock layer and do not clip (plan: ZIndex 100, ClipToBounds False). Note: MenuFlyout has no ZIndex/ClipToBounds in Avalonia; ContextMenu gets these. -->
+  <Style Selector="ContextMenu">
+    <Setter Property="ZIndex" Value="100" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+
+  <!-- 1px Neon Cyan splitters (visible by default); pointerover keeps same for discoverability -->
   <Style Selector="psp|ProportionalStackPanelSplitter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Thickness" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Thickness" Value="1" />
+    <Setter Property="ZIndex" Value="50" />
   </Style>
   <Style Selector="psp|ProportionalStackPanelSplitter:pointerover">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
   </Style>
 
-  <!-- Hide the Dock document tab strip (we have our own tab bar) -->
+  <!-- DocumentTabStrip: minimal, transparent, shows when multiple docs share a DocumentDock (tab-merge) -->
   <Style Selector="dock|DocumentTabStrip">
-    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Opacity" Value="0.7" />
+  </Style>
+  <Style Selector="dock|DocumentTabStripItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource DimTextBrush}" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+  <!-- :active is Dock's pseudo-class for the active document (not :selected) -->
+  <Style Selector="dock|DocumentTabStripItem:active">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
   </Style>
 
-  <!-- Floating HostWindow: minimal chrome, match app theme -->
+  <!-- Minimum pane dimensions to enforce Tab Fairness (250px) -->
+  <Style Selector="dock|DocumentDockControl">
+    <Setter Property="MinWidth" Value="250" />
+    <Setter Property="MinHeight" Value="250" />
+  </Style>
+
+  <!-- Floating HostWindow: zero-chrome, 1px Neon Cyan border, match app theme -->
   <Style Selector="dock|HostWindow">
     <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+    <Setter Property="SystemDecorations" Value="None" />
+    <Setter Property="ExtendClientAreaToDecorationsHint" Value="True" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
 </Styles>

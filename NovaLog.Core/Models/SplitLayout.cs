@@ -18,6 +18,10 @@ public sealed class WorkspaceTabLayout
 
     [JsonPropertyName("isActive")]
     public bool IsActive { get; set; }
+
+    /// <summary>Optional. When set, the full Dock layout (splits, proportions) for this tab is stored as JSON. Restored when switching tabs so geometry is preserved.</summary>
+    [JsonPropertyName("dockLayoutJson")]
+    public string? DockLayoutJson { get; set; }
 }
 
 public sealed class SplitLayoutNode

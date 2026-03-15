@@ -84,6 +84,11 @@
                <TextBlock Text="&#xEB57;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
              </Button>
 
+             <!-- Monitor Explosion -->
+             <Button Classes="neon-action toolbar-btn" Command="{Binding ExplodeCommand}" ToolTip.Tip="Explode to monitors&#x0a;Distribute panes to secondary screens">
+               <TextBlock Text="&#xEB4B;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
+             </Button>
+
              <Border Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,2" VerticalAlignment="Center" />
            </StackPanel>
 
@@ -238,6 +243,7 @@
                         Layout="{Binding Workspace.Layout}"
                         Factory="{Binding Workspace.DockFactory}"
                         InitializeLayout="True"
+                        EnableManagedWindowLayer="False"
                         AutomationProperties.AutomationId="logViewPanel">
         <dock:DockControl.DataTemplates>
           <docking:DockViewLocator />

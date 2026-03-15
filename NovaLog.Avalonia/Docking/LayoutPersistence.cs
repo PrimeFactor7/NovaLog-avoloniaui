@@ -54,12 +54,34 @@ public static class LayoutPersistence
             if (!File.Exists(path))
                 return null;
             var json = File.ReadAllText(path);
+            return DeserializeFromJson(json);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"LayoutPersistence.Load failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Serializes a root layout to JSON string (for per-tab persistence in workspace.json).</summary>
+    public static string SerializeToJson(IRootDock layout)
+    {
+        var serializer = CreateSerializer();
+        return serializer.Serialize(layout);
+    }
+
+    /// <summary>Deserializes a root layout from JSON string. Returns null if json is null/empty or invalid.</summary>
+    public static IRootDock? DeserializeFromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
             var serializer = CreateSerializer();
             return serializer.Deserialize<IRootDock>(json);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"LayoutPersistence.Load failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"LayoutPersistence.DeserializeFromJson failed: {ex.Message}");
             return null;
         }
     }

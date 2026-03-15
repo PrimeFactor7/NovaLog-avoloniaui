@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Dock.Model.Controls;
 using NovaLog.Avalonia.Controls;
 using NovaLog.Avalonia.Docking;
+using NovaLog.Avalonia.Services;
 using NovaLog.Core.Models;
 using NovaLog.Core.Services;
 using NovaLog.Core.Theme;
@@ -21,6 +22,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public ThemeService ThemeService { get; } = new();
     private readonly WorkspaceManager _workspaceManager = new();
+    private MonitorManager? _monitorManager;
     private AppSettings _appSettings = new();
     private LogViewViewModel? _observedActiveLogView;
     private EventHandler<Dock.Model.Core.Events.DockableClosedEventArgs>? _dockableClosedHandler;
@@ -350,6 +352,19 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     
     [RelayCommand] private void SplitVertical() => Workspace.SplitFocused(false);
     [RelayCommand] private void SplitHorizontal() => Workspace.SplitFocused(true);
+
+    /// <summary>Sets the main window reference for MonitorManager. Call from Window.Opened.</summary>
+    public void SetMainWindow(global::Avalonia.Controls.Window window)
+    {
+        _monitorManager = new MonitorManager(window);
+    }
+
+    [RelayCommand]
+    private void Explode()
+    {
+        if (_monitorManager is null || Workspace.DockFactory is null) return;
+        _monitorManager.ExplodeToMonitors(Workspace, Workspace.DockFactory);
+    }
 
     [RelayCommand] 
     private void CloseAllPanesInActiveTab()

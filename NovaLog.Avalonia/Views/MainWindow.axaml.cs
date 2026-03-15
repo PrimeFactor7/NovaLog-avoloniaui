@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -13,7 +14,12 @@ namespace NovaLog.Avalonia.Views;
 
 public partial class MainWindow : Window
 {
+    private const string TabDragFormat = "NovaLogTab";
     private ContextMenu? _tabOverflowMenu;
+    private Point _tabDragStartPoint;
+    private bool _tabDragPending;
+    private WorkspaceTabItem? _tabDragItem;
+    private PointerPressedEventArgs? _tabDragPressArgs;
 
     public MainWindow()
     {
@@ -45,8 +51,12 @@ public partial class MainWindow : Window
         // Tab bar: handle tab clicks and middle-click close
         TabBar.AddHandler(Button.ClickEvent, OnTabButtonClick);
         TabBar.AddHandler(PointerPressedEvent, OnTabBarPointerPressed, handledEventsToo: true);
+        TabBar.AddHandler(PointerMovedEvent, OnTabBarPointerMoved, handledEventsToo: true);
 
-        // Tab overflow dropdown: click handler opens a ContextMenu
+        // Tab bar drag-drop reorder
+        DragDrop.SetAllowDrop(TabBar, true);
+        TabBar.AddHandler(DragDrop.DragOverEvent, OnTabBarDragOver);
+        TabBar.AddHandler(DragDrop.DropEvent, OnTabBarDrop);
     }
 
     private void OnTabButtonClick(object? sender, RoutedEventArgs e)
@@ -122,22 +132,107 @@ public partial class MainWindow : Window
 
     private void OnTabBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        var point = e.GetCurrentPoint(this);
+
         // Middle-click on tab button → close tab
-        if (!e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed) return;
+        if (point.Properties.IsMiddleButtonPressed)
+        {
+            if (DataContext is not MainWindowViewModel vm) return;
+
+            var source = e.Source as Control;
+            while (source is not null and not Button)
+                source = source.GetVisualParent() as Control;
+
+            if (source is Button btn && btn.DataContext is WorkspaceTabItem tab)
+            {
+                var idx = vm.Workspace.Tabs.IndexOf(tab);
+                if (idx >= 0)
+                    vm.Workspace.CloseTab(idx);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        // Left-click: start drag tracking for tab reorder
+        if (point.Properties.IsLeftButtonPressed)
+        {
+            var source = e.Source as Control;
+            while (source is not null and not Button)
+                source = source.GetVisualParent() as Control;
+
+            if (source is Button btn && btn.DataContext is WorkspaceTabItem tab && btn.Tag as string != "tab-close")
+            {
+                _tabDragStartPoint = e.GetPosition(TabBar);
+                _tabDragPending = true;
+                _tabDragItem = tab;
+                _tabDragPressArgs = e; // Store the original press args for DoDragDropAsync
+            }
+        }
+    }
+
+    private async void OnTabBarPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_tabDragPending || _tabDragItem is null || _tabDragPressArgs is null) return;
+
+        var pos = e.GetPosition(TabBar);
+        var delta = pos - _tabDragStartPoint;
+        if (Math.Abs(delta.X) < 6 && Math.Abs(delta.Y) < 6) return;
+
+        _tabDragPending = false;
+        var pressArgs = _tabDragPressArgs;
+        _tabDragPressArgs = null;
+
+        var transfer = new DataTransfer();
+        var format = DataFormat.CreateStringApplicationFormat(TabDragFormat);
+        transfer.Add(DataTransferItem.Create(format, _tabDragItem.Id));
+        await DragDrop.DoDragDropAsync(pressArgs, transfer, DragDropEffects.Move);
+        _tabDragItem = null;
+    }
+
+    private void OnTabBarDragOver(object? sender, DragEventArgs e)
+    {
+        if (!e.Data.Contains(TabDragFormat))
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+        e.DragEffects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void OnTabBarDrop(object? sender, DragEventArgs e)
+    {
+        if (!e.Data.Contains(TabDragFormat)) return;
         if (DataContext is not MainWindowViewModel vm) return;
 
-        // Walk visual tree up from e.Source to find the parent Button
-        var source = e.Source as Control;
-        while (source is not null and not Button)
-            source = source.GetVisualParent() as Control;
+        var draggedId = e.Data.Get(TabDragFormat) as string;
+        if (string.IsNullOrEmpty(draggedId)) return;
 
-        if (source is Button btn && btn.DataContext is WorkspaceTabItem tab)
+        var fromIdx = vm.Workspace.Tabs.Select((t, i) => (t, i)).FirstOrDefault(x => x.t.Id == draggedId).i;
+
+        // Determine target index from pointer X position
+        var pos = e.GetPosition(TabBar);
+        var toIdx = GetTabIndexFromPosition(vm, pos.X);
+
+        vm.Workspace.ReorderTab(fromIdx, toIdx);
+        e.Handled = true;
+    }
+
+    private int GetTabIndexFromPosition(MainWindowViewModel vm, double x)
+    {
+        // Walk the visual children of the tab bar's panel to find insertion point
+        var panel = TabBar.GetVisualDescendants().OfType<StackPanel>().FirstOrDefault();
+        if (panel is null) return vm.Workspace.Tabs.Count - 1;
+
+        double accum = 0;
+        for (int i = 0; i < panel.Children.Count; i++)
         {
-            var idx = vm.Workspace.Tabs.IndexOf(tab);
-            if (idx >= 0)
-                vm.Workspace.CloseTab(idx);
-            e.Handled = true;
+            var child = panel.Children[i];
+            var midpoint = accum + child.Bounds.Width / 2;
+            if (x < midpoint) return i;
+            accum += child.Bounds.Width + 2; // 2 = spacing
         }
+        return vm.Workspace.Tabs.Count - 1;
     }
 
     private async void OnTabContextMenuItemClick(object? sender, RoutedEventArgs e)
@@ -183,6 +278,27 @@ public partial class MainWindow : Window
                 var mapper = new ThemeMapper(vm.ThemeService);
                 mapper.ApplyTheme(app);
             }
+
+            // Monitor Explosion: provide window reference for screen detection
+            vm.SetMainWindow(this);
+
+            // Tab Fairness: register split-size checker that inspects the active pane's visual bounds
+            vm.Workspace.SplitSizeChecker = horizontal =>
+            {
+                // Find the focused LogViewPanel in the visual tree
+                var dockControl = this.GetVisualDescendants().OfType<Dock.Avalonia.Controls.DockControl>().FirstOrDefault();
+                if (dockControl is null) return true;
+
+                // Find the active LogViewPanel
+                var panels = dockControl.GetVisualDescendants().OfType<LogViewPanel>().ToList();
+                var activePanel = panels.FirstOrDefault(p => p.DataContext == vm.Workspace.ActiveLogView);
+                if (activePanel is null) return true;
+
+                // Check if splitting would create a pane below 250px
+                return horizontal
+                    ? activePanel.Bounds.Width >= 500
+                    : activePanel.Bounds.Height >= 500;
+            };
 
             // Restore window state
             var (w, h, maximized) = vm.GetSavedWindowState();
