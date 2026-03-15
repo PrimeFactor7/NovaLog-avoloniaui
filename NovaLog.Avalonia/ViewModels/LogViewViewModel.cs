@@ -232,6 +232,8 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _indexingProgress;
     [ObservableProperty] private bool _isStreaming;
     [ObservableProperty] private string _navStatus = "";
+    /// <summary>Set when LoadFile/LoadFolder fails; shown in main window status bar.</summary>
+    [ObservableProperty] private string? _loadErrorMessage;
 
     [RelayCommand]
     private void ToggleViewMode() => IsGridMode = !IsGridMode;
@@ -965,6 +967,7 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
     /// <summary>Load a file. Uses BigFileLogProvider (memory-mapped) for files > 512 KB, else reads into memory.</summary>
     public void LoadFile(string filePath)
     {
+        LoadErrorMessage = null;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         System.Diagnostics.Debug.WriteLine($"[LOAD] Start loading: {Path.GetFileName(filePath)}");
 
@@ -1020,6 +1023,7 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
             Title = $"Error: {Path.GetFileName(filePath)}";
             TotalLineCount = 0;
             _delegatingSource.SetInner(Array.Empty<LogLineViewModel>());
+            LoadErrorMessage = $"Load failed: {ex.Message}";
             System.Diagnostics.Debug.WriteLine($"LoadFile failed: {ex.Message}");
         }
     }
@@ -1108,6 +1112,7 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
     /// <summary>Load a folder, discovering audit JSON or log files, with streaming.</summary>
     public void LoadFolder(string directoryPath)
     {
+        LoadErrorMessage = null;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] ====== Start loading: {directoryPath} ======");
         System.Diagnostics.Debug.WriteLine($"[LOAD FOLDER] Full path: {Path.GetFullPath(directoryPath)}");
@@ -1120,7 +1125,9 @@ public partial class LogViewViewModel : ObservableObject, IDisposable
             _loadedPaths.Clear();
             ResetLineSelection();
             _delegatingSource.SetInner(PlaceholderLine);
-            Title = $"Missing: {Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))}";
+            var name = Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            Title = $"Missing: {name}";
+            LoadErrorMessage = $"Folder not found: {directoryPath}";
             TotalLineCount = PlaceholderLine.Count;
             Filter.OnSourceChanged(null);
             return;

@@ -8,10 +8,10 @@
 
     <Application.DataTemplates>
         <docking:DockViewLocator />
-        <DataTemplate DataType="docking:LogViewDocument">
+        <DataTemplate DataType="docking:LogViewDocument" x:DataType="docking:LogViewDocument">
             <views:LogViewPanel DataContext="{Binding Context}" />
         </DataTemplate>
-        <DataTemplate DataType="vm:LogViewViewModel">
+        <DataTemplate DataType="vm:LogViewViewModel" x:DataType="vm:LogViewViewModel">
             <views:LogViewPanel />
         </DataTemplate>
     </Application.DataTemplates>

@@ -50,7 +50,7 @@
 
              <!-- Search/Filter -->
              <ToggleButton Classes="neon-action toolbar-btn"
-                           IsChecked="{Binding Workspace.ActiveLogView.Filter.IsVisible}"
+                           IsChecked="{Binding ActiveFilterVisible}"
                            ToolTip.Tip="Filter / search (Ctrl+F)&#x0a;Show search and filter panel in active pane"
                            AutomationProperties.AutomationId="btnFilter">
                <TextBlock Text="&#xEAF1;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
@@ -69,7 +69,7 @@
 
              <!-- Grid View (grid icon; checked = grid, unchecked = text) -->
              <ToggleButton Classes="neon-action toolbar-btn"
-                           IsChecked="{Binding Workspace.ActiveLogView.IsGridMode}"
+                           IsChecked="{Binding ActiveIsGridMode}"
                            ToolTip.Tip="Grid view (G)&#x0a;Table with File/Timestamp, Level, Message columns. Toggle for text view.">
                <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource CodiconFont}" FontSize="18" />
              </ToggleButton>
@@ -141,7 +141,7 @@
         <!-- Right Side: Navigation, Simulator, Pin, Settings -->
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
            
-           <TextBlock Text="{Binding Workspace.ActiveLogView.NavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+           <TextBlock Text="{Binding ActiveNavStatus}" Foreground="{DynamicResource DimTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
 
            <!-- Bookmarks -->
            <Button Classes="neon-action toolbar-btn" Command="{Binding ToggleBookmarkCommand}" ToolTip.Tip="Toggle bookmark (Ctrl+B)&#x0a;Add or remove bookmark on current line">
@@ -262,7 +262,7 @@
     <Border Grid.Row="3"
             Background="{DynamicResource StatusBarBgBrush}"
             Padding="8,2">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
         <TextBlock Text="{Binding StatusFile}"
                    Foreground="{DynamicResource DimTextBrush}"
                    FontSize="11"
@@ -291,6 +291,14 @@
                    VerticalAlignment="Center"
                    AutomationProperties.Name="{Binding StatusFollow}"
                    AutomationProperties.AutomationId="lblFollow" />
+        <TextBlock Grid.Column="4"
+                   Text="{Binding ActiveLoadError}"
+                   Foreground="{DynamicResource TextErrorBrush}"
+                   FontSize="11" Margin="12,0"
+                   TextTrimming="CharacterEllipsis"
+                   MaxWidth="400"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="lblLoadError" />
       </Grid>
     </Border>
   </Grid>

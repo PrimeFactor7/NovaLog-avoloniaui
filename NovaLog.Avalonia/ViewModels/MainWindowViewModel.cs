@@ -25,6 +25,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private MonitorManager? _monitorManager;
     private AppSettings _appSettings = new();
     private LogViewViewModel? _observedActiveLogView;
+    private FilterPanelViewModel? _observedActiveFilter;
     private EventHandler<Dock.Model.Core.Events.DockableClosedEventArgs>? _dockableClosedHandler;
     private Action<string, SourceKind>? _sourceSelectedHandler;
     private Action<string, SourceKind>? _sourceNewTabHandler;
@@ -383,6 +384,36 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public string StatusFollow => Workspace.IsMasterFollowOn ? "Follow: All"
         : Workspace.ActiveLogView?.IsFollowMode == true ? "Follow: On" : "Follow: Off";
 
+    /// <summary>Null-safe binding for Filter.IsVisible when no active pane.</summary>
+    public bool ActiveFilterVisible
+    {
+        get => Workspace.ActiveLogView?.Filter?.IsVisible ?? false;
+        set
+        {
+            if (Workspace.ActiveLogView?.Filter != null)
+                Workspace.ActiveLogView.Filter.IsVisible = value;
+            OnPropertyChanged(nameof(ActiveFilterVisible));
+        }
+    }
+
+    /// <summary>Null-safe binding for IsGridMode when no active pane.</summary>
+    public bool ActiveIsGridMode
+    {
+        get => Workspace.ActiveLogView?.IsGridMode ?? false;
+        set
+        {
+            if (Workspace.ActiveLogView != null)
+                Workspace.ActiveLogView.IsGridMode = value;
+            OnPropertyChanged(nameof(ActiveIsGridMode));
+        }
+    }
+
+    /// <summary>Null-safe binding for NavStatus when no active pane.</summary>
+    public string ActiveNavStatus => Workspace.ActiveLogView?.NavStatus ?? "";
+
+    /// <summary>Load error message from active pane for status bar (e.g. "Load failed: ...").</summary>
+    public string ActiveLoadError => Workspace.ActiveLogView?.LoadErrorMessage ?? "";
+
     // Simulators
     private readonly List<LogSimulator> _simulators = new();
     public void StartSimulator(int intervalMs, bool showcase = false)
@@ -467,17 +498,23 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         AttachActiveLogView(Workspace.ActiveLogView);
         RaiseStatusProperties();
+        RaiseActiveLogViewDependentProperties();
     }
 
     private void AttachActiveLogView(LogViewViewModel? logView)
     {
         if (_observedActiveLogView is not null)
             _observedActiveLogView.PropertyChanged -= OnActiveLogViewPropertyChanged;
+        if (_observedActiveFilter is not null)
+            _observedActiveFilter.PropertyChanged -= OnActiveFilterPropertyChanged;
 
         _observedActiveLogView = logView;
+        _observedActiveFilter = logView?.Filter;
 
         if (_observedActiveLogView is not null)
             _observedActiveLogView.PropertyChanged += OnActiveLogViewPropertyChanged;
+        if (_observedActiveFilter is not null)
+            _observedActiveFilter.PropertyChanged += OnActiveFilterPropertyChanged;
     }
 
     private void OnActiveLogViewPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -490,7 +527,26 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             case nameof(LogViewViewModel.IsFollowMode):
                 RaiseStatusProperties();
                 break;
+            case nameof(LogViewViewModel.IsGridMode):
+            case nameof(LogViewViewModel.NavStatus):
+            case nameof(LogViewViewModel.LoadErrorMessage):
+                RaiseActiveLogViewDependentProperties();
+                break;
         }
+    }
+
+    private void OnActiveFilterPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FilterPanelViewModel.IsVisible))
+            RaiseActiveLogViewDependentProperties();
+    }
+
+    private void RaiseActiveLogViewDependentProperties()
+    {
+        OnPropertyChanged(nameof(ActiveFilterVisible));
+        OnPropertyChanged(nameof(ActiveIsGridMode));
+        OnPropertyChanged(nameof(ActiveNavStatus));
+        OnPropertyChanged(nameof(ActiveLoadError));
     }
 
     private void RaiseStatusProperties()
@@ -509,6 +565,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (_observedActiveLogView is not null)
             _observedActiveLogView.PropertyChanged -= OnActiveLogViewPropertyChanged;
+        if (_observedActiveFilter is not null)
+            _observedActiveFilter.PropertyChanged -= OnActiveFilterPropertyChanged;
 
         // Unsubscribe SourceManager events
         if (_sourceSelectedHandler is not null) SourceManager.SourceSelected -= _sourceSelectedHandler;

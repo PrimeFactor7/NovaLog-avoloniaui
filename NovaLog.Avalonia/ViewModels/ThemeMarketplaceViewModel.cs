@@ -31,9 +31,19 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     /// <summary>When applying, use theme for log content and syntax (JSON/SQL, levels).</summary>
     [ObservableProperty] private bool _applyToLogs = true;
 
+    private CancellationTokenSource? _searchCts;
+    private CancellationTokenSource? _fetchCts;
+
     public ThemeMarketplaceViewModel(ThemeService themeService)
     {
         _themeService = themeService;
+    }
+
+    /// <summary>Cancel in-flight search/fetch when window closes.</summary>
+    public void CancelPending()
+    {
+        _searchCts?.Cancel();
+        _fetchCts?.Cancel();
     }
 
     partial void OnSelectedExtensionChanged(VSCodeExtensionSummary? value)
@@ -55,13 +65,21 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
         SearchResults.Clear();
         SelectedExtension = null;
         if (string.IsNullOrWhiteSpace(SearchTerm)) return;
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var ct = _searchCts.Token;
         IsSearching = true;
         try
         {
-            var list = await _marketplace.SearchAsync(SearchTerm).ConfigureAwait(true);
+            var list = await _marketplace.SearchAsync(SearchTerm, cancellationToken: ct).ConfigureAwait(true);
+            if (ct.IsCancellationRequested) return;
             SearchResults.Clear();
             foreach (var ext in list)
                 SearchResults.Add(ext);
+        }
+        catch (OperationCanceledException)
+        {
+            // Window closed or new search started
         }
         catch (Exception ex)
         {
@@ -69,7 +87,8 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
         }
         finally
         {
-            IsSearching = false;
+            if (!ct.IsCancellationRequested)
+                IsSearching = false;
         }
     }
 
@@ -84,16 +103,25 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
             FetchError = "Enter publisher and extension.";
             return;
         }
+        _fetchCts?.Cancel();
+        _fetchCts = new CancellationTokenSource();
+        var ct = _fetchCts.Token;
         IsFetching = true;
         try
         {
             var list = await _marketplace.FetchThemesAsync(
                 Publisher,
                 Extension,
-                string.IsNullOrWhiteSpace(Version) ? null : Version).ConfigureAwait(true);
+                string.IsNullOrWhiteSpace(Version) ? null : Version,
+                cancellationToken: ct).ConfigureAwait(true);
+            if (ct.IsCancellationRequested) return;
             Variants.Clear();
             foreach (var v in list)
                 Variants.Add(v);
+        }
+        catch (OperationCanceledException)
+        {
+            // Window closed or new fetch started
         }
         catch (Exception ex)
         {
@@ -101,7 +129,8 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
         }
         finally
         {
-            IsFetching = false;
+            if (!ct.IsCancellationRequested)
+                IsFetching = false;
         }
     }
 
