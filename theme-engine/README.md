@@ -6,7 +6,7 @@ VS Code–compatible theme engine: import themes from the Marketplace via a prox
 
 1. **Proxies** – Bypass CORS and VSIX limits: fetch extension, unzip, extract theme JSON/JSONC, strip comments, return token dictionaries.
    - **Node proxy** (`server/`) – Experiment; port 3001.
-   - **.NET proxy** (`ThemeProxy/`) – Production; port 5000; single-file publish; can be run as a sidecar by NovaLog on Windows.
+   - **.NET proxy** (`ThemeProxy/`) – Production; port 15707; binds to 127.0.0.1; single-file publish; can be run as a sidecar by NovaLog on Windows.
 2. **React frontend** (`client/`) – Fetches from proxy, maps VS Code keys → app CSS vars via `mapVSCodeToAppTokens`, keeps `baseTheme` + `userOverrides`; deep-merge (overrides win) and injects into `document.documentElement` as CSS variables.
 3. **Fallback CSS** – All components use `var(--token, var(--default-token))` so missing keys don’t break the UI.
 
@@ -24,11 +24,11 @@ cd theme-engine/client && npm install && npm run dev
 
 ### Option 2: .NET proxy (production)
 
-Build and run the .NET proxy, then point the client at it.
+Build and run the .NET proxy on port **15707** (loopback only). Then point the client at it.
 
 ```bash
-# Build and run .NET proxy (port 5000)
-cd theme-engine/ThemeProxy && dotnet run -- --urls=http://localhost:5000
+# Build and run .NET proxy (port 15707, 127.0.0.1 only)
+cd theme-engine/ThemeProxy && dotnet run -- --urls=http://127.0.0.1:15707
 ```
 
 Or publish as a single-file executable (e.g. for shipping with NovaLog):
@@ -39,9 +39,9 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 # Output: bin/Release/net8.0/win-x64/publish/ThemeProxy.exe
 ```
 
-Run the published exe: `ThemeProxy.exe --urls=http://localhost:5000`.
+Run the published exe: `ThemeProxy.exe --urls=http://127.0.0.1:15707`.
 
-**Client with .NET proxy:** set `VITE_PROXY_URL=http://localhost:5000` (or configure the Vite proxy to target port 5000), then:
+**Client with .NET proxy:** set `VITE_PROXY_URL=http://127.0.0.1:15707`, then:
 
 ```bash
 cd theme-engine/client && npm install && npm run dev
@@ -51,7 +51,14 @@ Open http://localhost:5173. Use “Fetch themes” with publisher/extension/vers
 
 ### NovaLog sidecar (Windows)
 
-On Windows, the NovaLog Avalonia app starts the .NET theme proxy automatically via `ThemeProxyManager`: it launches `ThemeProxy.exe` from the app’s base directory (or a ThemeProxy subfolder), binds it to a Windows Job Object so the proxy exits when NovaLog exits, and stops it on app shutdown. Place the published `ThemeProxy.exe` next to the NovaLog executable (or in a `ThemeProxy` subfolder, if you configure that path). No separate proxy process is needed when using NovaLog on Windows.
+On Windows, the NovaLog Avalonia app starts the .NET theme proxy automatically via `ThemeProxyManager`: it launches `ThemeProxy.exe` from the app’s base directory (or a ThemeProxy subfolder) on **127.0.0.1:15707**, binds it to a Windows Job Object so the proxy exits when NovaLog exits, and stops it on app shutdown. Place the published `ThemeProxy.exe` next to the NovaLog executable (or in a `ThemeProxy` subfolder, if you configure that path). No separate proxy process is needed when using NovaLog on Windows.
+
+### Production deployment
+
+- **Internal API port:** 15707  
+- **Local endpoint:** http://127.0.0.1:15707  
+- **CORS:** Restricted to loopback origins (e.g. Vite dev server, same host).
+- **Checklist:** Build ThemeProxy single-file; place `ThemeProxy.exe` in the installer root (or app base directory); set React/Vite env to `VITE_PROXY_URL=http://127.0.0.1:15707` for builds that call the proxy; sign both the main app and the proxy to avoid antivirus false positives.
 
 ## Expansion
 

@@ -15,14 +15,14 @@ public sealed class ThemeProxyManager : IDisposable
     private Process? _proxyProcess;
     private IntPtr _jobHandle;
     private const string ProxyFileName = "ThemeProxy.exe";
+    private const int AppPort = 15707;
 
     /// <summary>
     /// Start the theme proxy exe in the given directory and bind it to a job so it exits with this process.
     /// No-op when not on Windows or when ThemeProxy.exe is not found.
     /// </summary>
     /// <param name="proxyDirectory">Directory containing ThemeProxy.exe (e.g. AppDomain.CurrentDomain.BaseDirectory or a ThemeProxy subfolder).</param>
-    /// <param name="port">Port for --urls=http://localhost:{port}.</param>
-    public void StartProxy(string proxyDirectory, int port = 5000)
+    public void StartProxy(string proxyDirectory)
     {
         if (!OperatingSystem.IsWindows())
             return;
@@ -57,7 +57,7 @@ public sealed class ThemeProxyManager : IDisposable
         var startInfo = new ProcessStartInfo
         {
             FileName = fullPath,
-            Arguments = $"--urls=http://localhost:{port}",
+            Arguments = $"--urls=http://127.0.0.1:{AppPort}",
             UseShellExecute = false,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden

@@ -7,12 +7,20 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    options.AddDefaultPolicy(p => p
+        .WithOrigins("http://127.0.0.1:5173", "http://localhost:5173", "http://127.0.0.1:15707", "http://localhost:15707")
+        .AllowAnyMethod()
+        .AllowAnyHeader());
 });
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
 app.UseCors();
+
+// ==========================================
+// 0. HEALTH (for monitoring / scripts)
+// ==========================================
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", port = 15707 }));
 
 // ==========================================
 // 1. SEARCH ENDPOINT (Marketplace Search)

@@ -43,7 +43,7 @@ public partial class App : Application
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 _themeProxyManager = new ThemeProxyManager();
-                _themeProxyManager.StartProxy(AppDomain.CurrentDomain.BaseDirectory, port: 5000);
+                _themeProxyManager.StartProxy(AppDomain.CurrentDomain.BaseDirectory);
                 desktop.Exit += (_, _) => _themeProxyManager?.StopProxy();
             }
         }
