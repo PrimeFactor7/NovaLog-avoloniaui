@@ -244,17 +244,7 @@
                         Factory="{Binding Workspace.DockFactory}"
                         InitializeLayout="True"
                         EnableManagedWindowLayer="False"
-                        AutomationProperties.AutomationId="logViewPanel">
-        <dock:DockControl.DataTemplates>
-          <docking:DockViewLocator />
-          <DataTemplate DataType="docking:LogViewDocument">
-            <views:LogViewPanel DataContext="{Binding Context}" />
-          </DataTemplate>
-          <DataTemplate DataType="vm:LogViewViewModel">
-            <views:LogViewPanel />
-          </DataTemplate>
-        </dock:DockControl.DataTemplates>
-      </dock:DockControl>
+                        AutomationProperties.AutomationId="logViewPanel" />
 
       <!-- Settings flyout (right-docked) -->
       <views:SettingsFlyout Grid.Column="3"

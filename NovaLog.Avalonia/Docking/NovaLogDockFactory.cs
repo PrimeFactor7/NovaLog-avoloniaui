@@ -74,21 +74,11 @@ public class NovaLogDockFactory : Factory
     }
 
     /// <summary>
-    /// Adds Pin/Opacity/Close controls to a floating dock window without replacing
-    /// the existing content (preserves Dock.Avalonia's template parts for native drag-to-dock).
-    /// Chrome removal (SystemDecorations=None) is handled via the HostWindow style in DockNeon.axaml.
+    /// Adds Pin/Opacity/Close controls and enables dragging for floating dock windows.
+    /// Does not depend on HostWindowTitleBar (DockNeon strips it); injects a hit-testable bar and wraps content.
     /// </summary>
     private static void AttachFloatingWindowChrome(HostWindow host)
     {
-        // Find the existing HostWindowTitleBar inside the HostWindow template
-        var titleBar = host.GetVisualDescendants()
-            .OfType<HostWindowTitleBar>()
-            .FirstOrDefault();
-
-        if (titleBar is null)
-            return;
-
-        // Build our controls and insert them into the existing title bar
         var topmostToggle = new global::Avalonia.Controls.Primitives.ToggleButton
         {
             Content = "Pin",
@@ -125,13 +115,12 @@ public class NovaLogDockFactory : Factory
         ToolTip.SetTip(closeBtn, "Close floating window");
         closeBtn.Click += (_, _) => host.Close();
 
-        // Add chrome without replacing host.Content (avoids breaking Dock template bindings).
-        // If Content is already a Panel (e.g. Grid from the theme), add our bar as a child; otherwise skip overlay.
+        // Bar must have a nearly-invisible background to be hit-testable for dragging.
         var controlBar = new Border
         {
-            Background = Brushes.Transparent,
+            Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)),
             Padding = new Thickness(6, 2),
-            MinHeight = 24,
+            MinHeight = 32,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Top,
             ZIndex = 100,
@@ -144,8 +133,22 @@ public class NovaLogDockFactory : Factory
             }
         };
 
-        // Only inject into existing Panel (e.g. theme Grid); never replace host.Content.
-        if (host.Content is Panel panel)
-            panel.Children.Add(controlBar);
+        controlBar.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(host).Properties.IsLeftButtonPressed)
+            {
+                host.BeginMoveDrag(e);
+                e.Handled = true;
+            }
+        };
+
+        if (host.Content is Control existingContent)
+        {
+            host.Content = null;
+            host.Content = new Grid
+            {
+                Children = { existingContent, controlBar }
+            };
+        }
     }
 }

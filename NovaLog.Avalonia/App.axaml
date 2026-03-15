@@ -1,7 +1,20 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:docking="using:NovaLog.Avalonia.Docking"
+             xmlns:vm="using:NovaLog.Avalonia.ViewModels"
+             xmlns:views="using:NovaLog.Avalonia.Views"
              x:Class="NovaLog.Avalonia.App"
              RequestedThemeVariant="Dark">
+
+    <Application.DataTemplates>
+        <docking:DockViewLocator />
+        <DataTemplate DataType="docking:LogViewDocument">
+            <views:LogViewPanel DataContext="{Binding Context}" />
+        </DataTemplate>
+        <DataTemplate DataType="vm:LogViewViewModel">
+            <views:LogViewPanel />
+        </DataTemplate>
+    </Application.DataTemplates>
 
     <Application.Resources>
         <ResourceDictionary>
