@@ -11,6 +11,12 @@ public sealed class AppSettings
     [JsonPropertyName("theme")]
     public string Theme { get; set; } = AppConstants.ThemeDark;
 
+    [JsonPropertyName("marketplaceThemeApp")]
+    public string? MarketplaceThemeApp { get; set; }
+
+    [JsonPropertyName("marketplaceThemeLogs")]
+    public string? MarketplaceThemeLogs { get; set; }
+
     [JsonPropertyName("timestampColorEnabled")]
     public bool TimestampColorEnabled { get; set; }
 

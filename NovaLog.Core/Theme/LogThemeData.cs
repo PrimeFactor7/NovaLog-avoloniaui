@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NovaLog.Core.Models;
 
 namespace NovaLog.Core.Theme;
@@ -78,6 +79,14 @@ public sealed class LogThemeData
         LogLevel.Fatal   => TextFatal,
         _                => TextDefault
     };
+
+    public string Serialize() => JsonSerializer.Serialize(this);
+    public static LogThemeData? Deserialize(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<LogThemeData>(json); }
+        catch { return null; }
+    }
 
     /// <summary>Create a new theme from a base and property overrides (e.g. from VSCodeThemeMapping.ToThemeOverrides).</summary>
     public static LogThemeData WithOverrides(LogThemeData baseTheme, IReadOnlyDictionary<string, string>? propertyOverrides)

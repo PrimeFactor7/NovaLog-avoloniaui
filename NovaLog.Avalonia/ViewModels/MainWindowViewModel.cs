@@ -62,6 +62,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         Settings.SettingsChanged += OnSettingsChanged;
         Settings.PropertyChanged += OnSettingsPropertyChanged;
 
+        ThemeService.ThemeChanged += OnThemeChanged;
+
         _sourceSelectedHandler = (path, kind) =>
         {
             if (kind == SourceKind.File) Workspace.ActiveLogView?.LoadFile(path);
@@ -197,16 +199,28 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         ThemeService.SetTheme(Settings.Theme);
         ThemeLabel = ThemeService.CurrentTheme.Name;
+
+        // Restore marketplace themes if saved
+        if (!string.IsNullOrEmpty(Settings.MarketplaceThemeApp))
+        {
+            var appData = LogThemeData.Deserialize(Settings.MarketplaceThemeApp);
+            if (appData != null) ThemeService.SetAppTheme(appData);
+        }
+        if (!string.IsNullOrEmpty(Settings.MarketplaceThemeLogs))
+        {
+            var logData = LogThemeData.Deserialize(Settings.MarketplaceThemeLogs);
+            if (logData != null) ThemeService.SetLogTheme(logData);
+        }
         
         ThemeService.SetTimestampOverride(Settings.TimestampColorEnabled ? Settings.TimestampColor.ToString() : null);
         ThemeService.SetMessageOverride(Settings.MessageColorEnabled ? Settings.MessageColor.ToString() : null);
         
         foreach (var vm in Settings.LevelColors)
         {
-            if (Enum.TryParse<LogLevel>(vm.Name, out var level))
+            if (Enum.TryParse<LogLevel>(vm.Key, out var level))
             {
-                ThemeService.SetLevelFgOverride(level, vm.Foreground.ToString());
-                ThemeService.SetLevelBgOverride(level, vm.BackgroundEnabled ? vm.Background.ToString() : null);
+                ThemeService.SetLevelFgOverride(level, vm.Value.Foreground.ToString());
+                ThemeService.SetLevelBgOverride(level, vm.Value.BackgroundEnabled ? vm.Value.Background?.ToString() : null);
             }
         }
 
@@ -216,6 +230,25 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         ThemeService.StackTraceHighlightEnabled = Settings.StackTraceHighlightEnabled;
         ThemeService.NumberHighlightEnabled = Settings.NumberHighlightEnabled;
         RaiseStatusProperties();
+    }
+
+    private void OnThemeChanged(LogThemeData theme)
+    {
+        ThemeLabel = theme.Name;
+        Settings.Theme = ThemeLabel;
+
+        // Update marketplace theme settings if the currently active theme is a marketplace one
+        if (ThemeService.AppTheme.Name != LogThemeData.Dark.Name && ThemeService.AppTheme.Name != LogThemeData.Light.Name)
+            Settings.MarketplaceThemeApp = ThemeService.AppTheme.Serialize();
+        else
+            Settings.MarketplaceThemeApp = null;
+
+        if (ThemeService.LogTheme.Name != LogThemeData.Dark.Name && ThemeService.LogTheme.Name != LogThemeData.Light.Name)
+            Settings.MarketplaceThemeLogs = ThemeService.LogTheme.Serialize();
+        else
+            Settings.MarketplaceThemeLogs = null;
+
+        SaveSettings();
     }
 
     private void LoadSession()
