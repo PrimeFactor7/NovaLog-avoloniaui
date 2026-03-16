@@ -132,14 +132,32 @@ public sealed class VSCodeThemeService
                 await using var themeStream = themeEntry.Open();
                 using var themeDoc = await JsonDocument.ParseAsync(themeStream, options, cancellationToken).ConfigureAwait(false);
                 var root = themeDoc.RootElement;
-                var colorsElement = root.TryGetProperty("colors", out var colors) ? colors : root;
+
                 var colorsDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                // 1. Resolve variables if present
+                if (root.TryGetProperty("variables", out var variablesElement))
+                {
+                    foreach (var prop in variablesElement.EnumerateObject())
+                    {
+                        var val = prop.Value.GetString();
+                        if (!string.IsNullOrEmpty(val))
+                            colorsDict[prop.Name] = val;
+                    }
+                }
+
+                // 2. Resolve colors
+                var colorsElement = root.TryGetProperty("colors", out var colors) ? colors : root;
                 foreach (var prop in colorsElement.EnumerateObject())
                 {
                     var val = prop.Value.GetString();
                     if (!string.IsNullOrEmpty(val))
-                        colorsDict[prop.Name] = val;
+                    {
+                        // Resolve references like "$variableName"
+                        colorsDict[prop.Name] = VSCodeThemeMapping.TryResolveVariable(val, colorsDict);
+                    }
                 }
+
                 var tokenColorsList = new List<(string Scope, string Foreground)>();
                 if (root.TryGetProperty("tokenColors", out var tokenColorsArr))
                 {
@@ -148,7 +166,12 @@ public sealed class VSCodeThemeService
                         var foreground = entry.TryGetProperty("settings", out var settings) && settings.TryGetProperty("foreground", out var fg)
                             ? fg.GetString()
                             : null;
+
                         if (string.IsNullOrWhiteSpace(foreground)) continue;
+
+                        // Resolve references in tokenColors as well
+                        foreground = VSCodeThemeMapping.TryResolveVariable(foreground, colorsDict);
+
                         if (entry.TryGetProperty("scope", out var scopeEl))
                         {
                             if (scopeEl.ValueKind == JsonValueKind.String)

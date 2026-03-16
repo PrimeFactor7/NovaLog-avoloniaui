@@ -136,4 +136,12 @@ public static class VSCodeThemeMapping
         if (hasSyntax) return VSCodeThemeKind.SyntaxOnly;
         return VSCodeThemeKind.UIOnly;
     }
+
+    public static string TryResolveVariable(string value, IReadOnlyDictionary<string, string> colors)
+    {
+        if (string.IsNullOrEmpty(value) || !value.StartsWith('$')) return value;
+        var varName = value.TrimStart('$');
+        if (colors.TryGetValue(varName, out var resolved)) return resolved;
+        return value;
+    }
 }
