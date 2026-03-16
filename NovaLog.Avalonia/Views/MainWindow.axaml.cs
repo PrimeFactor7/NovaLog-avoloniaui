@@ -52,21 +52,8 @@ public partial class MainWindow : Window
         DragDrop.SetAllowDrop(TabBar, true);
         TabBar.AddHandler(DragDrop.DragOverEvent, OnTabBarDragOver);
         TabBar.AddHandler(DragDrop.DropEvent, OnTabBarDrop);
-    }
-
-    private void OnTabButtonClick(object? sender, RoutedEventArgs e)
-    {
-        // Ignore clicks on the tab close button (handled by OnTabCloseClick)
-        if (e.Source is Button { Tag: "tab-close" })
-            return;
-
-        if (e.Source is Button btn && btn.DataContext is WorkspaceTabItem tab &&
-            DataContext is MainWindowViewModel vm)
-        {
-            var idx = vm.Workspace.Tabs.IndexOf(tab);
-            if (idx >= 0)
-                vm.Workspace.SwitchTab(idx);
-        }
+        TabBar.AddHandler(PointerPressedEvent, OnTabBarPointerPressed, handledEventsToo: true);
+        TabBar.AddHandler(PointerMovedEvent, OnTabBarPointerMoved, handledEventsToo: true);
     }
 
     private void OnTabCloseClick(object? sender, RoutedEventArgs e)
@@ -127,18 +114,18 @@ public partial class MainWindow : Window
 
     private void OnTabBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        var point = e.GetCurrentPoint(this);
+        if (DataContext is not MainWindowViewModel vm) return;
 
-        // Middle-click on tab button → close tab
+        var point = e.GetCurrentPoint(TabBar);
+
+        // Middle-click: close tab
         if (point.Properties.IsMiddleButtonPressed)
         {
-            if (DataContext is not MainWindowViewModel vm) return;
-
             var source = e.Source as Control;
-            while (source is not null and not Button)
+            while (source is not null and not ListBoxItem)
                 source = source.GetVisualParent() as Control;
 
-            if (source is Button btn && btn.DataContext is WorkspaceTabItem tab)
+            if (source is ListBoxItem lbi && lbi.DataContext is WorkspaceTabItem tab)
             {
                 var idx = vm.Workspace.Tabs.IndexOf(tab);
                 if (idx >= 0)
@@ -152,11 +139,14 @@ public partial class MainWindow : Window
         if (point.Properties.IsLeftButtonPressed)
         {
             var source = e.Source as Control;
-            while (source is not null and not Button)
+            while (source is not null and not ListBoxItem)
                 source = source.GetVisualParent() as Control;
 
-            if (source is Button btn && btn.DataContext is WorkspaceTabItem tab && btn.Tag as string != "tab-close")
+            if (source is ListBoxItem lbi && lbi.DataContext is WorkspaceTabItem tab)
             {
+                // Don't start drag if clicking the close button
+                if (e.Source is Button { Tag: "tab-close" }) return;
+
                 _tabDragStartPoint = e.GetPosition(TabBar);
                 _tabDragPending = true;
                 _tabDragItem = tab;

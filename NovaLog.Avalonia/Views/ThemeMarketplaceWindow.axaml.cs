@@ -6,6 +6,11 @@ namespace NovaLog.Avalonia.Views;
 
 public partial class ThemeMarketplaceWindow : Window
 {
+    public ThemeMarketplaceWindow()
+    {
+        InitializeComponent();
+    }
+
     public ThemeMarketplaceWindow(ThemeService themeService)
     {
         InitializeComponent();
