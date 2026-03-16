@@ -28,6 +28,8 @@ public partial class SettingsViewModel : ObservableObject
 {
     [ObservableProperty] private bool _isVisible;
     [ObservableProperty] private string _theme = AppConstants.ThemeDark;
+    [ObservableProperty] private string? _marketplaceThemeApp;
+    [ObservableProperty] private string? _marketplaceThemeLogs;
     [ObservableProperty] private float _fontSize = 10f;
     [ObservableProperty] private int _lineHeight = 18;
     
@@ -99,6 +101,8 @@ public partial class SettingsViewModel : ObservableObject
     public void LoadFrom(AppSettings settings)
     {
         Theme = settings.Theme;
+        MarketplaceThemeApp = settings.MarketplaceThemeApp;
+        MarketplaceThemeLogs = settings.MarketplaceThemeLogs;
         FontSize = settings.FontSize;
         LineHeight = settings.LineHeight;
 
@@ -160,6 +164,8 @@ public partial class SettingsViewModel : ObservableObject
     public void SaveTo(AppSettings settings)
     {
         settings.Theme = Theme;
+        settings.MarketplaceThemeApp = MarketplaceThemeApp;
+        settings.MarketplaceThemeLogs = MarketplaceThemeLogs;
         settings.FontSize = FontSize;
         settings.LineHeight = LineHeight;
 

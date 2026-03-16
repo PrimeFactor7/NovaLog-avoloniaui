@@ -32,6 +32,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private Func<string, Task<string?>>? _aliasInputHandler;
     private Action? _closeRequestedHandler;
     private Action<SourceItemViewModel>? _sourceRemovedHandler;
+    private bool _isInitializing = true;
 
     public MainWindowViewModel()
     {
@@ -61,8 +62,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Settings.SettingsChanged += OnSettingsChanged;
         Settings.PropertyChanged += OnSettingsPropertyChanged;
-
-        ThemeService.ThemeChanged += OnThemeChanged;
 
         _sourceSelectedHandler = (path, kind) =>
         {
@@ -127,6 +126,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         AttachActiveLogView(Workspace.ActiveLogView);
         RaiseStatusProperties();
         ApplySettingsToTheme();
+        
+        _isInitializing = false;
+        ThemeService.ThemeChanged += OnThemeChanged;
     }
 
     /// <summary>Builds or restores Dock layout. If layout.json is missing or invalid, creates a fresh layout.
@@ -217,10 +219,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         
         foreach (var vm in Settings.LevelColors)
         {
-            if (Enum.TryParse<LogLevel>(vm.Key, out var level))
+            if (Enum.TryParse<LogLevel>(vm.Name, out var level))
             {
-                ThemeService.SetLevelFgOverride(level, vm.Value.Foreground.ToString());
-                ThemeService.SetLevelBgOverride(level, vm.Value.BackgroundEnabled ? vm.Value.Background?.ToString() : null);
+                ThemeService.SetLevelFgOverride(level, vm.Foreground.ToString());
+                ThemeService.SetLevelBgOverride(level, vm.BackgroundEnabled ? vm.Background.ToString() : null);
             }
         }
 
@@ -234,6 +236,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void OnThemeChanged(LogThemeData theme)
     {
+        if (_isInitializing) return;
+
         ThemeLabel = theme.Name;
         Settings.Theme = ThemeLabel;
 

@@ -191,6 +191,7 @@
                     CanUserResizeColumns="True"
                     CanUserSortColumns="False"
                     ShowColumnHeaders="True"
+                    UseLayoutRounding="True"
                     Classes.gridlines="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.GridLinesVisible}"
                     Classes.minimap="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Settings.MinimapVisible}"
                     Background="{DynamicResource BackgroundBrush}">
