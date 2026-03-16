@@ -219,12 +219,12 @@
           </Style>
           <!-- Horizontal gridlines on rows -->
           <Style Selector="TreeDataGrid.gridlines TreeDataGridRow">
-            <Setter Property="BorderBrush" Value="{DynamicResource SplitterBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
           </Style>
           <!-- Vertical gridlines on cells -->
           <Style Selector="TreeDataGrid.gridlines :is(TreeDataGridCell)">
-            <Setter Property="BorderBrush" Value="{DynamicResource SplitterBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
             <Setter Property="BorderThickness" Value="0,0,1,0" />
           </Style>
           <!-- Suppress borders on cells nested inside expander cells to prevent doubling -->

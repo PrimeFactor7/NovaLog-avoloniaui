@@ -37,7 +37,12 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     public ThemeMarketplaceViewModel(ThemeService themeService)
     {
         _themeService = themeService;
+        // Initial popular search
+        _ = SearchAsync();
     }
+
+    [RelayCommand]
+    private async Task SearchOnEnter() => await SearchAsync();
 
     /// <summary>Cancel in-flight search/fetch when window closes.</summary>
     public void CancelPending()
@@ -64,7 +69,7 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
         SearchError = null;
         SearchResults.Clear();
         SelectedExtension = null;
-        if (string.IsNullOrWhiteSpace(SearchTerm)) return;
+        
         _searchCts?.Cancel();
         _searchCts = new CancellationTokenSource();
         var ct = _searchCts.Token;

@@ -16,7 +16,11 @@
       <TextBlock Text="Theme Marketplace" FontSize="18" FontWeight="Bold" />
       <TextBlock Text="Search VS Code theme extensions, fetch a theme, then apply its colors to the app UI and/or log syntax (JSON, SQL, levels)." Opacity="0.9" TextWrapping="Wrap" MaxWidth="800" />
       <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
-        <TextBox Text="{Binding SearchTerm}" Watermark="e.g. dark, monokai, github" MinWidth="280" />
+        <TextBox Text="{Binding SearchTerm}" Watermark="e.g. dark, monokai, github" MinWidth="280">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding SearchOnEnterCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
         <Button Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
       </StackPanel>
       <TextBlock Text="{Binding SearchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding SearchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />

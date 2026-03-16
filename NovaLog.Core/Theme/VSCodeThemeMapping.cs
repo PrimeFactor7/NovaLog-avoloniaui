@@ -53,6 +53,8 @@ public static class VSCodeThemeMapping
         ["tab.border"] = "Separator",
         ["sideBar.border"] = "Separator",
         ["panel.border"] = "Separator",
+        ["editorGroup.border"] = "SplitterBg",
+        ["editorGroupHeader.tabsBorder"] = "Separator",
         ["focusBorder"] = "Accent",
         ["button.background"] = "Accent",
         ["button.foreground"] = "TextDefault",
