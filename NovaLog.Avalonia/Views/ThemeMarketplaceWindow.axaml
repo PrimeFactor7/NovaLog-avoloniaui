@@ -10,80 +10,134 @@
         Background="{DynamicResource BackgroundBrush}"
         TextElement.Foreground="{DynamicResource TextDefaultBrush}">
 
-  <Grid RowDefinitions="Auto,Auto,Auto,*,*,Auto" ColumnDefinitions="*,*" Margin="20">
-    <!-- Header + Search -->
-    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="6">
-      <TextBlock Text="Theme Marketplace" FontSize="18" FontWeight="Bold" />
-      <TextBlock Text="Search VS Code theme extensions, fetch a theme, then apply its colors to the app UI and/or log syntax (JSON, SQL, levels)." Opacity="0.9" TextWrapping="Wrap" MaxWidth="800" />
-      <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
-        <TextBox Text="{Binding SearchTerm}" Watermark="e.g. dark, monokai, github" MinWidth="280">
-          <TextBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding SearchOnEnterCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
-        <Button Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
+  <Window.Styles>
+    <Style Selector="Button.safe-action">
+      <Setter Property="Background" Value="#007ACC" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.safe-action:pointerover">
+      <Setter Property="Background" Value="#008BE1" />
+    </Style>
+    <Style Selector="Button.safe-action:disabled">
+      <Setter Property="Background" Value="#404040" />
+      <Setter Property="Foreground" Value="#A0A0A0" />
+    </Style>
+  </Window.Styles>
+
+  <Grid>
+    <Grid RowDefinitions="Auto,Auto,Auto,*,*,Auto" ColumnDefinitions="*,*" Margin="20">
+      <!-- Header + Search -->
+      <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="6">
+        <TextBlock Text="Theme Marketplace" FontSize="18" FontWeight="Bold" />
+        <TextBlock Text="Search VS Code theme extensions, fetch a theme, then apply its colors to the app UI and/or log syntax (JSON, SQL, levels)." Opacity="0.9" TextWrapping="Wrap" MaxWidth="800" />
+        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+          <TextBox Text="{Binding SearchTerm}" Watermark="e.g. dark, monokai, github" MinWidth="280">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding SearchOnEnterCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Content="Search" Classes="safe-action" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
+        </StackPanel>
+        <TextBlock Text="{Binding SearchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding SearchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
       </StackPanel>
-      <TextBlock Text="{Binding SearchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding SearchError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
-    </StackPanel>
 
-    <!-- Left column: Extensions list -->
-    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4">
-      <TextBlock Text="Extensions" FontWeight="SemiBold" FontSize="14" />
-      <TextBlock Text="Theme extensions from the VS Code Marketplace. Select one to fill publisher/extension below and fetch its theme variants." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
-    </StackPanel>
-    <ListBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding SearchResults}" SelectedItem="{Binding SelectedExtension}"
-             Background="{DynamicResource PanelBgBrush}" MinHeight="180" Padding="4">
-      <ListBox.ItemTemplate>
-        <DataTemplate>
-          <StackPanel Margin="4,6">
-            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Publisher}" Opacity="0.85" FontSize="12" />
+      <!-- Left column: Extensions list -->
+      <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,10,0,0">
+        <TextBlock Text="Extensions" FontWeight="SemiBold" FontSize="14" />
+        <TextBlock Text="Theme extensions from the VS Code Marketplace. Select one to fill publisher/extension below and fetch its theme variants." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+      </StackPanel>
+      <ListBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding SearchResults}" SelectedItem="{Binding SelectedExtension}"
+               Background="{DynamicResource PanelBgBrush}" MinHeight="180" Padding="4">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Margin="4,6">
+              <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Publisher}" Opacity="0.85" FontSize="12" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <!-- Right column: Fetch by publisher/extension -->
+      <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="10,10,0,0">
+        <TextBlock Text="Fetch by ID" FontWeight="SemiBold" FontSize="14" />
+        <TextBlock Text="Paste or edit publisher and extension name (and optional version), then click Fetch themes to load variants from the extension's VSIX." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+      </StackPanel>
+      <StackPanel Grid.Row="3" Grid.Column="1" Spacing="6" VerticalAlignment="Top" Margin="10,0,0,0">
+        <TextBox Text="{Binding Publisher}" Watermark="e.g. zoxon, GitHub" />
+        <TextBox Text="{Binding Extension}" Watermark="e.g. monokai-light, github-vscode-theme" />
+        <TextBox Text="{Binding Version}" Watermark="optional, e.g. 0.1.2" />
+        <Button Content="Fetch themes" Classes="safe-action" Command="{Binding FetchThemesCommand}" IsEnabled="{Binding !IsFetching}" HorizontalAlignment="Left" />
+        <TextBlock Text="{Binding FetchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding FetchError, Converter={x:Static ObjectConverters.IsNotNull}}" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <!-- Left: Theme variants list -->
+      <StackPanel Grid.Row="4" Grid.Column="0" Spacing="4" Margin="0,10,0,0">
+        <TextBlock Text="Theme variants" FontWeight="SemiBold" FontSize="14" />
+        <TextBlock Text="Color schemes inside the extension (e.g. Dark+, Light+). Full = UI and syntax colors; UI only or Syntax only = partial. Select one and choose what to apply below." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+      </StackPanel>
+      <ListBox Grid.Row="5" Grid.Column="0" ItemsSource="{Binding Variants}" SelectedItem="{Binding SelectedVariant}"
+               Background="{DynamicResource PanelBgBrush}" MinHeight="200" Padding="4">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Margin="4,6">
+              <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding KindDisplay}" Opacity="0.8" FontSize="12" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <!-- Right: Apply options -->
+      <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4" VerticalAlignment="Top" Margin="10,10,0,0">
+        <TextBlock Text="Apply options" FontWeight="SemiBold" FontSize="14" />
+        <TextBlock Text="Choose whether to apply the selected variant to the app chrome (panels, tabs, sidebar) and/or to log content (level colors, JSON/SQL highlighting). You can mix themes (e.g. one for UI, another for logs)." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
+      </StackPanel>
+      <StackPanel Grid.Row="5" Grid.Column="1" Spacing="12" VerticalAlignment="Top" Margin="10,0,0,0">
+        <CheckBox IsChecked="{Binding ApplyToApp}" Content="Apply to App — panels, tabs, toolbar, sidebar" />
+        <CheckBox IsChecked="{Binding ApplyToLogs}" Content="Apply to Logs — level text, JSON/SQL/code highlighting in messages" />
+        
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <CheckBox IsChecked="{Binding AutoRevertEnabled}" Content="Auto revert after" VerticalAlignment="Center" />
+          <NumericUpDown Value="{Binding RevertTimeoutSeconds}" Minimum="5" Maximum="60" Width="120" VerticalAlignment="Center" />
+          <TextBlock Text="seconds" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Button Content="Apply theme" Classes="safe-action" Command="{Binding ApplyThemeCommand}"
+                IsEnabled="{Binding SelectedVariant, Converter={x:Static ObjectConverters.IsNotNull}}"
+                HorizontalAlignment="Left" Padding="24,8" />
+      </StackPanel>
+    </Grid>
+
+    <!-- Confirmation Overlay -->
+    <Border IsVisible="{Binding IsConfirming}" Background="#A0000000" ZIndex="2000">
+      <Border Background="{DynamicResource ToolBarBgBrush}" 
+              BorderBrush="{DynamicResource AccentBrush}" 
+              BorderThickness="1" 
+              CornerRadius="8" 
+              HorizontalAlignment="Center" 
+              VerticalAlignment="Center" 
+              Padding="30"
+              MinWidth="400">
+        <StackPanel Spacing="20">
+          <TextBlock Text="Keep this theme?" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" />
+          <TextBlock Text="The theme has been applied. Do you want to keep these changes?" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" />
+          
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+            <TextBlock Text="Reverting in " VerticalAlignment="Center" />
+            <TextBlock Text="{Binding CountdownRemaining}" FontWeight="Bold" FontSize="18" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+            <TextBlock Text=" seconds..." VerticalAlignment="Center" />
           </StackPanel>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
 
-    <!-- Right column: Fetch by publisher/extension -->
-    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
-      <TextBlock Text="Fetch by ID" FontWeight="SemiBold" FontSize="14" />
-      <TextBlock Text="Paste or edit publisher and extension name (and optional version), then click Fetch themes to load variants from the extension's VSIX." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
-    </StackPanel>
-    <StackPanel Grid.Row="3" Grid.Column="1" Spacing="6" VerticalAlignment="Top">
-      <TextBox Text="{Binding Publisher}" Watermark="e.g. zoxon, GitHub" />
-      <TextBox Text="{Binding Extension}" Watermark="e.g. monokai-light, github-vscode-theme" />
-      <TextBox Text="{Binding Version}" Watermark="optional, e.g. 0.1.2" />
-      <Button Content="Fetch themes" Command="{Binding FetchThemesCommand}" IsEnabled="{Binding !IsFetching}" HorizontalAlignment="Left" />
-      <TextBlock Text="{Binding FetchError}" Foreground="{DynamicResource TextErrorBrush}" IsVisible="{Binding FetchError, Converter={x:Static ObjectConverters.IsNotNull}}" TextWrapping="Wrap" />
-    </StackPanel>
-
-    <!-- Left: Theme variants list -->
-    <StackPanel Grid.Row="4" Grid.Column="0" Spacing="4">
-      <TextBlock Text="Theme variants" FontWeight="SemiBold" FontSize="14" />
-      <TextBlock Text="Color schemes inside the extension (e.g. Dark+, Light+). Full = UI and syntax colors; UI only or Syntax only = partial. Select one and choose what to apply below." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
-    </StackPanel>
-    <ListBox Grid.Row="5" Grid.Column="0" ItemsSource="{Binding Variants}" SelectedItem="{Binding SelectedVariant}"
-             Background="{DynamicResource PanelBgBrush}" MinHeight="200" Padding="4">
-      <ListBox.ItemTemplate>
-        <DataTemplate>
-          <StackPanel Margin="4,6">
-            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding KindDisplay}" Opacity="0.8" FontSize="12" />
+          <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Center">
+            <Button Content="Keep changes" Classes="safe-action" Command="{Binding KeepThemeCommand}" MinWidth="120" HorizontalContentAlignment="Center" />
+            <Button Content="Revert now" Command="{Binding RevertThemeCommand}" MinWidth="120" HorizontalContentAlignment="Center" />
           </StackPanel>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
-
-    <!-- Right: Apply options -->
-    <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4" VerticalAlignment="Top">
-      <TextBlock Text="Apply options" FontWeight="SemiBold" FontSize="14" />
-      <TextBlock Text="Choose whether to apply the selected variant to the app chrome (panels, tabs, sidebar) and/or to log content (level colors, JSON/SQL highlighting). You can mix themes (e.g. one for UI, another for logs)." Opacity="0.85" TextWrapping="Wrap" FontSize="12" />
-    </StackPanel>
-    <StackPanel Grid.Row="5" Grid.Column="1" Spacing="12" VerticalAlignment="Top">
-      <CheckBox IsChecked="{Binding ApplyToApp}" Content="Apply to App — panels, tabs, toolbar, sidebar" />
-      <CheckBox IsChecked="{Binding ApplyToLogs}" Content="Apply to Logs — level text, JSON/SQL/code highlighting in messages" />
-      <Button Content="Apply theme" Command="{Binding ApplyThemeCommand}"
-              IsEnabled="{Binding SelectedVariant, Converter={x:Static ObjectConverters.IsNotNull}}"
-              HorizontalAlignment="Left" Padding="24,8" />
-    </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
   </Grid>
 </Window>
+

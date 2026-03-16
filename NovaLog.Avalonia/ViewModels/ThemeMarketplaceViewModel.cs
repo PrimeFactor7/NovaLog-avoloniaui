@@ -31,8 +31,16 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     /// <summary>When applying, use theme for log content and syntax (JSON/SQL, levels).</summary>
     [ObservableProperty] private bool _applyToLogs = true;
 
+    [ObservableProperty] private bool _autoRevertEnabled = true;
+    [ObservableProperty] private int _revertTimeoutSeconds = 10;
+    [ObservableProperty] private bool _isConfirming;
+    [ObservableProperty] private int _countdownRemaining;
+
     private CancellationTokenSource? _searchCts;
     private CancellationTokenSource? _fetchCts;
+    private LogThemeData? _previousAppTheme;
+    private LogThemeData? _previousLogTheme;
+    private global::Avalonia.Threading.DispatcherTimer? _revertTimer;
 
     public ThemeMarketplaceViewModel(ThemeService themeService)
     {
@@ -49,6 +57,46 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     {
         _searchCts?.Cancel();
         _fetchCts?.Cancel();
+        StopRevertTimer();
+    }
+
+    private void StopRevertTimer()
+    {
+        if (_revertTimer != null)
+        {
+            _revertTimer.Stop();
+            _revertTimer.Tick -= OnRevertTimerTick;
+            _revertTimer = null;
+        }
+    }
+
+    private void OnRevertTimerTick(object? sender, EventArgs e)
+    {
+        CountdownRemaining--;
+        if (CountdownRemaining <= 0)
+        {
+            RevertTheme();
+        }
+    }
+
+    [RelayCommand]
+    private void KeepTheme()
+    {
+        StopRevertTimer();
+        IsConfirming = false;
+        _previousAppTheme = null;
+        _previousLogTheme = null;
+    }
+
+    [RelayCommand]
+    private void RevertTheme()
+    {
+        StopRevertTimer();
+        if (_previousAppTheme != null) _themeService.SetAppTheme(_previousAppTheme);
+        if (_previousLogTheme != null) _themeService.SetLogTheme(_previousLogTheme);
+        IsConfirming = false;
+        _previousAppTheme = null;
+        _previousLogTheme = null;
     }
 
     partial void OnSelectedExtensionChanged(VSCodeExtensionSummary? value)
@@ -144,6 +192,23 @@ public partial class ThemeMarketplaceViewModel : ObservableObject
     {
         if (SelectedVariant == null) return;
         var variant = SelectedVariant;
+
+        if (AutoRevertEnabled)
+        {
+            _previousAppTheme = _themeService.AppTheme;
+            _previousLogTheme = _themeService.LogTheme;
+            IsConfirming = true;
+            CountdownRemaining = RevertTimeoutSeconds;
+            
+            StopRevertTimer();
+            _revertTimer = new global::Avalonia.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            _revertTimer.Tick += OnRevertTimerTick;
+            _revertTimer.Start();
+        }
+
         if (ApplyToApp)
         {
             var uiOverrides = VSCodeThemeMapping.ToThemeOverrides(variant.Colors);
